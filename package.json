@@ -1,0 +1,15 @@
+{
+  "name": "motokey-api",
+  "version": "1.0.0",
+  "description": "MotoKey API — Passeport numérique moto",
+  "main": "motokey-api.js",
+  "scripts": {
+    "start":  "node motokey-api.js",
+    "setup":  "node setup-supabase.js",
+    "test":   "node test-api.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.0"
+  }
+}
