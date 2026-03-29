@@ -288,6 +288,17 @@ function match(method, reqMethod, pattern, pathname) {
 }
 
 /* ─── SERVER ─── */
+// Charger l'app HTML si présente dans le même dossier
+const _fs   = require('fs');
+const _path = require('path');
+let APP_HTML = null;
+try {
+  APP_HTML = _fs.readFileSync(_path.join(__dirname,'MotoKey_App.html'),'utf8');
+  console.log('✅ MotoKey_App.html chargé — accessible sur /app');
+} catch(e) {
+  console.log('ℹ️  MotoKey_App.html absent — copiez-le dans le même dossier pour y accéder via /app');
+}
+
 const server = http.createServer(async function(req, res){
   const parsed   = url.parse(req.url, true);
   const pathname = parsed.pathname.replace(/\/+$/,'') || '/';
@@ -295,6 +306,13 @@ const server = http.createServer(async function(req, res){
   const query    = parsed.query;
 
   if(method==='OPTIONS'){ sendJSON(res,204,{}); return; }
+
+  // ── Servir l'app HTML sur /app
+  if((pathname==='/'||pathname==='/app') && method==='GET' && APP_HTML){
+    res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Access-Control-Allow-Origin':'*'});
+    res.end(APP_HTML);
+    return;
+  }
 
   let b = {};
   if(['POST','PUT','PATCH'].includes(method)) b = await body(req);
