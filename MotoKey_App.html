@@ -1421,6 +1421,33 @@ async function apiCall(method, path, body) {
   }
 }
 
+// Charge les motos + interventions depuis l'API et remplace G.motos
+async function loadMotosFromAPI() {
+  var res = await apiCall('GET', '/motos');
+  if (!res || !res.success || !res.data || !res.data.motos) return;
+  var apiMotos = res.data.motos;
+
+  // Interventions de toutes les motos en parallèle
+  var allInter = await Promise.all(apiMotos.map(function(m) {
+    return apiCall('GET', '/motos/' + m.id + '/interventions');
+  }));
+
+  G.motos = apiMotos.map(function(m, i) {
+    var iRes = allInter[i];
+    var interventions = (iRes && iRes.success && iRes.data && iRes.data.interventions) ? iRes.data.interventions : [];
+    var hist = interventions.map(function(inter) {
+      var d = inter.created_at ? new Date(inter.created_at) : new Date();
+      var ds = String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+      return { t: inter.titre||'', d: ds, km: inter.km||0, ty: inter.type||'bleu', tech: inter.technicien||'—', desc: inter.description||'', vf: inter.score_confiance||0, isN: false };
+    });
+    return { id: m.id, mk: m.marque, md: m.modele, yr: m.annee, pl: m.plaque, vin: m.vin, km: m.km, own: m.client_nom||'—', col: m.couleur_dossier||'rouge', sc: m.score||0, em: '🏍️', hist: hist, plan: [], sd: {c:0,p:0,pr:0,m:0} };
+  });
+
+  if (G.motos.length > 0) curMoto = G.motos[0].id;
+  renderSection(curSec);
+  toast('✅ '+G.motos.length+' moto(s) chargée(s) depuis l\'API Railway');
+}
+
 // Indicateur de statut API dans la barre
 (async function checkAPI() {
   try {
@@ -1432,8 +1459,9 @@ async function apiCall(method, path, body) {
         pill.innerHTML = '<div style="display:flex;align-items:center;gap:6px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3);border-radius:20px;padding:4px 11px;font-size:11px;font-weight:700;color:#22c55e;margin-left:10px"><div style="width:6px;height:6px;border-radius:50%;background:#22c55e;animation:pu 1.5s infinite"></div>API Railway ✓</div>';
         bar.appendChild(pill.firstChild);
       }
-      // Auto-login garage de démo
+      // Auto-login puis chargement des vraies données
       await apiLogin('garage@motokey.fr', 'motokey2026', 'garage');
+      await loadMotosFromAPI();
     }
   } catch(e) {}
 })();
