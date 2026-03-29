@@ -189,10 +189,36 @@ const DB = {
 };
 
 /* ─── MÉTIER ─── */
-function calcScore(ints) {
-  let s = 0;
-  ints.forEach(function(i){ s += ({vert:12,bleu:8,jaune:5,rouge:-5}[i.type]||0); });
-  return Math.max(0,Math.min(100,s));
+function calcScore(ints, km) {
+  if(!ints || ints.length === 0) return 0;
+  
+  // Points de base selon la qualité des interventions
+  var pts = 0;
+  ints.forEach(function(i){
+    pts += ({vert:12, bleu:8, jaune:5, rouge:-5}[i.type]||0);
+  });
+  
+  // Bonus conformité : moyenne de qualité des interventions
+  var nbInts  = ints.length;
+  var nbVert  = ints.filter(function(i){return i.type==='vert';}).length;
+  var nbBleu  = ints.filter(function(i){return i.type==='bleu';}).length;
+  var nbBons  = nbVert + nbBleu;
+  var tauxBon = nbBons / nbInts;
+  
+  // Score de conformité = qualité moyenne * 100
+  // Une moto avec que des interventions pro = score max
+  var scoreConformite = Math.round(tauxBon * 100);
+  
+  // Pondération : 70% conformité + 30% accumulation points
+  var scoreAccum = Math.min(100, pts);
+  var scoreFinal = Math.round((scoreConformite * 0.70) + (scoreAccum * 0.30));
+  
+  // Bonus moto peu kilométrée et bien entretenue
+  if(km && km < 10000 && tauxBon >= 0.8) {
+    scoreFinal = Math.min(100, scoreFinal + 15);
+  }
+  
+  return Math.max(0, Math.min(100, scoreFinal));
 }
 function couleur(score) {
   return score>=80?'vert':score>=60?'bleu':score>=40?'jaune':'rouge';
