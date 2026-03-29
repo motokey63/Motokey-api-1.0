@@ -73,10 +73,71 @@
 const http   = require('http');
 const crypto = require('crypto');
 const url    = require('url');
+const https2 = require('https');
 
-const PORT       = 3000;
-const JWT_SECRET = 'motokey_secret_2026';
+const PORT       = process.env.PORT || 3000;
+const JWT_SECRET = process.env.JWT_SECRET || 'motokey_secret_2026';
 const VERSION    = '1.0.0';
+
+/* ─── SUPABASE CLIENT LEGER ─── */
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+
+function sbRequest(method, path, body) {
+  return new Promise(function(resolve) {
+    if (!SUPABASE_URL || !SUPABASE_KEY) { resolve(null); return; }
+    try {
+      const parsed = new URL(SUPABASE_URL + '/rest/v1' + path);
+      const data   = body ? JSON.stringify(body) : null;
+      const opts   = {
+        hostname: parsed.hostname,
+        path:     parsed.pathname + parsed.search,
+        method:   method,
+        headers: {
+          'apikey':        SUPABASE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'Content-Type':  'application/json',
+          'Prefer':        'return=representation',
+        }
+      };
+      if (data) opts.headers['Content-Length'] = Buffer.byteLength(data);
+      const req = https2.request(opts, function(res) {
+        let d = '';
+        res.on('data', function(c){ d += c; });
+        res.on('end', function(){
+          try { resolve(JSON.parse(d)); } catch(e) { resolve(null); }
+        });
+      });
+      req.on('error', function(){ resolve(null); });
+      if (data) req.write(data);
+      req.end();
+    } catch(e) { resolve(null); }
+  });
+}
+
+const SB = {
+  async select(table, filters) {
+    let path = '/' + table + '?order=created_at.desc';
+    if (filters) {
+      Object.entries(filters).forEach(function([k,v]){
+        path += '&' + k + '=eq.' + encodeURIComponent(v);
+      });
+    }
+    const r = await sbRequest('GET', path);
+    return Array.isArray(r) ? r : [];
+  },
+  async insert(table, row) {
+    const r = await sbRequest('POST', '/' + table, row);
+    return Array.isArray(r) ? r[0] : (r && !r.code ? r : null);
+  },
+  async update(table, id, data) {
+    const r = await sbRequest('PATCH', '/' + table + '?id=eq.' + id, data);
+    return Array.isArray(r) ? r[0] : (r && !r.code ? r : null);
+  }
+};
+
+const USE_SUPABASE = !!(SUPABASE_URL && SUPABASE_KEY);
+console.log(USE_SUPABASE ? '✅ Supabase connecte — donnees persistantes' : '⚠️  Mode RAM — configurer SUPABASE_URL et SUPABASE_SERVICE_KEY');
 
 /* ─── UTILS ─── */
 function uid() {
@@ -413,13 +474,27 @@ const server = http.createServer(async function(req, res){
   /* MOTOS */
   if((p=M('GET','/motos'))!==null){
     const a = auth(req,res); if(!a) return;
+
+    // Lire depuis Supabase si connecté
+    if (USE_SUPABASE) {
+      const sbMotos = await SB.select('motos', {garage_id: a.id});
+      if (sbMotos && sbMotos.length > 0) {
+        // Fusionner avec RAM (évite les doublons)
+        sbMotos.forEach(function(sm){
+          if (!DB.motos.find(function(dm){return dm.id===sm.id;})) {
+            DB.motos.push(sm);
+          }
+        });
+      }
+    }
+
     let list = DB.motos.filter(function(m){return m.garage_id===a.id;});
     if(query.couleur) list = list.filter(function(m){return m.couleur_dossier===query.couleur;});
     const result = list.map(function(m){
       const c  = DB.clients.find(function(x){return x.id===m.client_id;});
       const is = DB.interventions.filter(function(i){return i.moto_id===m.id;});
       const sc = calcScore(is);
-      return Object.assign({},m,{client_nom:c?c.nom:'—',nb_interventions:is.length,score:sc,couleur_dossier:couleur(sc)});
+      return Object.assign({},m,{client_nom:c?c.nom:(m.client_nom||'—'),nb_interventions:is.length,score:sc,couleur_dossier:couleur(sc)});
     });
     return ok(res,{motos:result,total:result.length});
   }
@@ -428,13 +503,30 @@ const server = http.createServer(async function(req, res){
     const a = auth(req,res); if(!a) return;
     const {marque,modele,annee,plaque,vin,km,client_email,client_nom,client_tel} = b;
     if(!marque||!modele||!plaque||!vin) return fail(res,'marque, modele, plaque et vin requis');
+
+    // Chercher ou créer le client
     let cli = DB.clients.find(function(c){return c.email===client_email;});
     if(!cli&&client_nom){
       cli = {id:'cli-'+uid(),nom:client_nom,email:client_email||client_nom.toLowerCase().replace(/\s/g,'')+uid()+'@motokey.fr',password:hashPwd('changeme'),tel:client_tel||'',created_at:nowISO()};
       DB.clients.push(cli);
     }
-    const m = {id:'moto-'+uid(),garage_id:a.id,client_id:cli?cli.id:null,marque,modele,annee:parseInt(annee)||new Date().getFullYear(),plaque,vin,km:parseInt(km)||0,couleur_dossier:'rouge',score:0,pneu_actuel:null,pneu_km_montage:null,created_at:nowISO(),updated_at:nowISO()};
+
+    const motoId = 'moto-'+uid();
+    const m = {id:motoId,garage_id:a.id,client_id:cli?cli.id:null,marque,modele,annee:parseInt(annee)||new Date().getFullYear(),plaque,vin,km:parseInt(km)||0,couleur_dossier:'rouge',score:0,created_at:nowISO(),updated_at:nowISO()};
     DB.motos.push(m);
+
+    // Sauvegarder dans Supabase si connecté
+    if (USE_SUPABASE) {
+      SB.insert('motos', {
+        id: motoId, marque, modele,
+        annee: parseInt(annee)||new Date().getFullYear(),
+        plaque, vin, km: parseInt(km)||0,
+        couleur_dossier: 'rouge', score: 0,
+        client_nom: client_nom||null,
+        created_at: nowISO(), updated_at: nowISO()
+      }).catch(function(e){ console.warn('Supabase insert moto:', e.message); });
+    }
+
     return ok(res,{moto:m,client:cli},'Dossier moto créé',201);
   }
 
@@ -479,27 +571,73 @@ const server = http.createServer(async function(req, res){
   /* INTERVENTIONS */
   if((p=M('GET','/motos/:id/interventions'))!==null){
     const a = auth(req,res); if(!a) return;
-    const m = DB.motos.find(function(x){return x.id===p.id&&x.garage_id===a.id;});
+
+    // Charger depuis Supabase
+    if (USE_SUPABASE) {
+      const sbInters = await SB.select('interventions', {moto_id: p.id});
+      if (sbInters && sbInters.length > 0) {
+        sbInters.forEach(function(si){
+          if (!DB.interventions.find(function(di){return di.id===si.id;})) {
+            // Normaliser le format date
+            if (si.date_intervention && !si.date) {
+              const d = new Date(si.date_intervention);
+              si.date = String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+            }
+            DB.interventions.push(si);
+          }
+        });
+      }
+    }
+
+    // Chercher la moto (en RAM ou Supabase)
+    let m = DB.motos.find(function(x){return x.id===p.id;});
+    if(!m && USE_SUPABASE){
+      const rows = await SB.select('motos', {id: p.id});
+      if(rows && rows[0]) m = rows[0];
+    }
     if(!m) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
-    let is = DB.interventions.filter(function(i){return i.moto_id===p.id;}).sort(function(a,b){return b.created_at.localeCompare(a.created_at);});
+
+    let is = DB.interventions.filter(function(i){return i.moto_id===p.id;}).sort(function(a,b){return (b.created_at||'').localeCompare(a.created_at||'');});
     if(query.type) is = is.filter(function(i){return i.type===query.type;});
     return ok(res,{interventions:is,total:is.length});
   }
 
   if((p=M('POST','/motos/:id/interventions'))!==null){
     const a = auth(req,res); if(!a) return;
-    const m = DB.motos.find(function(x){return x.id===p.id&&x.garage_id===a.id;});
+    // Chercher la moto en RAM ou Supabase
+    let m = DB.motos.find(function(x){return x.id===p.id&&x.garage_id===a.id;});
+    if(!m && USE_SUPABASE){
+      const rows = await SB.select('motos', {id: p.id});
+      if(rows && rows[0]) { m = rows[0]; DB.motos.push(m); }
+    }
     if(!m) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
     const {type,titre,description,km,technicien,montant_ht} = b;
     if(!type||!titre) return fail(res,'type et titre requis');
     if(!['vert','bleu','jaune','rouge'].includes(type)) return fail(res,'type invalide (vert/bleu/jaune/rouge)');
-    const inter = {id:'int-'+uid(),moto_id:p.id,garage_id:a.id,type,titre,description:description||'',km:parseInt(km)||m.km,technicien:technicien||a.nom,date:todayFR(),score_confiance:rand(78,99),montant_ht:parseFloat(montant_ht)||0,created_at:nowISO()};
+    const interId = 'int-'+uid();
+    const sc_conf = rand(78,99);
+    const inter = {id:interId,moto_id:p.id,garage_id:a.id,type,titre,description:description||'',km:parseInt(km)||m.km,technicien:technicien||a.nom,date:todayFR(),score_confiance:sc_conf,montant_ht:parseFloat(montant_ht)||0,created_at:nowISO()};
     DB.interventions.push(inter);
     const mi = DB.motos.findIndex(function(x){return x.id===p.id;});
     if(mi>=0&&inter.km>DB.motos[mi].km){DB.motos[mi].km=inter.km;DB.motos[mi].updated_at=nowISO();}
     const allIs = DB.interventions.filter(function(i){return i.moto_id===p.id;});
     const sc = calcScore(allIs);
     if(mi>=0){DB.motos[mi].score=sc;DB.motos[mi].couleur_dossier=couleur(sc);}
+
+    // Sauvegarder intervention dans Supabase
+    if (USE_SUPABASE) {
+      SB.insert('interventions', {
+        id: interId, moto_id: p.id, garage_id: a.id,
+        type, titre, description: description||'', km: parseInt(km)||m.km,
+        date_intervention: new Date().toISOString().split('T')[0],
+        score_confiance: sc_conf, montant_ht: parseFloat(montant_ht)||0,
+        created_at: nowISO()
+      }).catch(function(e){ console.warn('SB inter:', e.message); });
+      // Mettre à jour le score de la moto dans Supabase
+      SB.update('motos', p.id, {score: sc, couleur_dossier: couleur(sc), km: parseInt(km)||m.km, updated_at: nowISO()})
+        .catch(function(e){ console.warn('SB score:', e.message); });
+    }
+
     return ok(res,{intervention:inter,nouveau_score:sc,nouvelle_couleur:couleur(sc)},'Intervention ajoutée · Client synchronisé',201);
   }
 
