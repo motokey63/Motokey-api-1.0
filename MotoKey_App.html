@@ -10,9 +10,9 @@
    VARIABLES & RESET
 ════════════════════════════════════════ */
 :root {
-  --bg:#f0f2f5;--bg2:#ffffff;--bg3:#1c1f23;--bg4:#22262c;
+  --bg:#0d0f12;--bg2:#141618;--bg3:#1c1f23;--bg4:#22262c;
   --border:#2a2d32;--border2:#353a42;
-  --text:#1a1d23;--text2:#5a6172;--text3:#555c66;
+  --text:#e8eaed;--text2:#8b9199;--text3:#555c66;
   --accent:#ff6b00;--accent2:#ff8c33;
   --green:#22c55e;--green-bg:rgba(34,197,94,.1);--green-b:rgba(34,197,94,.28);
   --blue:#3b82f6;--blue-bg:rgba(59,130,246,.1);--blue-b:rgba(59,130,246,.28);
@@ -717,33 +717,48 @@ function renderSection(sec){
 
 /* ────── DASHBOARD ────── */
 function renderDashboard(m){
-  const rows = DB.motos.map(function(mo){
-    var col = colVar(mo.couleur);
-    return '<div class="moto-row" onclick="selectMotoAndGo(' + mo.id + ',\'fiche\')">'
-      + '<div class="moto-icon">' + mo.emoji + '</div>'
-      + '<div><div class="moto-name">' + mo.marque + ' ' + mo.modele + '</div>'
-      + '<div class="moto-meta">' + mo.annee + ' \u00b7 ' + mo.proprio + '</div></div>'
-      + '<div class="moto-plate">' + mo.plaque + '</div>'
-      + '<div class="moto-km"><div class="moto-km-val">' + mo.km.toLocaleString('fr-FR') + '</div><div class="moto-km-lbl">km</div></div>'
-      + '<div class="score-wrap">'
-      + '<div style="display:flex;justify-content:space-between;font-size:11px">'
-      + '<span style="color:' + col + ';font-weight:700;font-size:10px;text-transform:uppercase">' + scoreLabel(mo.couleur) + '</span>'
-      + '<span style="color:' + col + ';font-size:14px;font-weight:700">' + mo.score + '/100</span></div>'
-      + '<div class="score-bar-bg"><div class="score-bar-fill" style="width:' + mo.score + '%;background:' + col + '"></div></div>'
-      + '</div>'
-      + '<div class="color-dot" style="background:' + col + '"></div>'
-      + '</div>';
+  const cnts = {vert:0,bleu:0,jaune:0,rouge:0};
+  DB.motos.forEach(x=>cnts[x.couleur]=(cnts[x.couleur]||0)+1);
+  const rows = DB.motos.map(mo=>{
+    const col = colVar(mo.couleur);
+    return `<div class="moto-row" onclick="selectMotoAndGo(${mo.id},'fiche')">
+      <div class="moto-icon">${mo.emoji}</div>
+      <div><div class="moto-name">${mo.marque} ${mo.modele}</div><div class="moto-meta">${mo.annee} · ${mo.proprio}</div></div>
+      <div class="moto-plate">${mo.plaque}</div>
+      <div class="moto-km"><div class="moto-km-val">${mo.km.toLocaleString('fr-FR')}</div><div class="moto-km-lbl">km</div></div>
+      <div class="score-wrap">
+        <div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:${col};font-weight:700;font-size:10px;text-transform:uppercase">${scoreLabel(mo.couleur)}</span><span style="color:${col};font-family:'Barlow Condensed',sans-serif;font-size:14px;font-weight:700">${mo.score}/100</span></div>
+        <div class="score-bar-bg"><div class="score-bar-fill" style="width:${mo.score}%;background:${col}"></div></div>
+      </div>
+      <div class="color-dot" style="background:${col}"></div>
+    </div>`;
   }).join('');
-  return '<div class="page-wrap">'
-    + '<div class="page-header">'
-    + '<div><div class="page-title">Tableau de bord</div>'
-    + '<div class="page-sub">Vue d\'ensemble du parc \u00b7 ' + DB.motos.length + ' motos</div></div>'
-    + '<div style="display:flex;gap:8px">'
-    + '<button class="btn btn-ghost btn-sm" onclick="openModal(\'addMotoModal\')">+ Moto</button>'
-    + '<button class="btn btn-primary btn-sm" onclick="openModal(\'addInterModal\')">+ Intervention</button>'
-    + '</div></div>'
-    + '<div class="moto-grid">' + rows + '</div>'
-    + '</div>';
+  return `<div class="page-wrap">
+    <div class="page-header">
+      <div><div class="page-title">Tableau de bord</div><div class="page-sub">Vue d'ensemble du parc · ${DB.motos.length} motos</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="openModal('addMotoModal')">+ Moto</button>
+        <button class="btn btn-primary btn-sm" onclick="openModal('addInterModal')">+ Intervention</button>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card g"><div class="stat-label">Dossiers verts</div><div class="stat-val">${cnts.vert||0}</div><div class="stat-sub">Entretien tracé</div></div>
+      <div class="stat-card b"><div class="stat-label">Dossiers bleus</div><div class="stat-val">${cnts.bleu||0}</div><div class="stat-sub">Pro validé</div></div>
+      <div class="stat-card y"><div class="stat-label">Dossiers jaunes</div><div class="stat-val">${cnts.jaune||0}</div><div class="stat-sub">Propriétaire</div></div>
+      <div class="stat-card r"><div class="stat-label">Dossiers rouges</div><div class="stat-val">${cnts.rouge||0}</div><div class="stat-sub">Entretien manquant</div></div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <div class="page-title" style="font-size:16px">Dossiers Motos</div>
+      <div style="display:flex;gap:5px" id="dashFilters">
+        <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="filterDash('tous',this)">Tous</button>
+        <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="filterDash('vert',this)">🟢</button>
+        <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="filterDash('bleu',this)">🔵</button>
+        <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="filterDash('jaune',this)">🟡</button>
+        <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="filterDash('rouge',this)">🔴</button>
+      </div>
+    </div>
+    <div class="moto-grid">${rows}</div>
+  </div>`;
 }
 
 function selectMotoAndGo(id, sec){
