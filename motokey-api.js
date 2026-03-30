@@ -391,7 +391,7 @@ const server = http.createServer(async function(req, res){
   // ── Servir l'app HTML sur /app
   if((pathname==='/'||pathname==='/app') && method==='GET'){
     try {
-      res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Access-Control-Allow-Origin':'*'});
+      res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store','Access-Control-Allow-Origin':'*'});
       res.end(getAppHTML());
     } catch(e) {
       res.writeHead(404,{'Content-Type':'text/plain'});
