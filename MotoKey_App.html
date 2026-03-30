@@ -10,9 +10,9 @@
    VARIABLES & RESET
 ════════════════════════════════════════ */
 :root {
-  --bg:#f0f2f5;--bg2:#ffffff;--bg3:#1c1f23;--bg4:#22262c;
+  --bg:#0d0f12;--bg2:#141618;--bg3:#1c1f23;--bg4:#22262c;
   --border:#2a2d32;--border2:#353a42;
-  --text:#1a1d23;--text2:#5a6172;--text3:#555c66;
+  --text:#e8eaed;--text2:#8b9199;--text3:#555c66;
   --accent:#ff6b00;--accent2:#ff8c33;
   --green:#22c55e;--green-bg:rgba(34,197,94,.1);--green-b:rgba(34,197,94,.28);
   --blue:#3b82f6;--blue-bg:rgba(59,130,246,.1);--blue-b:rgba(59,130,246,.28);
@@ -631,6 +631,7 @@ let transfertStep = 1;
 let currentMotoId = 1;
 let currentGSection = 'dashboard';
 let currentCPage = 'home';
+let searchQuery = '';
 
 /* ══════════════════════════════════════
    HELPERS
@@ -719,7 +720,15 @@ function renderSection(sec){
 function renderDashboard(m){
   const cnts = {vert:0,bleu:0,jaune:0,rouge:0};
   DB.motos.forEach(x=>cnts[x.couleur]=(cnts[x.couleur]||0)+1);
-  const rows = DB.motos.map(mo=>{
+  const q = searchQuery.toLowerCase();
+  const filtered = q ? DB.motos.filter(mo=>
+    mo.plaque.toLowerCase().includes(q) ||
+    (mo.vin||'').toLowerCase().includes(q) ||
+    mo.marque.toLowerCase().includes(q) ||
+    mo.modele.toLowerCase().includes(q) ||
+    mo.proprio.toLowerCase().includes(q)
+  ) : DB.motos;
+  const rows = filtered.map(mo=>{
     const col = colVar(mo.couleur);
     return `<div class="moto-row" onclick="selectMotoAndGo(${mo.id},'fiche')">
       <div class="moto-icon">${mo.emoji}</div>
@@ -747,8 +756,11 @@ function renderDashboard(m){
       <div class="stat-card y"><div class="stat-label">Dossiers jaunes</div><div class="stat-val">${cnts.jaune||0}</div><div class="stat-sub">Propriétaire</div></div>
       <div class="stat-card r"><div class="stat-label">Dossiers rouges</div><div class="stat-val">${cnts.rouge||0}</div><div class="stat-sub">Entretien manquant</div></div>
     </div>
+    <div style="margin-bottom:12px">
+      <input type="text" placeholder="🔍 Rechercher par plaque, VIN, marque, modèle, propriétaire…" value="${searchQuery.replace(/"/g,'&quot;')}" oninput="searchQuery=this.value;renderSection('dashboard')" style="width:100%;box-sizing:border-box;padding:9px 14px;border-radius:9px;border:1px solid var(--border);background:var(--bg2);color:var(--text);font-size:13px;font-family:inherit;outline:none">
+    </div>
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <div class="page-title" style="font-size:16px">Dossiers Motos</div>
+      <div class="page-title" style="font-size:16px">Dossiers Motos <span style="font-size:13px;font-weight:400;color:var(--text2)">${filtered.length}/${DB.motos.length}</span></div>
       <div style="display:flex;gap:5px" id="dashFilters">
         <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="filterDash('tous',this)">Tous</button>
         <button class="btn btn-ghost btn-sm" style="padding:4px 10px;font-size:10px" onclick="filterDash('vert',this)">🟢</button>
