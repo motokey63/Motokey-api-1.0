@@ -1,4 +1,3 @@
-// Redéploiement forcé : 2026-03-30
 /**
  * ╔══════════════════════════════════════════════════════════╗
  * ║           MOTOKEY — API MOCK COMPLÈTE v1.0              ║
@@ -315,9 +314,16 @@ function match(method, reqMethod, pattern, pathname) {
 }
 
 /* ─── SERVER ─── */
+// Charger l'app HTML si présente dans le même dossier
 const _fs   = require('fs');
 const _path = require('path');
-const _appHtmlPath = _path.join(__dirname,'MotoKey_App.html');
+let APP_HTML = null;
+try {
+  APP_HTML = _fs.readFileSync(_path.join(__dirname,'MotoKey_App.html'),'utf8');
+  console.log('✅ MotoKey_App.html chargé — accessible sur /app');
+} catch(e) {
+  console.log('ℹ️  MotoKey_App.html absent — copiez-le dans le même dossier pour y accéder via /app');
+}
 
 const server = http.createServer(async function(req, res){
   const parsed   = url.parse(req.url, true);
@@ -327,16 +333,10 @@ const server = http.createServer(async function(req, res){
 
   if(method==='OPTIONS'){ sendJSON(res,204,{}); return; }
 
-  // ── Servir l'app HTML sur /app (lecture dynamique à chaque requête)
-  if((pathname==='/'||pathname==='/app') && method==='GET'){
-    try {
-      const html = _fs.readFileSync(_appHtmlPath,'utf8');
-      res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Access-Control-Allow-Origin':'*'});
-      res.end(html);
-    } catch(e) {
-      res.writeHead(404,{'Content-Type':'text/plain'});
-      res.end('MotoKey_App.html introuvable');
-    }
+  // ── Servir l'app HTML sur /app
+  if((pathname==='/'||pathname==='/app') && method==='GET' && APP_HTML){
+    res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Access-Control-Allow-Origin':'*'});
+    res.end(APP_HTML);
     return;
   }
 
