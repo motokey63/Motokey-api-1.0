@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MotoKey</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:sans-serif;background:#f0f2f5;color:#1a1d23}
+#nav{display:flex;gap:10px;padding:16px 20px;background:#fff;border-bottom:1px solid #e2e5eb}
+#nav button{padding:8px 18px;border:1px solid #e2e5eb;border-radius:8px;background:#f0f2f5;color:#1a1d23;font-size:14px;cursor:pointer}
+#nav button:hover{background:#e2e5eb}
+#main{padding:24px 20px;font-size:16px}
+</style>
+</head>
+<body>
+<div id="nav">
+  <button onclick="show('dashboard')">Tableau de bord</button>
+  <button onclick="show('fiche')">Fiche moto</button>
+  <button onclick="show('entretien')">Entretien</button>
+  <button onclick="show('devis')">Devis</button>
+  <button onclick="show('params')">Paramètres</button>
+</div>
+<div id="main"></div>
+<script>
+function show(section){
+  document.getElementById('main').textContent = 'Section : ' + section;
+}
+document.getElementById('main').textContent = 'Bonjour MotoKey';
+</script>
+</body>
+</html>
