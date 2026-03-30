@@ -6,27 +6,576 @@
 <title>MotoKey</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:sans-serif;background:#f0f2f5;color:#1a1d23}
-#nav{display:flex;gap:10px;padding:16px 20px;background:#fff;border-bottom:1px solid #e2e5eb}
-#nav button{padding:8px 18px;border:1px solid #e2e5eb;border-radius:8px;background:#f0f2f5;color:#1a1d23;font-size:14px;cursor:pointer}
-#nav button:hover{background:#e2e5eb}
-#main{padding:24px 20px;font-size:16px}
+:root{
+  --bg:#f0f2f5;--bg2:#ffffff;--text:#1a1d23;--text2:#6b7280;
+  --border:#e2e5eb;--primary:#2563eb;--danger:#ef4444;--success:#22c55e;
+  --warn:#f59e0b;--r:12px;--sh:0 1px 3px rgba(0,0,0,.06)
+}
+body{font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+input,select,textarea{font-family:inherit}
+
+/* LOGIN */
+#loginScreen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:40px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+.login-logo{font-size:28px;font-weight:800;color:var(--primary);margin-bottom:6px}
+.login-sub{color:var(--text2);font-size:14px;margin-bottom:28px}
+.login-err{background:#fef2f2;border:1px solid #fecaca;color:var(--danger);border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:16px;display:none}
+
+/* NAV */
+#appShell{display:none}
+#nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;gap:4px;position:sticky;top:0;z-index:100}
+.nav-logo{font-size:18px;font-weight:800;color:var(--primary);margin-right:16px;padding:14px 0}
+.nav-btn{padding:10px 14px;border:none;background:none;color:var(--text2);font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;transition:.15s;white-space:nowrap}
+.nav-btn:hover{color:var(--text)}
+.nav-btn.active{color:var(--primary);border-bottom-color:var(--primary)}
+.nav-end{margin-left:auto;display:flex;align-items:center;gap:8px}
+.nav-user{font-size:12px;color:var(--text2)}
+.btn-logout{font-size:12px;padding:6px 12px;border:1px solid var(--border);background:none;border-radius:8px;cursor:pointer;color:var(--text2)}
+.btn-logout:hover{background:var(--bg)}
+
+/* MAIN */
+#main{padding:24px;max-width:1100px;margin:0 auto}
+
+/* FORM ELEMENTS */
+.field{margin-bottom:14px}
+.field label{display:block;font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px}
+.field input,.field select,.field textarea{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg2);color:var(--text);transition:.15s;outline:none}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+.row-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* BUTTONS */
+.btn{padding:9px 18px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:.15s}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:#1d4ed8}
+.btn-secondary{background:var(--bg);color:var(--text);border:1px solid var(--border)}
+.btn-secondary:hover{background:var(--border)}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-sm{padding:6px 12px;font-size:12px}
+
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:20px;box-shadow:var(--sh)}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.section-title{font-size:20px;font-weight:700}
+.section-sub{color:var(--text2);font-size:13px;margin-top:2px}
+
+/* MOTO GRID */
+.moto-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.moto-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:18px;cursor:pointer;transition:.15s;box-shadow:var(--sh)}
+.moto-card:hover{border-color:var(--primary);box-shadow:0 4px 12px rgba(37,99,235,.12);transform:translateY(-1px)}
+.moto-card-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.moto-name{font-size:15px;font-weight:700}
+.moto-plate{font-size:11px;font-weight:700;background:var(--bg);padding:3px 8px;border-radius:5px;letter-spacing:.5px;color:var(--text2)}
+.moto-client{font-size:12px;color:var(--text2);margin-bottom:8px}
+.moto-km{font-size:13px;color:var(--text2)}
+.score-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;margin-top:8px}
+.score-vert{background:#dcfce7;color:#15803d}
+.score-bleu{background:#dbeafe;color:#1d4ed8}
+.score-jaune{background:#fef9c3;color:#a16207}
+.score-rouge{background:#fee2e2;color:#b91c1c}
+
+/* SEARCH */
+.search-bar{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:10px;font-size:14px;background:var(--bg2);margin-bottom:16px;outline:none}
+.search-bar:focus{border-color:var(--primary)}
+
+/* TABLE */
+.table{width:100%;border-collapse:collapse;font-size:13px}
+.table th{text-align:left;padding:10px 12px;border-bottom:2px solid var(--border);font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px}
+.table td{padding:10px 12px;border-bottom:1px solid var(--border)}
+.table tr:last-child td{border-bottom:none}
+.table tr:hover td{background:var(--bg)}
+
+/* BADGE */
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.badge-vert{background:#dcfce7;color:#15803d}
+.badge-bleu{background:#dbeafe;color:#1d4ed8}
+.badge-jaune{background:#fef9c3;color:#a16207}
+.badge-rouge{background:#fee2e2;color:#b91c1c}
+
+/* ALERT */
+.alert{padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:16px}
+.alert-warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.alert-success{background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d}
+.alert-info{background:#eff6ff;border:1px solid #bfdbfe;color:#1d4ed8}
+
+/* PLAN ENTRETIEN */
+.entretien-item{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:8px}
+.entretien-nom{font-size:14px;font-weight:600}
+.entretien-info{font-size:12px;color:var(--text2);margin-top:2px}
+
+/* PNEU */
+.pneu-stat{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;margin-bottom:8px}
+.pneu-label{font-size:13px;color:var(--text2);font-weight:500}
+.pneu-val{font-size:15px;font-weight:700}
+
+/* DEVIS LINES */
+.devis-line{display:grid;grid-template-columns:1fr 80px 90px 30px;gap:8px;align-items:center;margin-bottom:8px}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:48px 20px;color:var(--text2)}
+.empty-icon{font-size:40px;margin-bottom:12px}
+.empty-text{font-size:15px;font-weight:600;margin-bottom:4px}
+.empty-sub{font-size:13px}
+
+/* LOADING */
+.loading{text-align:center;padding:32px;color:var(--text2);font-size:14px}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;background:#1a1d23;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;transform:translateY(80px);opacity:0;transition:.3s;z-index:999;max-width:320px}
+#toast.show{transform:translateY(0);opacity:1}
+
+@media(max-width:768px){
+  .moto-grid{grid-template-columns:1fr}
+  .row-2{grid-template-columns:1fr}
+  #nav{gap:0;overflow-x:auto}
+  .nav-btn{padding:10px 10px;font-size:12px}
+}
 </style>
 </head>
 <body>
-<div id="nav">
-  <button onclick="show('dashboard')">Tableau de bord</button>
-  <button onclick="show('fiche')">Fiche moto</button>
-  <button onclick="show('entretien')">Entretien</button>
-  <button onclick="show('devis')">Devis</button>
-  <button onclick="show('params')">Paramètres</button>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">🔑 MotoKey</div>
+    <div class="login-sub">Espace Garage — Connexion</div>
+    <div class="login-err" id="loginErr"></div>
+    <div class="field"><label>Email</label><input id="loginEmail" type="email" value="garage@motokey.fr" placeholder="garage@motokey.fr"></div>
+    <div class="field"><label>Mot de passe</label><input id="loginPass" type="password" value="motokey2026" placeholder="••••••••"></div>
+    <button class="btn btn-primary" style="width:100%;margin-top:6px" onclick="doLogin()">Connexion</button>
+  </div>
 </div>
-<div id="main"></div>
+
+<!-- APP -->
+<div id="appShell">
+  <div id="nav">
+    <span class="nav-logo">🔑 MotoKey</span>
+    <button class="nav-btn active" onclick="nav('dashboard',this)">Tableau de bord</button>
+    <button class="nav-btn" onclick="nav('fiche',this)">Fiche moto</button>
+    <button class="nav-btn" onclick="nav('entretien',this)">Entretien</button>
+    <button class="nav-btn" onclick="nav('pneus',this)">Pneus</button>
+    <button class="nav-btn" onclick="nav('devis',this)">Devis</button>
+    <div class="nav-end">
+      <span class="nav-user" id="navUser"></span>
+      <button class="btn-logout" onclick="doLogout()">Déconnexion</button>
+    </div>
+  </div>
+  <div id="main"></div>
+</div>
+
+<div id="toast"></div>
+
 <script>
-function show(section){
-  document.getElementById('main').textContent = 'Section : ' + section;
+const API = window.location.origin;
+let TOKEN = '';
+let motos = [];
+let selectedMoto = null;
+let devisLines = [];
+
+// ── API HELPER ──
+async function api(path, method='GET', body=null) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (TOKEN) opts.headers['Authorization'] = 'Bearer ' + TOKEN;
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  const j = await r.json();
+  if (!j.success) throw new Error(j.error?.message || j.message || 'Erreur');
+  return j.data;
 }
-document.getElementById('main').textContent = 'Bonjour MotoKey';
+
+function toast(msg, dur=3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), dur);
+}
+
+// ── LOGIN ──
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass  = document.getElementById('loginPass').value;
+  const err   = document.getElementById('loginErr');
+  err.style.display = 'none';
+  try {
+    const data = await api('/auth/login', 'POST', { email, password: pass, role: 'garage' });
+    TOKEN = data.token;
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appShell').style.display = 'block';
+    document.getElementById('navUser').textContent = data.garage?.nom || email;
+    await loadDashboard();
+  } catch(e) {
+    err.textContent = e.message;
+    err.style.display = 'block';
+  }
+}
+
+function doLogout() {
+  TOKEN = ''; motos = []; selectedMoto = null;
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appShell').style.display = 'none';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') doLogin();
+});
+
+// ── NAVIGATION ──
+function nav(section, btn) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  const m = document.getElementById('main');
+  m.innerHTML = '<div class="loading">Chargement…</div>';
+  if (section === 'dashboard') loadDashboard();
+  else if (section === 'fiche') renderFiche();
+  else if (section === 'entretien') renderEntretien();
+  else if (section === 'pneus') renderPneus();
+  else if (section === 'devis') loadDevis();
+}
+
+// ── DASHBOARD ──
+let searchQ = '';
+
+async function loadDashboard() {
+  const m = document.getElementById('main');
+  try {
+    const data = await api('/motos');
+    motos = data.motos || data || [];
+    renderDashboard();
+  } catch(e) {
+    m.innerHTML = '<div class="card"><div class="alert alert-warn">Erreur chargement motos : ' + e.message + '</div></div>';
+  }
+}
+
+function renderDashboard() {
+  const filtered = searchQ
+    ? motos.filter(mo =>
+        (mo.marque||'').toLowerCase().includes(searchQ) ||
+        (mo.modele||'').toLowerCase().includes(searchQ) ||
+        (mo.plaque||'').toLowerCase().includes(searchQ) ||
+        (mo.client_nom||'').toLowerCase().includes(searchQ))
+    : motos;
+
+  const cards = filtered.length ? filtered.map(mo => `
+    <div class="moto-card" onclick="selectMoto(${mo.id})">
+      <div class="moto-card-top">
+        <div>
+          <div class="moto-name">${mo.marque} ${mo.modele} <span style="font-weight:400;color:var(--text2);font-size:13px">${mo.annee||''}</span></div>
+          <div class="moto-client">👤 ${mo.client_nom||'—'}</div>
+        </div>
+        <span class="moto-plate">${mo.plaque||''}</span>
+      </div>
+      <div class="moto-km">🔧 ${(mo.km||0).toLocaleString('fr-FR')} km</div>
+      <span class="score-badge score-${mo.couleur_dossier||'bleu'}">${scoreDot(mo.couleur_dossier)} ${scoreLabel(mo.couleur_dossier)} · ${mo.score||0}/100</span>
+    </div>`).join('') : '<div class="empty"><div class="empty-icon">🏍️</div><div class="empty-text">Aucune moto trouvée</div><div class="empty-sub">Modifiez votre recherche ou créez un dossier</div></div>';
+
+  document.getElementById('main').innerHTML = `
+    <div class="section-header">
+      <div><div class="section-title">Tableau de bord</div><div class="section-sub">${motos.length} moto${motos.length>1?'s':''} · ${filtered.length} affichée${filtered.length>1?'s':''}</div></div>
+      <button class="btn btn-primary btn-sm" onclick="nav('fiche',null);highlightNav('fiche')">+ Nouvelle moto</button>
+    </div>
+    <input class="search-bar" placeholder="🔍 Rechercher par marque, modèle, plaque, client…" value="${searchQ}" oninput="searchQ=this.value.toLowerCase();renderDashboard()">
+    <div class="moto-grid">${cards}</div>`;
+}
+
+function scoreDot(c){return{vert:'🟢',bleu:'🔵',jaune:'🟡',rouge:'🔴'}[c]||'🔵'}
+function scoreLabel(c){return{vert:'Excellent',bleu:'Bon',jaune:'Moyen',rouge:'Faible'}[c]||'Bon'}
+
+function selectMoto(id) {
+  selectedMoto = motos.find(m => m.id === id) || null;
+  highlightNav('fiche');
+  renderFiche();
+}
+
+function highlightNav(section) {
+  const labels = {dashboard:'Tableau de bord',fiche:'Fiche moto',entretien:'Entretien',pneus:'Pneus',devis:'Devis'};
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim() === labels[section]);
+  });
+}
+
+// ── FICHE MOTO ──
+function renderFiche() {
+  const m = document.getElementById('main');
+  if (selectedMoto) {
+    const mo = selectedMoto;
+    m.innerHTML = `
+      <div class="section-header">
+        <div><div class="section-title">${mo.marque} ${mo.modele}</div><div class="section-sub">Dossier numérique · ${mo.plaque}</div></div>
+        <button class="btn btn-secondary btn-sm" onclick="selectedMoto=null;renderFiche()">+ Nouvelle moto</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="card">
+          <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">Informations moto</div>
+          ${infoRow('Marque',mo.marque)}${infoRow('Modèle',mo.modele)}${infoRow('Année',mo.annee)}${infoRow('Plaque',mo.plaque)}${infoRow('VIN',mo.vin||'—')}${infoRow('Kilométrage',(mo.km||0).toLocaleString('fr-FR')+' km')}
+          <div style="margin-top:16px"><span class="score-badge score-${mo.couleur_dossier||'bleu'}">${scoreDot(mo.couleur_dossier)} ${scoreLabel(mo.couleur_dossier)} · ${mo.score||0}/100</span></div>
+        </div>
+        <div class="card">
+          <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">Client</div>
+          ${infoRow('Nom',mo.client_nom||'—')}${infoRow('Email',mo.client_email||'—')}${infoRow('Téléphone',mo.client_tel||'—')}
+        </div>
+      </div>`;
+  } else {
+    m.innerHTML = `
+      <div class="section-header"><div><div class="section-title">Nouvelle moto</div><div class="section-sub">Créer un dossier numérique</div></div></div>
+      <div class="card" style="max-width:600px">
+        <div id="ficheErr" class="alert alert-warn" style="display:none"></div>
+        <div class="row-2">
+          <div class="field"><label>Marque *</label><input id="fMarque" placeholder="Yamaha"></div>
+          <div class="field"><label>Modèle *</label><input id="fModele" placeholder="MT-07"></div>
+        </div>
+        <div class="row-2">
+          <div class="field"><label>Année</label><input id="fAnnee" type="number" placeholder="2021"></div>
+          <div class="field"><label>Kilométrage</label><input id="fKm" type="number" placeholder="0"></div>
+        </div>
+        <div class="row-2">
+          <div class="field"><label>Plaque *</label><input id="fPlaque" placeholder="AB-123-CD"></div>
+          <div class="field"><label>VIN *</label><input id="fVin" placeholder="17 caractères"></div>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin:16px 0 10px">Client</div>
+        <div class="row-2">
+          <div class="field"><label>Nom complet</label><input id="fClientNom" placeholder="Sophie Laurent"></div>
+          <div class="field"><label>Email</label><input id="fClientEmail" type="email" placeholder="sophie@email.com"></div>
+        </div>
+        <div class="field"><label>Téléphone</label><input id="fClientTel" placeholder="06 12 34 56 78"></div>
+        <div style="margin-top:6px;display:flex;gap:10px">
+          <button class="btn btn-primary" onclick="saveMoto()">Enregistrer</button>
+          <button class="btn btn-secondary" onclick="selectedMoto=null;renderFiche()">Annuler</button>
+        </div>
+      </div>`;
+  }
+}
+
+function infoRow(label, val) {
+  return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="color:var(--text2)">${label}</span><span style="font-weight:500">${val}</span></div>`;
+}
+
+async function saveMoto() {
+  const err = document.getElementById('ficheErr');
+  err.style.display = 'none';
+  const body = {
+    marque: document.getElementById('fMarque').value.trim(),
+    modele: document.getElementById('fModele').value.trim(),
+    plaque: document.getElementById('fPlaque').value.trim(),
+    vin: document.getElementById('fVin').value.trim(),
+    annee: parseInt(document.getElementById('fAnnee').value)||null,
+    km: parseInt(document.getElementById('fKm').value)||0,
+    client_nom: document.getElementById('fClientNom').value.trim(),
+    client_email: document.getElementById('fClientEmail').value.trim(),
+    client_tel: document.getElementById('fClientTel').value.trim()
+  };
+  if (!body.marque||!body.modele||!body.plaque||!body.vin) {
+    err.textContent = 'Marque, modèle, plaque et VIN sont requis.';
+    err.style.display = 'block'; return;
+  }
+  try {
+    const data = await api('/motos','POST',body);
+    toast('✅ Moto créée avec succès');
+    await loadDashboard();
+    selectedMoto = data.moto || data;
+    renderFiche();
+  } catch(e) {
+    err.textContent = e.message; err.style.display = 'block';
+  }
+}
+
+// ── ENTRETIEN ──
+async function renderEntretien() {
+  const m = document.getElementById('main');
+  const selHtml = motoSelect('eSelMoto', 'changerMotoEntretien');
+  m.innerHTML = `
+    <div class="section-header"><div><div class="section-title">Entretien</div><div class="section-sub">Plan constructeur et interventions</div></div></div>
+    <div class="field" style="max-width:300px"><label>Moto</label>${selHtml}</div>
+    <div id="entretienContent"><div class="empty"><div class="empty-icon">🔧</div><div class="empty-text">Sélectionnez une moto</div></div></div>
+    <div class="card" style="margin-top:20px;max-width:600px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:14px">Ajouter une intervention</div>
+      <div id="interErr" class="alert alert-warn" style="display:none"></div>
+      <div class="row-2">
+        <div class="field"><label>Type</label>
+          <select id="iType">
+            <option value="vert">🟢 Concession</option>
+            <option value="bleu" selected>🔵 Pro validé</option>
+            <option value="jaune">🟡 Propriétaire</option>
+            <option value="rouge">🔴 Non effectué</option>
+          </select>
+        </div>
+        <div class="field"><label>Titre *</label><input id="iTitre" placeholder="Vidange, courroie…"></div>
+      </div>
+      <div class="field"><label>Description</label><textarea id="iDesc" rows="2" placeholder="Détails…"></textarea></div>
+      <div class="row-2">
+        <div class="field"><label>Kilométrage</label><input id="iKm" type="number" placeholder="18500"></div>
+        <div class="field"><label>Montant HT (€)</label><input id="iMontant" type="number" placeholder="0"></div>
+      </div>
+      <div class="field"><label>Technicien</label><input id="iTech" placeholder="J.-M. Duval"></div>
+      <button class="btn btn-primary" onclick="saveInter()">Ajouter l'intervention</button>
+    </div>`;
+  if (selectedMoto) {
+    document.getElementById('eSelMoto').value = selectedMoto.id;
+    await loadEntretien(selectedMoto.id);
+  }
+}
+
+async function changerMotoEntretien() {
+  const id = parseInt(document.getElementById('eSelMoto').value);
+  if (!id) return;
+  selectedMoto = motos.find(m => m.id === id) || selectedMoto;
+  await loadEntretien(id);
+}
+
+async function loadEntretien(id) {
+  const c = document.getElementById('entretienContent');
+  c.innerHTML = '<div class="loading">Chargement plan entretien…</div>';
+  try {
+    const data = await api('/motos/'+id+'/entretien');
+    const plan = data.plan || data.operations || data || [];
+    if (!plan.length) { c.innerHTML = '<div class="alert alert-info">Aucun plan d\'entretien disponible pour cette moto.</div>'; return; }
+    c.innerHTML = plan.map(op => {
+      const pct = op.km_interval > 0 ? Math.min(100, Math.round(((op.km_depuis||0)/op.km_interval)*100)) : 0;
+      const statut = pct>=100?'badge-rouge':pct>=80?'badge-jaune':pct>=40?'badge-bleu':'badge-vert';
+      const label = pct>=100?'En retard':pct>=80?'À planifier':pct>=40?'À prévoir':'À jour';
+      return `<div class="entretien-item">
+        <div>
+          <div class="entretien-nom">${op.nom||op.titre||'Opération'}</div>
+          <div class="entretien-info">Tous les ${(op.km_interval||0).toLocaleString('fr-FR')} km · Dernière : ${op.km_derniere||0} km</div>
+        </div>
+        <span class="badge ${statut}">${label} · ${pct}%</span>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    c.innerHTML = '<div class="alert alert-warn">Erreur : '+e.message+'</div>';
+  }
+}
+
+async function saveInter() {
+  const err = document.getElementById('interErr');
+  err.style.display = 'none';
+  const motoId = selectedMoto?.id || parseInt(document.getElementById('eSelMoto')?.value);
+  if (!motoId) { err.textContent = 'Sélectionnez une moto.'; err.style.display='block'; return; }
+  const titre = document.getElementById('iTitre').value.trim();
+  if (!titre) { err.textContent = 'Le titre est requis.'; err.style.display='block'; return; }
+  const body = {
+    type: document.getElementById('iType').value,
+    titre,
+    description: document.getElementById('iDesc').value,
+    km: parseInt(document.getElementById('iKm').value)||0,
+    montant_ht: parseFloat(document.getElementById('iMontant').value)||0,
+    technicien: document.getElementById('iTech').value.trim()
+  };
+  try {
+    await api('/motos/'+motoId+'/interventions','POST',body);
+    toast('✅ Intervention ajoutée');
+    document.getElementById('iTitre').value='';
+    document.getElementById('iDesc').value='';
+    await loadEntretien(motoId);
+    await loadDashboard();
+  } catch(e) { err.textContent = e.message; err.style.display='block'; }
+}
+
+// ── PNEUS ──
+async function renderPneus() {
+  const m = document.getElementById('main');
+  const selHtml = motoSelect('pSelMoto','changerMotoPneus');
+  m.innerHTML = `
+    <div class="section-header"><div><div class="section-title">Pneus</div><div class="section-sub">Suivi d'usure et alertes</div></div></div>
+    <div class="field" style="max-width:300px"><label>Moto</label>${selHtml}</div>
+    <div id="pneusContent"><div class="empty"><div class="empty-icon">🏍️</div><div class="empty-text">Sélectionnez une moto</div></div></div>`;
+  if (selectedMoto) { document.getElementById('pSelMoto').value = selectedMoto.id; await loadPneus(selectedMoto.id); }
+}
+
+async function changerMotoPneus() {
+  const id = parseInt(document.getElementById('pSelMoto').value);
+  if (id) { selectedMoto = motos.find(m=>m.id===id)||selectedMoto; await loadPneus(id); }
+}
+
+async function loadPneus(id) {
+  const c = document.getElementById('pneusContent');
+  c.innerHTML = '<div class="loading">Chargement…</div>';
+  try {
+    const data = await api('/motos/'+id);
+    const mo = data.moto || data;
+    const kmMontage = mo.pneu_km_montage || 0;
+    const kmParcourus = (mo.km||0) - kmMontage;
+    const usure = kmParcourus >= 8000;
+    c.innerHTML = `
+      ${usure ? '<div class="alert alert-warn">⚠️ Usure estimée : '+kmParcourus.toLocaleString('fr-FR')+' km depuis le montage — inspection recommandée</div>' : '<div class="alert alert-success">✅ Pneus en bon état ('+kmParcourus.toLocaleString('fr-FR')+' km depuis montage)</div>'}
+      <div style="max-width:480px">
+        <div class="pneu-stat"><span class="pneu-label">Pneu monté</span><span class="pneu-val">${mo.pneu_actuel||'Non renseigné'}</span></div>
+        <div class="pneu-stat"><span class="pneu-label">Km au montage</span><span class="pneu-val">${kmMontage.toLocaleString('fr-FR')} km</span></div>
+        <div class="pneu-stat"><span class="pneu-label">Km actuels</span><span class="pneu-val">${(mo.km||0).toLocaleString('fr-FR')} km</span></div>
+        <div class="pneu-stat"><span class="pneu-label">Km parcourus depuis montage</span><span class="pneu-val" style="color:${usure?'var(--danger)':'var(--success)'}">${kmParcourus.toLocaleString('fr-FR')} km</span></div>
+        <div class="pneu-stat"><span class="pneu-label">Statut</span><span class="pneu-val"><span class="badge ${usure?'badge-rouge':'badge-vert'}">${usure?'⚠️ Vérification recommandée':'✅ OK'}</span></span></div>
+      </div>`;
+  } catch(e) { c.innerHTML = '<div class="alert alert-warn">Erreur : '+e.message+'</div>'; }
+}
+
+// ── DEVIS ──
+async function loadDevis() {
+  const m = document.getElementById('main');
+  m.innerHTML = '<div class="loading">Chargement devis…</div>';
+  try {
+    const data = await api('/devis');
+    const liste = data.devis || data || [];
+    devisLines = [{designation:'',qte:1,prix_ht:0}];
+    m.innerHTML = `
+      <div class="section-header">
+        <div><div class="section-title">Devis</div><div class="section-sub">${liste.length} devis</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+        <div>
+          <div class="card">
+            <div style="font-size:13px;font-weight:700;margin-bottom:14px">Créer un devis</div>
+            <div id="devisErr" class="alert alert-warn" style="display:none"></div>
+            <div class="field"><label>Moto</label>${motoSelect('dSelMoto',null)}</div>
+            <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Lignes</div>
+            <div id="devisLines">${renderDevisLines()}</div>
+            <button class="btn btn-secondary btn-sm" style="margin-bottom:14px" onclick="addDevisLine()">+ Ligne</button>
+            <div class="field"><label>Remise (%)</label><input id="dRemise" type="number" value="0" min="0" max="100"></div>
+            <button class="btn btn-primary" onclick="saveDevis()">Créer le devis</button>
+          </div>
+        </div>
+        <div>
+          ${liste.length ? `<table class="table"><thead><tr><th>Réf.</th><th>Date</th><th>Moto</th><th>Total HT</th></tr></thead><tbody>
+            ${liste.map(d=>`<tr><td><strong>${d.reference||d.id}</strong></td><td>${d.date||'—'}</td><td>${d.moto||'—'}</td><td>${(d.total_ht||0).toLocaleString('fr-FR',{minimumFractionDigits:2})} €</td></tr>`).join('')}
+          </tbody></table>` : '<div class="empty"><div class="empty-icon">📄</div><div class="empty-text">Aucun devis</div></div>'}
+        </div>
+      </div>`;
+    if (selectedMoto) document.getElementById('dSelMoto').value = selectedMoto.id;
+  } catch(e) { m.innerHTML = '<div class="card"><div class="alert alert-warn">Erreur : '+e.message+'</div></div>'; }
+}
+
+function renderDevisLines() {
+  return devisLines.map((l,i)=>`
+    <div class="devis-line">
+      <input placeholder="Désignation" value="${l.designation}" oninput="devisLines[${i}].designation=this.value" style="padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px">
+      <input type="number" placeholder="Qté" value="${l.qte}" oninput="devisLines[${i}].qte=+this.value" style="padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px">
+      <input type="number" placeholder="Prix HT" value="${l.prix_ht}" oninput="devisLines[${i}].prix_ht=+this.value" style="padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px">
+      <button onclick="devisLines.splice(${i},1);document.getElementById('devisLines').innerHTML=renderDevisLines()" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:16px">×</button>
+    </div>`).join('');
+}
+
+function addDevisLine() {
+  devisLines.push({designation:'',qte:1,prix_ht:0});
+  document.getElementById('devisLines').innerHTML = renderDevisLines();
+}
+
+async function saveDevis() {
+  const err = document.getElementById('devisErr');
+  err.style.display = 'none';
+  const motoId = parseInt(document.getElementById('dSelMoto').value);
+  if (!motoId) { err.textContent = 'Sélectionnez une moto.'; err.style.display='block'; return; }
+  const lignes = devisLines.filter(l=>l.designation.trim());
+  if (!lignes.length) { err.textContent = 'Ajoutez au moins une ligne.'; err.style.display='block'; return; }
+  try {
+    await api('/devis','POST',{moto_id:motoId, lignes, remise:parseFloat(document.getElementById('dRemise').value)||0});
+    toast('✅ Devis créé');
+    await loadDevis();
+  } catch(e) { err.textContent = e.message; err.style.display='block'; }
+}
+
+// ── HELPERS ──
+function motoSelect(id, onchange) {
+  const opts = motos.map(m=>`<option value="${m.id}">${m.marque} ${m.modele} — ${m.plaque}</option>`).join('');
+  const oc = onchange ? `onchange="${onchange}()"` : '';
+  return `<select id="${id}" ${oc} style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg2);color:var(--text)"><option value="">— Choisir —</option>${opts}</select>`;
+}
 </script>
 </body>
 </html>
