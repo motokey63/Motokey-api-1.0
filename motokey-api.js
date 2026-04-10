@@ -907,11 +907,14 @@ const server = http.createServer(async function(req, res){
 
   // GET /auth/client/healthz — sanity check, prêt pour 7b si jwt_configured: true
   if((p=M('GET','/auth/client/healthz'))!==null){
+    // Debug temporaire : liste les noms (pas les valeurs) des vars Railway visibles
+    const jwtVars = Object.keys(process.env).filter(function(k){ return k.includes('JWT') || k.includes('SECRET') || k.includes('FRONTEND'); });
     return ok(res,{
-      ready_for_7b:   !!process.env.JWT_CLIENT_SECRET,
-      jwt_configured: !!process.env.JWT_CLIENT_SECRET,
+      ready_for_7b:            !!process.env.JWT_CLIENT_SECRET,
+      jwt_configured:          !!process.env.JWT_CLIENT_SECRET,
       frontend_url_configured: !!process.env.FRONTEND_CLIENT_URL,
-      version:        '7a'
+      version:                 '7a',
+      _debug_visible_vars:     jwtVars
     });
   }
 
