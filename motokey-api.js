@@ -76,6 +76,13 @@ const url        = require('url');
 const https2     = require('https');
 const clientAuth = require('./auth/client_auth');
 
+console.log('=== DEBUG ENV ===');
+console.log('JWT_CLIENT_SECRET present:', !!process.env.JWT_CLIENT_SECRET);
+console.log('JWT_CLIENT_SECRET length:', process.env.JWT_CLIENT_SECRET ? process.env.JWT_CLIENT_SECRET.length : 0);
+console.log('FRONTEND_CLIENT_URL present:', !!process.env.FRONTEND_CLIENT_URL);
+console.log('All JWT keys:', Object.keys(process.env).filter(function(k){ return k.includes('JWT'); }));
+console.log('================');
+
 const PORT       = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'motokey_secret_2026';
 const VERSION    = '1.0.0';
