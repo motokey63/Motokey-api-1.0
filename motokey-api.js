@@ -70,10 +70,11 @@
 
 'use strict';
 
-const http   = require('http');
-const crypto = require('crypto');
-const url    = require('url');
-const https2 = require('https');
+const http       = require('http');
+const crypto     = require('crypto');
+const url        = require('url');
+const https2     = require('https');
+const clientAuth = require('./auth/client_auth');
 
 const PORT       = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'motokey_secret_2026';
@@ -900,6 +901,35 @@ const server = http.createServer(async function(req, res){
       transferts:{total:DB.transferts.filter(function(t){return t.garage_id===a.id;}).length,finalises:DB.transferts.filter(function(t){return t.garage_id===a.id&&t.statut==='finalise';}).length},
       fraude:{total:DB.fraude_verifications.length,authentifiees:DB.fraude_verifications.filter(function(f){return f.verdict==='authentifie';}).length,suspectes:DB.fraude_verifications.filter(function(f){return f.verdict==='fraude_suspectee';}).length}
     });
+  }
+
+  /* ── LIVRAISON 7a : AUTH CLIENT ── */
+
+  // GET /auth/client/healthz — sanity check, prêt pour 7b si jwt_configured: true
+  if((p=M('GET','/auth/client/healthz'))!==null){
+    return ok(res,{
+      ready_for_7b:   !!process.env.JWT_CLIENT_SECRET,
+      jwt_configured: !!process.env.JWT_CLIENT_SECRET,
+      frontend_url_configured: !!process.env.FRONTEND_CLIENT_URL,
+      version:        '7a'
+    });
+  }
+
+  // GET /auth/client/config — règles mdp + infos éditeur (public, sans token)
+  if((p=M('GET','/auth/client/config'))!==null){
+    return ok(res, Object.assign({}, clientAuth.CONFIG_DATA, { jwt_configured: !!process.env.JWT_CLIENT_SECRET }));
+  }
+
+  // GET /auth/client/test-ratelimit — vérifie le rate limiter (5 OK puis 429)
+  if((p=M('GET','/auth/client/test-ratelimit'))!==null){
+    if(!clientAuth.rateLimitAuth(req, res, pathname)) return;
+    return ok(res,{ message:'OK — rate limit non atteint', limit: 5, window: '15 min' });
+  }
+
+  // GET /client/ping — route protégée, nécessite un JWT client valide
+  if((p=M('GET','/client/ping'))!==null){
+    if(!await clientAuth.requireClient(req, res)) return;
+    return ok(res,{ pong: true, user: req.clientUser.email, id: req.clientUser.id });
   }
 
   /* 404 */
