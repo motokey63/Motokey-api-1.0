@@ -31,12 +31,12 @@ let supabase = null;
 try {
   const { createClient } = require('@supabase/supabase-js');
   const SB_URL = process.env.SUPABASE_URL;
-  const SB_KEY = process.env.SUPABASE_SERVICE_KEY;
+  const SB_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_KEY;
   if (SB_URL && SB_KEY) {
     supabase = createClient(SB_URL, SB_KEY, { auth: { persistSession: false } });
     console.log('✅ [7a] Supabase client auth initialisé');
   } else {
-    console.warn('⚠️  [7a] SUPABASE_URL/SERVICE_KEY manquant — sessions et audit désactivés');
+    console.warn('⚠️  [7a] SUPABASE_URL/SECRET_KEY manquant — sessions et audit désactivés');
   }
 } catch (e) {
   console.warn('⚠️  [7a] @supabase/supabase-js indisponible:', e.message);

@@ -1045,6 +1045,23 @@ const server = http.createServer(async function(req, res){
     });
   }
 
+  /* ── ENTITÉS DE FACTURATION ── */
+
+  // GET /entites-facturation — liste les entités de facturation du garage connecté
+  if((p=M('GET','/entites-facturation'))!==null){
+    const a = auth(req,res); if(!a) return;
+    if(USE_SUPABASE && SBLayer){
+      const { data, error } = await SBLayer.supabase
+        .from('entites_facturation')
+        .select('*')
+        .eq('garage_id', a.id)
+        .order('created_at', { ascending: false });
+      if(error) return fail(res, error.message, 500, 'DB_ERROR');
+      return ok(res, data || []);
+    }
+    return ok(res, []);
+  }
+
   /* ── LIVRAISON 7a : AUTH CLIENT ── */
 
   // GET /auth/client/healthz — sanity check, prêt pour 7b si jwt_configured: true
