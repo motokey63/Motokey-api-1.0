@@ -28,10 +28,10 @@ const SUPABASE_URL         = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  console.error('❌ Variables manquantes dans .env :');
-  if (!SUPABASE_URL)         console.error('   SUPABASE_URL');
-  if (!SUPABASE_SERVICE_KEY) console.error('   SUPABASE_SERVICE_KEY');
-  process.exit(1);
+  // En mode RAM, on exporte null — motokey-api.js vérifie USE_SUPABASE && SBLayer avant d'appeler
+  console.warn('⚠️  supabase.js : SUPABASE_URL ou SUPABASE_SERVICE_KEY manquant — module désactivé');
+  module.exports = null;
+  return;  // CommonJS : stoppe l'exécution du module sans tuer le process
 }
 
 // ── Client Supabase (service role = bypass RLS pour l'API) ─
@@ -40,9 +40,11 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
 });
 
 // ── Client Supabase public (pour les clients, avec RLS) ────
+// Pour signInWithPassword: utilise ANON_KEY si disponible, sinon SERVICE_KEY
 const supabasePublic = createClient(
   SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+  process.env.SUPABASE_ANON_KEY || SUPABASE_SERVICE_KEY,
+  { auth: { persistSession: false } }
 );
 
 // ══════════════════════════════════════════════════════════
@@ -565,7 +567,7 @@ const Storage = {
 
 // ══════════════════════════════════════════════════════════
 // REALTIME — Souscription sync live
--- ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
 const Realtime = {
 
   // Souscription côté client (app mobile)

@@ -76,6 +76,15 @@ const url        = require('url');
 const https2     = require('https');
 const clientAuth = require('./auth/client_auth');
 
+// Couche Supabase (supabase.js) — chargée si SUPABASE_URL + SUPABASE_SERVICE_KEY présents
+let SBLayer = null;
+try {
+  SBLayer = require('./supabase');
+  console.log('✅ supabase.js chargé');
+} catch(e) {
+  console.warn('⚠️  supabase.js introuvable — mode RAM uniquement:', e.message);
+}
+
 console.log('=== DEBUG ENV ===');
 console.log('JWT_CLIENT_SECRET present:', !!process.env.JWT_CLIENT_SECRET);
 console.log('JWT_CLIENT_SECRET length:', process.env.JWT_CLIENT_SECRET ? process.env.JWT_CLIENT_SECRET.length : 0);
@@ -456,6 +465,31 @@ const server = http.createServer(async function(req, res){
   if((p=M('POST','/auth/login'))!==null){
     const {email,password,role='garage'} = b;
     if(!email||!password) return fail(res,'Email et mot de passe requis');
+
+    // ── Supabase path ──
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        if (role === 'garage') {
+          const result = await SBLayer.Auth.loginGarage({ email, password });
+          const g = result.garage;
+          return ok(res, {
+            token: jwtSign({ id: g.id, role: 'garage', email, nom: g.nom }),
+            role: 'garage', garage: g
+          }, 'Connexion réussie');
+        } else {
+          const result = await SBLayer.Auth.loginClient({ email, password });
+          const c = result.client;
+          return ok(res, {
+            token: jwtSign({ id: c.id, role: 'client', email, nom: c.nom, moto_id: result.moto_id }),
+            role: 'client', client: c, moto_id: result.moto_id
+          }, 'Connexion réussie');
+        }
+      } catch(e) {
+        return fail(res, e.message || 'Identifiants incorrects', 401, 'INVALID_CREDENTIALS');
+      }
+    }
+
+    // ── RAM fallback ──
     const h = hashPwd(password);
     if(role==='garage'){
       const g = DB.garages.find(function(x){return x.email===email&&x.password===h;});
@@ -474,6 +508,22 @@ const server = http.createServer(async function(req, res){
   if((p=M('POST','/auth/register'))!==null){
     const {nom,email,password,siret,tel,adresse} = b;
     if(!nom||!email||!password) return fail(res,'Nom, email et mot de passe requis');
+
+    // ── Supabase path ──
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const g = await SBLayer.Auth.registerGarage({ nom, email, password, siret, tel, adresse });
+        return ok(res, {
+          token: jwtSign({ id: g.id, role: 'garage', email, nom }),
+          garage: g
+        }, 'Garage créé', 201);
+      } catch(e) {
+        const status = e.message && e.message.includes('déjà') ? 409 : 400;
+        return fail(res, e.message, status, status===409?'DUPLICATE':'ERROR');
+      }
+    }
+
+    // ── RAM fallback ──
     if(DB.garages.find(function(g){return g.email===email;})) return fail(res,'Email déjà utilisé',409,'DUPLICATE');
     const g = {id:'gar-'+uid(),nom,email,password:hashPwd(password),siret:siret||'',tel:tel||'',adresse:adresse||'',taux_std:65,taux_spec:80,tva:20,plan:'starter',techniciens:[nom],created_at:nowISO()};
     DB.garages.push(g);
@@ -499,19 +549,14 @@ const server = http.createServer(async function(req, res){
   if((p=M('GET','/motos'))!==null){
     const a = auth(req,res); if(!a) return;
 
-    // Lire depuis Supabase si connecté
-    if (USE_SUPABASE) {
-      const sbMotos = await SB.select('motos', {garage_id: a.id});
-      if (sbMotos && sbMotos.length > 0) {
-        // Fusionner avec RAM (évite les doublons)
-        sbMotos.forEach(function(sm){
-          if (!DB.motos.find(function(dm){return dm.id===sm.id;})) {
-            DB.motos.push(sm);
-          }
-        });
-      }
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const list = await SBLayer.Motos.list(a.id, { couleur: query.couleur });
+        return ok(res, { motos: list, total: list.length });
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
     }
 
+    // ── RAM fallback ──
     let list = DB.motos.filter(function(m){return m.garage_id===a.id;});
     if(query.couleur) list = list.filter(function(m){return m.couleur_dossier===query.couleur;});
     const result = list.map(function(m){
@@ -528,34 +573,34 @@ const server = http.createServer(async function(req, res){
     const {marque,modele,annee,plaque,vin,km,client_email,client_nom,client_tel} = b;
     if(!marque||!modele||!plaque||!vin) return fail(res,'marque, modele, plaque et vin requis');
 
-    // Chercher ou créer le client
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const moto = await SBLayer.Motos.create(a.id, { marque, modele, annee, plaque, vin, km, client_email, client_nom, client_tel });
+        return ok(res, { moto }, 'Dossier moto créé', 201);
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+
+    // ── RAM fallback ──
     let cli = DB.clients.find(function(c){return c.email===client_email;});
     if(!cli&&client_nom){
       cli = {id:'cli-'+uid(),nom:client_nom,email:client_email||client_nom.toLowerCase().replace(/\s/g,'')+uid()+'@motokey.fr',password:hashPwd('changeme'),tel:client_tel||'',created_at:nowISO()};
       DB.clients.push(cli);
     }
-
-    const motoId = 'moto-'+uid();
-    const m = {id:motoId,garage_id:a.id,client_id:cli?cli.id:null,marque,modele,annee:parseInt(annee)||new Date().getFullYear(),plaque,vin,km:parseInt(km)||0,couleur_dossier:'rouge',score:0,created_at:nowISO(),updated_at:nowISO()};
+    const m = {id:'moto-'+uid(),garage_id:a.id,client_id:cli?cli.id:null,marque,modele,annee:parseInt(annee)||new Date().getFullYear(),plaque,vin,km:parseInt(km)||0,couleur_dossier:'rouge',score:0,created_at:nowISO(),updated_at:nowISO()};
     DB.motos.push(m);
-
-    // Sauvegarder dans Supabase si connecté
-    if (USE_SUPABASE) {
-      SB.insert('motos', {
-        id: motoId, marque, modele,
-        annee: parseInt(annee)||new Date().getFullYear(),
-        plaque, vin, km: parseInt(km)||0,
-        couleur_dossier: 'rouge', score: 0,
-        client_nom: client_nom||null,
-        created_at: nowISO(), updated_at: nowISO()
-      }).catch(function(e){ console.warn('Supabase insert moto:', e.message); });
-    }
-
     return ok(res,{moto:m,client:cli},'Dossier moto créé',201);
   }
 
   if((p=M('GET','/motos/:id'))!==null){
     const a = auth(req,res); if(!a) return;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const moto = await SBLayer.Motos.getById(p.id, a.id);
+        const ints = await SBLayer.Interventions.list(p.id, a.id);
+        return ok(res, { moto, client: moto.clients || {}, interventions: ints, nb_interventions: ints.length });
+      } catch(e) { return fail(res, 'Moto non trouvée', 404, 'NOT_FOUND'); }
+    }
+    // ── RAM fallback ──
     const m = DB.motos.find(function(x){return x.id===p.id&&x.garage_id===a.id;});
     if(!m) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
     const c  = DB.clients.find(function(x){return x.id===m.client_id;});
@@ -567,6 +612,13 @@ const server = http.createServer(async function(req, res){
 
   if((p=M('PUT','/motos/:id'))!==null){
     const a = auth(req,res); if(!a) return;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const moto = await SBLayer.Motos.update(p.id, a.id, b);
+        return ok(res, { moto }, 'Moto mise à jour');
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+    // ── RAM fallback ──
     const i = DB.motos.findIndex(function(x){return x.id===p.id&&x.garage_id===a.id;});
     if(i<0) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
     DB.motos[i] = Object.assign({},DB.motos[i],b,{id:p.id,garage_id:a.id,updated_at:nowISO()});
@@ -575,6 +627,13 @@ const server = http.createServer(async function(req, res){
 
   if((p=M('DELETE','/motos/:id'))!==null){
     const a = auth(req,res); if(!a) return;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        await SBLayer.Motos.delete(p.id, a.id);
+        return ok(res, { deleted_id: p.id }, 'Dossier supprimé');
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+    // ── RAM fallback ──
     const i = DB.motos.findIndex(function(x){return x.id===p.id&&x.garage_id===a.id;});
     if(i<0) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
     DB.motos.splice(i,1);
@@ -583,6 +642,13 @@ const server = http.createServer(async function(req, res){
 
   if((p=M('GET','/motos/:id/score'))!==null){
     const a = auth(req,res); if(!a) return;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const sc = await SBLayer.Motos.getScore(p.id, a.id);
+        return ok(res, sc);
+      } catch(e) { return fail(res, 'Moto non trouvée', 404, 'NOT_FOUND'); }
+    }
+    // ── RAM fallback ──
     const m = DB.motos.find(function(x){return x.id===p.id&&x.garage_id===a.id;});
     if(!m) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
     const is = DB.interventions.filter(function(i){return i.moto_id===m.id;});
@@ -597,30 +663,14 @@ const server = http.createServer(async function(req, res){
     const a = auth(req,res); if(!a) return;
 
     // Charger depuis Supabase
-    if (USE_SUPABASE) {
-      const sbInters = await SB.select('interventions', {moto_id: p.id});
-      if (sbInters && sbInters.length > 0) {
-        sbInters.forEach(function(si){
-          if (!DB.interventions.find(function(di){return di.id===si.id;})) {
-            // Normaliser le format date
-            if (si.date_intervention && !si.date) {
-              const d = new Date(si.date_intervention);
-              si.date = String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
-            }
-            DB.interventions.push(si);
-          }
-        });
-      }
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const is = await SBLayer.Interventions.list(p.id, a.id, { type: query.type });
+        return ok(res, { interventions: is, total: is.length });
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
     }
 
-    // Chercher la moto (en RAM ou Supabase)
-    let m = DB.motos.find(function(x){return x.id===p.id;});
-    if(!m && USE_SUPABASE){
-      const rows = await SB.select('motos', {id: p.id});
-      if(rows && rows[0]) m = rows[0];
-    }
-    if(!m) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
-
+    // ── RAM fallback ──
     let is = DB.interventions.filter(function(i){return i.moto_id===p.id;}).sort(function(a,b){return (b.created_at||'').localeCompare(a.created_at||'');});
     if(query.type) is = is.filter(function(i){return i.type===query.type;});
     return ok(res,{interventions:is,total:is.length});
@@ -628,16 +678,20 @@ const server = http.createServer(async function(req, res){
 
   if((p=M('POST','/motos/:id/interventions'))!==null){
     const a = auth(req,res); if(!a) return;
-    // Chercher la moto en RAM ou Supabase
-    let m = DB.motos.find(function(x){return x.id===p.id&&x.garage_id===a.id;});
-    if(!m && USE_SUPABASE){
-      const rows = await SB.select('motos', {id: p.id});
-      if(rows && rows[0]) { m = rows[0]; DB.motos.push(m); }
-    }
-    if(!m) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
     const {type,titre,description,km,technicien,montant_ht} = b;
     if(!type||!titre) return fail(res,'type et titre requis');
     if(!['vert','bleu','jaune','rouge'].includes(type)) return fail(res,'type invalide (vert/bleu/jaune/rouge)');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const result = await SBLayer.Interventions.create(a.id, p.id, { type, titre, description, km: parseInt(km)||0, technicien_id: null, montant_ht: parseFloat(montant_ht)||0 });
+        return ok(res, result, 'Intervention ajoutée · Client synchronisé', 201);
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+
+    // ── RAM fallback ──
+    let m = DB.motos.find(function(x){return x.id===p.id&&x.garage_id===a.id;});
+    if(!m) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
     const interId = 'int-'+uid();
     const sc_conf = rand(78,99);
     const inter = {id:interId,moto_id:p.id,garage_id:a.id,type,titre,description:description||'',km:parseInt(km)||m.km,technicien:technicien||a.nom,date:todayFR(),score_confiance:sc_conf,montant_ht:parseFloat(montant_ht)||0,created_at:nowISO()};
@@ -647,21 +701,6 @@ const server = http.createServer(async function(req, res){
     const allIs = DB.interventions.filter(function(i){return i.moto_id===p.id;});
     const sc = calcScore(allIs);
     if(mi>=0){DB.motos[mi].score=sc;DB.motos[mi].couleur_dossier=couleur(sc);}
-
-    // Sauvegarder intervention dans Supabase
-    if (USE_SUPABASE) {
-      SB.insert('interventions', {
-        id: interId, moto_id: p.id, garage_id: a.id,
-        type, titre, description: description||'', km: parseInt(km)||m.km,
-        date_intervention: new Date().toISOString().split('T')[0],
-        score_confiance: sc_conf, montant_ht: parseFloat(montant_ht)||0,
-        created_at: nowISO()
-      }).catch(function(e){ console.warn('SB inter:', e.message); });
-      // Mettre à jour le score de la moto dans Supabase
-      SB.update('motos', p.id, {score: sc, couleur_dossier: couleur(sc), km: parseInt(km)||m.km, updated_at: nowISO()})
-        .catch(function(e){ console.warn('SB score:', e.message); });
-    }
-
     return ok(res,{intervention:inter,nouveau_score:sc,nouvelle_couleur:couleur(sc)},'Intervention ajoutée · Client synchronisé',201);
   }
 
@@ -703,6 +742,13 @@ const server = http.createServer(async function(req, res){
   /* DEVIS */
   if((p=M('GET','/devis'))!==null){
     const a = auth(req,res); if(!a) return;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const list = await SBLayer.Devis.list(a.id);
+        return ok(res, { devis: list, total: list.length });
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+    // ── RAM fallback ──
     const list = DB.devis.filter(function(d){return d.garage_id===a.id;}).map(function(d){
       const m = DB.motos.find(function(x){return x.id===d.moto_id;});
       return Object.assign({},d,{moto_info:m?m.marque+' '+m.modele+' — '+m.plaque:'—',total_ttc:calcDevis(d).total_ttc});
@@ -712,17 +758,31 @@ const server = http.createServer(async function(req, res){
 
   if((p=M('POST','/devis'))!==null){
     const a = auth(req,res); if(!a) return;
-    const {moto_id,lignes,remise_type,remise_pct,remise_note,technicien} = b;
+    const {moto_id,lignes,remise_type,remise_pct,remise_note} = b;
     if(!moto_id) return fail(res,'moto_id requis');
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const dv = await SBLayer.Devis.create(a.id, { moto_id, lignes, remise_type, remise_pct, remise_note });
+        return ok(res, { devis: dv }, 'Devis créé', 201);
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+    // ── RAM fallback ──
     const m = DB.motos.find(function(x){return x.id===moto_id&&x.garage_id===a.id;});
     if(!m) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
-    const dv = {id:'dv-'+uid(),moto_id,garage_id:a.id,numero:'2026-'+String(DB.devis.length+100).padStart(4,'0'),statut:'brouillon',technicien:technicien||a.nom,lignes:lignes||[],remise_type:remise_type||'aucun',remise_pct:remise_pct||0,remise_note:remise_note||'',tva:20,created_at:nowISO(),updated_at:nowISO()};
+    const dv = {id:'dv-'+uid(),moto_id,garage_id:a.id,numero:'2026-'+String(DB.devis.length+100).padStart(4,'0'),statut:'brouillon',lignes:lignes||[],remise_type:remise_type||'aucun',remise_pct:remise_pct||0,remise_note:remise_note||'',tva:20,created_at:nowISO(),updated_at:nowISO()};
     DB.devis.push(dv);
     return ok(res,{devis:dv,totaux:calcDevis(dv)},'Devis créé',201);
   }
 
   if((p=M('GET','/devis/:id'))!==null){
     const a = auth(req,res); if(!a) return;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const dv = await SBLayer.Devis.getById(p.id, a.id);
+        return ok(res, { devis: dv, moto: dv.motos, totaux: SBLayer.Devis._calcTotaux(dv) });
+      } catch(e) { return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND'); }
+    }
+    // ── RAM fallback ──
     const dv = DB.devis.find(function(d){return d.id===p.id&&d.garage_id===a.id;});
     if(!dv) return fail(res,'Devis non trouvé',404,'NOT_FOUND');
     const m  = DB.motos.find(function(x){return x.id===dv.moto_id;});
@@ -733,6 +793,13 @@ const server = http.createServer(async function(req, res){
 
   if((p=M('PUT','/devis/:id'))!==null){
     const a = auth(req,res); if(!a) return;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const dv = await SBLayer.Devis.update(p.id, a.id, { entete: b.entete, lignes: b.lignes });
+        return ok(res, { devis: dv }, 'Devis mis à jour');
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+    // ── RAM fallback ──
     const i = DB.devis.findIndex(function(d){return d.id===p.id&&d.garage_id===a.id;});
     if(i<0) return fail(res,'Devis non trouvé',404,'NOT_FOUND');
     DB.devis[i] = Object.assign({},DB.devis[i],b,{id:p.id,garage_id:a.id,updated_at:nowISO()});
@@ -741,13 +808,20 @@ const server = http.createServer(async function(req, res){
 
   if((p=M('POST','/devis/:id/valider'))!==null){
     const a = auth(req,res); if(!a) return;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const result = await SBLayer.Devis.valider(p.id, a.id);
+        return ok(res, result, 'Devis validé · Intervention créée · Client synchronisé');
+      } catch(e) { return fail(res, e.message, 400, 'ERROR'); }
+    }
+    // ── RAM fallback ──
     const i = DB.devis.findIndex(function(d){return d.id===p.id&&d.garage_id===a.id;});
     if(i<0) return fail(res,'Devis non trouvé',404,'NOT_FOUND');
     if(DB.devis[i].statut==='valide') return fail(res,'Devis déjà validé');
     DB.devis[i].statut='valide'; DB.devis[i].valide_at=nowISO(); DB.devis[i].updated_at=nowISO();
     const tot = calcDevis(DB.devis[i]);
     const m   = DB.motos.find(function(x){return x.id===DB.devis[i].moto_id;});
-    const inter = {id:'int-'+uid(),moto_id:DB.devis[i].moto_id,garage_id:a.id,type:'bleu',titre:'Facture '+DB.devis[i].numero,description:DB.devis[i].lignes.map(function(l){return l.desc;}).join(', '),km:m?m.km:0,technicien:DB.devis[i].technicien,date:todayFR(),score_confiance:96,montant_ht:tot.base_ht,devis_id:p.id,created_at:nowISO()};
+    const inter = {id:'int-'+uid(),moto_id:DB.devis[i].moto_id,garage_id:a.id,type:'bleu',titre:'Facture '+DB.devis[i].numero,description:(DB.devis[i].lignes||[]).map(function(l){return l.desc||l.description||'';}).join(', '),km:m?m.km:0,date:todayFR(),score_confiance:96,montant_ht:tot.base_ht,devis_id:p.id,created_at:nowISO()};
     DB.interventions.push(inter);
     const allIs = DB.interventions.filter(function(x){return x.moto_id===DB.devis[i].moto_id;});
     const sc = calcScore(allIs);
@@ -776,6 +850,12 @@ const server = http.createServer(async function(req, res){
 
   if((p=M('GET','/fraude/historique'))!==null){
     const a = auth(req,res); if(!a) return;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const list = await SBLayer.Fraude.historique(a.id);
+        return ok(res, { verifications: list, total: list.length });
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
     return ok(res,{verifications:DB.fraude_verifications.slice().reverse(),total:DB.fraude_verifications.length});
   }
 
@@ -784,6 +864,13 @@ const server = http.createServer(async function(req, res){
     const a = auth(req,res); if(!a) return;
     const {moto_id,acheteur_nom,acheteur_email,prix,km_cession,notes} = b;
     if(!moto_id||!acheteur_nom||!prix) return fail(res,'moto_id, acheteur_nom et prix requis');
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const result = await SBLayer.Transferts.initier(a.id, { moto_id, acheteur_nom, acheteur_email, prix, km_cession, notes });
+        return ok(res, result, 'Code généré · SMS envoyé', 201);
+      } catch(e) { return fail(res, e.message, 400, 'ERROR'); }
+    }
+    // ── RAM fallback ──
     const m = DB.motos.find(function(x){return x.id===moto_id&&x.garage_id===a.id;});
     if(!m) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
     const code = 'MK-TR-'+Math.random().toString(36).substring(2,6).toUpperCase();
@@ -793,9 +880,15 @@ const server = http.createServer(async function(req, res){
   }
 
   if((p=M('POST','/transfert/confirmer-vendeur'))!==null){
-    const a = auth(req,res); if(!a) return;
     const {code} = b;
     if(!code) return fail(res,'code requis');
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const tr = await SBLayer.Transferts.confirmerVendeur(code);
+        return ok(res, { transfert: tr }, 'Vente confirmée par le vendeur');
+      } catch(e) { return fail(res, e.message, 400, 'ERROR'); }
+    }
+    // ── RAM fallback ──
     const i = DB.transferts.findIndex(function(t){return t.code===code;});
     if(i<0) return fail(res,'Code invalide',404,'NOT_FOUND');
     if(DB.transferts[i].statut!=='initie') return fail(res,'Transfert non confirmable dans cet état');
@@ -807,6 +900,13 @@ const server = http.createServer(async function(req, res){
   if((p=M('POST','/transfert/consulter'))!==null){
     const {code} = b;
     if(!code) return fail(res,'code requis');
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const result = await SBLayer.Transferts.consulter(code);
+        return ok(res, result, "Dossier consulté par l'acheteur");
+      } catch(e) { return fail(res, e.message, 400, 'ERROR'); }
+    }
+    // ── RAM fallback ──
     const tr = DB.transferts.find(function(t){return t.code===code;});
     if(!tr) return fail(res,'Code invalide',404,'NOT_FOUND');
     const m  = DB.motos.find(function(x){return x.id===tr.moto_id;});
@@ -814,12 +914,19 @@ const server = http.createServer(async function(req, res){
     const sc = calcScore(is);
     const i  = DB.transferts.findIndex(function(t){return t.code===code;});
     if(DB.transferts[i].statut==='vendeur_confirme'){DB.transferts[i].statut='acheteur_consulte';DB.transferts[i].steps.push({etape:'acheteur_consulte',at:nowISO(),par:'acheteur'});}
-    return ok(res,{dossier:{moto:m,score:sc,couleur:couleur(sc),interventions:is,nb_interventions:is.length},transfert:{code,acheteur_nom:tr.acheteur_nom,prix:tr.prix,km_cession:tr.km_cession}},'Dossier consulté par l\'acheteur');
+    return ok(res,{dossier:{moto:m,score:sc,couleur:couleur(sc),interventions:is,nb_interventions:is.length},transfert:{code,acheteur_nom:tr.acheteur_nom,prix:tr.prix,km_cession:tr.km_cession}},"Dossier consulté par l'acheteur");
   }
 
   if((p=M('POST','/transfert/finaliser'))!==null){
     const {code,signature_acheteur} = b;
     if(!code) return fail(res,'code requis');
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const result = await SBLayer.Transferts.finaliser(code, signature_acheteur);
+        return ok(res, result, 'Transfert finalisé · Certificat émis · Accès vendeur révoqué');
+      } catch(e) { return fail(res, e.message, 400, 'ERROR'); }
+    }
+    // ── RAM fallback ──
     const i = DB.transferts.findIndex(function(t){return t.code===code;});
     if(i<0) return fail(res,'Code invalide',404,'NOT_FOUND');
     const tr = DB.transferts[i];
@@ -830,14 +937,20 @@ const server = http.createServer(async function(req, res){
     const oldCli = DB.motos[mi]?DB.motos[mi].client_id:null;
     if(mi>=0){DB.motos[mi].client_id=nc.id;DB.motos[mi].updated_at=nowISO();}
     const certId = 'CERT-2026-'+Math.random().toString(36).substring(2,8).toUpperCase();
-    Object.assign(DB.transferts[i],{statut:'finalise',nouveau_client_id:nc.id,ancien_client_id:oldCli,certificat_id:certId,signature_acheteur:signature_acheteur||tr.acheteur_nom,finalise_at:nowISO()});
+    Object.assign(DB.transferts[i],{statut:'finalise',nouveau_client_id:nc.id,certificat_id:certId,signature_acheteur:signature_acheteur||tr.acheteur_nom,finalise_at:nowISO()});
     DB.transferts[i].steps.push({etape:'finalise',at:nowISO(),par:'acheteur'});
     const moto = DB.motos[mi];
-    return ok(res,{certificat:{id:certId,moto:{marque:moto?moto.marque:'',modele:moto?moto.modele:'',plaque:moto?moto.plaque:'',km:tr.km_cession},vendeur:{id:oldCli},acheteur:nc,prix:tr.prix,date:todayFR(),hash:crypto.createHash('sha256').update(certId+tr.code).digest('hex')},transfert:DB.transferts[i],acces_vendeur_revoque:true,nouveau_proprietaire:nc},'Transfert finalisé · Certificat émis · Accès vendeur révoqué');
+    return ok(res,{certificat:{id:certId,moto:{marque:moto?moto.marque:'',modele:moto?moto.modele:'',plaque:moto?moto.plaque:'',km:tr.km_cession},acheteur:nc,prix:tr.prix,date:todayFR(),hash:crypto.createHash('sha256').update(certId+tr.code).digest('hex')},transfert:DB.transferts[i],nouveau_proprietaire:nc},'Transfert finalisé · Certificat émis · Accès vendeur révoqué');
   }
 
   if((p=M('GET','/transfert/:code'))!==null){
     const a = auth(req,res); if(!a) return;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const result = await SBLayer.Transferts.consulter(p.code);
+        return ok(res, { transfert: result.transfert });
+      } catch(e) { return fail(res, 'Transfert non trouvé', 404, 'NOT_FOUND'); }
+    }
     const tr = DB.transferts.find(function(t){return t.code===p.code&&t.garage_id===a.id;});
     if(!tr) return fail(res,'Transfert non trouvé',404,'NOT_FOUND');
     return ok(res,{transfert:tr});
@@ -878,6 +991,13 @@ const server = http.createServer(async function(req, res){
   /* PARAMS & STATS */
   if((p=M('GET','/params'))!==null){
     const a = auth(req,res); if(!a) return;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const g = await SBLayer.Garages.getById(a.id);
+        return ok(res, { params: g });
+      } catch(e) { return fail(res, 'Garage non trouvé', 404, 'NOT_FOUND'); }
+    }
+    // ── RAM fallback ──
     const g = DB.garages.find(function(x){return x.id===a.id;});
     if(!g) return fail(res,'Garage non trouvé',404,'NOT_FOUND');
     const {password:_,...gd} = g;
@@ -886,6 +1006,13 @@ const server = http.createServer(async function(req, res){
 
   if((p=M('PUT','/params'))!==null){
     const a = auth(req,res); if(!a) return;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const g = await SBLayer.Garages.update(a.id, b);
+        return ok(res, { params: g }, 'Paramètres mis à jour');
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+    // ── RAM fallback ──
     const i = DB.garages.findIndex(function(x){return x.id===a.id;});
     if(i<0) return fail(res,'Garage non trouvé',404,'NOT_FOUND');
     ['nom','tel','adresse','siret','taux_std','taux_spec','tva','techniciens'].forEach(function(k){if(b[k]!==undefined)DB.garages[i][k]=b[k];});
@@ -895,6 +1022,13 @@ const server = http.createServer(async function(req, res){
 
   if((p=M('GET','/stats'))!==null){
     const a = auth(req,res); if(!a) return;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const stats = await SBLayer.Garages.getStats(a.id);
+        return ok(res, stats);
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+    // ── RAM fallback ──
     const ms = DB.motos.filter(function(m){return m.garage_id===a.id;});
     const co = {vert:0,bleu:0,jaune:0,rouge:0};
     ms.forEach(function(m){co[m.couleur_dossier]=(co[m.couleur_dossier]||0)+1;});
