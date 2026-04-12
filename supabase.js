@@ -8,10 +8,15 @@
  * Créer un fichier .env à la racine du projet avec :
  *
  *   SUPABASE_URL=https://xxxxx.supabase.co
- *   SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIs...
+ *   SUPABASE_SECRET_KEY=sbsec_...          ← nouveau système Publishable/Secret
+ *   SUPABASE_PUBLISHABLE_KEY=sbpub_...     ← nouveau système (remplace anon key)
+ *
+ * Fallback legacy (rétrocompat si nouvelles clés absentes) :
+ *   SUPABASE_SERVICE_KEY=eyJ...            ← ancienne service_role key
+ *   SUPABASE_ANON_KEY=eyJ...              ← ancienne anon key
  *
  * Ces clés se trouvent dans :
- * Supabase Dashboard > Settings > API
+ * Supabase Dashboard > Settings > API > Secret keys
  *
  * INSTALLATION :
  *   npm install @supabase/supabase-js dotenv
@@ -24,8 +29,12 @@ require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
 // ── Validation config ──────────────────────────────────────
-const SUPABASE_URL         = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+
+// Nouveau système Supabase (Publishable/Secret) avec fallback legacy
+const SUPABASE_SERVICE_KEY =
+  process.env.SUPABASE_SECRET_KEY ||      // nouveau
+  process.env.SUPABASE_SERVICE_KEY;       // legacy
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   // En mode RAM, on exporte null — motokey-api.js vérifie USE_SUPABASE && SBLayer avant d'appeler
@@ -39,11 +48,14 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
   auth: { persistSession: false }
 });
 
-// ── Client Supabase public (pour les clients, avec RLS) ────
-// Pour signInWithPassword: utilise ANON_KEY si disponible, sinon SERVICE_KEY
+// ── Client Supabase public (pour signInWithPassword, avec RLS) ────
+const SUPABASE_PUBLIC_KEY =
+  process.env.SUPABASE_PUBLISHABLE_KEY || // nouveau
+  process.env.SUPABASE_ANON_KEY ||        // legacy
+  SUPABASE_SERVICE_KEY;                   // dernier recours
 const supabasePublic = createClient(
   SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY || SUPABASE_SERVICE_KEY,
+  SUPABASE_PUBLIC_KEY,
   { auth: { persistSession: false } }
 );
 

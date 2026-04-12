@@ -1,7 +1,10 @@
 require('dotenv').config();
 const { createClient } = require('@supabase/supabase-js');
 
-const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+const sb = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_KEY
+);
 
 async function main() {
   console.log('\n🚀 Configuration MotoKey Supabase...\n');

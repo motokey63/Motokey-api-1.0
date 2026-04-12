@@ -76,7 +76,7 @@ const url        = require('url');
 const https2     = require('https');
 const clientAuth = require('./auth/client_auth');
 
-// Couche Supabase (supabase.js) — chargée si SUPABASE_URL + SUPABASE_SERVICE_KEY présents
+// Couche Supabase (supabase.js) — chargée si SUPABASE_URL + SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_KEY) présents
 let SBLayer = null;
 try {
   SBLayer = require('./supabase');
@@ -98,7 +98,8 @@ const VERSION    = '1.0.0';
 
 /* ─── SUPABASE CLIENT LEGER ─── */
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
+// Nouveau système Publishable/Secret avec fallback legacy
+const SUPABASE_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_KEY;
 
 function sbRequest(method, path, body) {
   return new Promise(function(resolve) {
@@ -154,7 +155,7 @@ const SB = {
 };
 
 const USE_SUPABASE = !!(SUPABASE_URL && SUPABASE_KEY);
-console.log(USE_SUPABASE ? '✅ Supabase connecte — donnees persistantes' : '⚠️  Mode RAM — configurer SUPABASE_URL et SUPABASE_SERVICE_KEY');
+console.log(USE_SUPABASE ? '✅ Supabase connecte — donnees persistantes' : '⚠️  Mode RAM — configurer SUPABASE_URL et SUPABASE_SECRET_KEY');
 
 /* ─── UTILS ─── */
 function uid() {
