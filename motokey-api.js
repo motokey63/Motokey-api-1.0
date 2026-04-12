@@ -435,6 +435,23 @@ const server = http.createServer(async function(req, res){
     return;
   }
 
+  /* ── DEBUG TEMP — À retirer après diagnostic Railway ── */
+  if(pathname === '/debug/env-check' && method === 'GET'){
+    const keys = Object.keys(process.env).filter(k =>
+      k.startsWith('JWT') || k.startsWith('SUPABASE') || k.startsWith('FRONTEND') || k.startsWith('RAILWAY')
+    ).sort();
+    return ok(res, {
+      keys_visible:                   keys,
+      jwt_client_secret_present:      !!process.env.JWT_CLIENT_SECRET,
+      jwt_client_secret_length:       (process.env.JWT_CLIENT_SECRET || '').length,
+      frontend_client_url_present:    !!process.env.FRONTEND_CLIENT_URL,
+      supabase_secret_key_present:    !!process.env.SUPABASE_SECRET_KEY,
+      supabase_publishable_key_present: !!process.env.SUPABASE_PUBLISHABLE_KEY,
+      railway_env:     process.env.RAILWAY_ENVIRONMENT  || null,
+      railway_service: process.env.RAILWAY_SERVICE_NAME || null
+    });
+  }
+
   let b = {};
   if(['POST','PUT','PATCH'].includes(method)) b = await body(req);
 
