@@ -1,0 +1,308 @@
+/*
+ * ══════════════════════════════════════════════════════════
+ * ARCHIVÉ — PRÉ-PIVOT (2026-04-13)
+ * Raison du pivot : abandon de l'auth maison (bcrypt + auth_tokens +
+ * JWT refresh custom) au profit de Supabase Auth natif.
+ * clients.auth_user_id + RLS auth.uid() étaient déjà en place,
+ * Supabase Auth gère 80% du travail gratuitement.
+ *
+ * Ce fichier est conservé pour référence future.
+ * Il NE doit PAS être require()'d — l'extension .archived-pre-pivot
+ * l'exclut du chargement Node.js.
+ *
+ * Contexte d'origine : bloc "LIVRAISON 7b" dans motokey-api.js
+ * (lignes 1095–1384 avant pivot).
+ * Dépendances : auth/client_auth.js, services/emailService.js,
+ *               table auth_tokens (migration archivée).
+ * ══════════════════════════════════════════════════════════
+ */
+
+  /* ── LIVRAISON 7b : AUTH CLIENT ENDPOINTS ── */
+  // TODO RBAC : sécuriser avec vérification de rôle quand les rôles seront définis
+
+  // ── Helpers locaux 7b ──────────────────────────────────
+  function gen6DigitCode() {
+    return String(Math.floor(100000 + Math.random() * 900000));
+  }
+  function in15min() {
+    return new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  }
+  function parseCookie(req, name) {
+    const c = req.headers['cookie'] || '';
+    const m = c.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : null;
+  }
+  function setRefreshCookie(res, token, maxAge) {
+    res.setHeader('Set-Cookie',
+      `refresh_token=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}; Path=/auth/client/refresh`);
+  }
+  function clearRefreshCookie(res) {
+    res.setHeader('Set-Cookie',
+      'refresh_token=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/auth/client/refresh');
+  }
+  const DEV_CODES = process.env.AUTH_DEV_RETURN_CODES === 'true';
+
+  // ── POST /auth/client/register ─────────────────────────
+  if ((p = M('POST', '/auth/client/register')) !== null) {
+    const b = await body(req);
+    const { email, password, prenom, nom, cgu_accepted } = b;
+
+    if (!email || !password || !prenom || !nom) {
+      return fail(res, 'Champs requis : email, password, prenom, nom', 400, 'MISSING_FIELDS');
+    }
+    if (!cgu_accepted) {
+      return fail(res, 'Vous devez accepter les CGU', 400, 'CGU_NOT_ACCEPTED');
+    }
+    const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRx.test(email)) {
+      return fail(res, 'Email invalide', 400, 'INVALID_EMAIL');
+    }
+    const pwdCheck = clientAuth.validatePasswordStrength(password);
+    if (!pwdCheck.valid) {
+      return fail(res, pwdCheck.errors.join('. '), 400, 'WEAK_PASSWORD');
+    }
+
+    // Vérifier unicité email
+    const existing = await sbRequest('GET',
+      `/clients?email=eq.${encodeURIComponent(email)}&select=id&limit=1`);
+    if (Array.isArray(existing) && existing.length > 0) {
+      return fail(res, 'Un compte existe déjà avec cet email', 409, 'EMAIL_EXISTS');
+    }
+
+    const passwordHash = await clientAuth.hashPassword(password);
+    const newClient = await SB.insert('clients', {
+      email,
+      password_hash: passwordHash,
+      prenom:        prenom.trim(),
+      nom:           nom.trim(),
+    });
+    if (!newClient || !newClient.id) {
+      return fail(res, 'Erreur création du compte', 500, 'SERVER_ERROR');
+    }
+
+    const code = gen6DigitCode();
+    await SB.insert('auth_tokens', {
+      user_id:    newClient.id,
+      type:       'verify_email',
+      code,
+      expires_at: in15min(),
+      ip:         clientAuth.getIp(req),
+      user_agent: req.headers['user-agent'] || null
+    });
+
+    await emailService.send('welcome', email, { prenom: prenom.trim(), email });
+    await emailService.send('verify',  email, { prenom: prenom.trim(), code, expires_minutes: 15 });
+
+    const resp = { message: 'Compte créé — vérifiez votre email pour activer votre compte' };
+    if (DEV_CODES) resp._dev_code = code;
+    return ok(res, resp, 'CREATED', 201);
+  }
+
+  // ── POST /auth/client/verify-email ─────────────────────
+  if ((p = M('POST', '/auth/client/verify-email')) !== null) {
+    const b = await body(req);
+    const { email, code } = b;
+    if (!email || !code) {
+      return fail(res, 'Champs requis : email, code', 400, 'MISSING_FIELDS');
+    }
+
+    const clients = await sbRequest('GET',
+      `/clients?email=eq.${encodeURIComponent(email)}&select=id,email_verified_at&limit=1`);
+    const client = Array.isArray(clients) ? clients[0] : null;
+    if (!client) return fail(res, 'Email ou code invalide', 400, 'INVALID_CODE');
+    if (client.email_verified_at) return fail(res, 'Email déjà vérifié', 400, 'ALREADY_VERIFIED');
+
+    const tokens = await sbRequest('GET',
+      `/auth_tokens?user_id=eq.${client.id}&type=eq.verify_email&code=eq.${encodeURIComponent(code)}&used_at=is.null&select=id,expires_at&limit=1`);
+    const token = Array.isArray(tokens) ? tokens[0] : null;
+    if (!token) return fail(res, 'Email ou code invalide', 400, 'INVALID_CODE');
+    if (new Date(token.expires_at) < new Date()) {
+      return fail(res, 'Code expiré — relancez une inscription', 400, 'CODE_EXPIRED');
+    }
+
+    await sbRequest('PATCH', `/auth_tokens?id=eq.${token.id}`, { used_at: nowISO() });
+    await sbRequest('PATCH', `/clients?id=eq.${client.id}`, { email_verified_at: nowISO() });
+
+    return ok(res, { message: 'Email vérifié — vous pouvez maintenant vous connecter' });
+  }
+
+  // ── POST /auth/client/login ────────────────────────────
+  if ((p = M('POST', '/auth/client/login')) !== null) {
+    if (!clientAuth.rateLimitAuth(req, res, pathname)) return;
+    const b = await body(req);
+    const { email, password } = b;
+    if (!email || !password) {
+      return fail(res, 'Champs requis : email, password', 400, 'MISSING_FIELDS');
+    }
+
+    const clients = await sbRequest('GET',
+      `/clients?email=eq.${encodeURIComponent(email)}&select=id,email,prenom,nom,password_hash,email_verified_at,failed_login_count,locked_until,last_login_at&limit=1`);
+    const client = Array.isArray(clients) ? clients[0] : null;
+
+    // Réponse identique que le compte existe ou non (anti-enumeration)
+    if (!client || !client.password_hash) {
+      return fail(res, 'Email ou mot de passe incorrect', 401, 'INVALID_CREDENTIALS');
+    }
+    if (!client.email_verified_at) {
+      return fail(res, 'Veuillez vérifier votre email avant de vous connecter', 403, 'EMAIL_NOT_VERIFIED');
+    }
+    if (client.locked_until && new Date(client.locked_until) > new Date()) {
+      const mins = Math.ceil((new Date(client.locked_until) - Date.now()) / 60000);
+      return fail(res, `Compte temporairement verrouillé. Réessayez dans ${mins} minute(s).`, 429, 'ACCOUNT_LOCKED');
+    }
+
+    const valid = await clientAuth.verifyPassword(password, client.password_hash);
+    if (!valid) {
+      const newCount = (client.failed_login_count || 0) + 1;
+      const patch    = { failed_login_count: newCount };
+      if (newCount >= 5) patch.locked_until = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+      await sbRequest('PATCH', `/clients?id=eq.${client.id}`, patch);
+      return fail(res, 'Email ou mot de passe incorrect', 401, 'INVALID_CREDENTIALS');
+    }
+
+    // Succès : reset compteur, maj last_login
+    const currentIp = clientAuth.getIp(req);
+    await sbRequest('PATCH', `/clients?id=eq.${client.id}`, {
+      failed_login_count: 0,
+      locked_until:       null,
+      last_login_at:      nowISO()
+    });
+
+    const jwtUser = { id: client.id, email: client.email };
+    const tkns = await clientAuth.generateTokens(jwtUser, {
+      ip:         currentIp,
+      user_agent: req.headers['user-agent'] || null
+    });
+
+    // Login-alert si connexion précédente connue (IP potentiellement différente)
+    if (client.last_login_at) {
+      const lastSessions = await sbRequest('GET',
+        `/users_client_sessions?user_id=eq.${client.id}&revoque=eq.false&order=created_at.desc&select=ip&limit=1`);
+      const lastIp = Array.isArray(lastSessions) && lastSessions[0] ? lastSessions[0].ip : null;
+      if (!lastIp || lastIp !== currentIp) {
+        await emailService.send('login-alert', client.email, {
+          prenom:     client.prenom || 'Client',
+          ip:         currentIp,
+          user_agent: req.headers['user-agent'] || null,
+          date:       new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })
+        });
+      }
+    }
+
+    if (req.headers['x-client-type'] === 'web') {
+      setRefreshCookie(res, tkns.refresh_token, tkns.refresh_expires_in);
+    }
+    return ok(res, tkns);
+  }
+
+  // ── POST /auth/client/refresh ──────────────────────────
+  if ((p = M('POST', '/auth/client/refresh')) !== null) {
+    const b           = await body(req);
+    const isWeb       = req.headers['x-client-type'] === 'web';
+    const refreshTok  = b.refresh_token || (isWeb ? parseCookie(req, 'refresh_token') : null);
+
+    if (!refreshTok) {
+      return fail(res, 'refresh_token requis', 400, 'MISSING_REFRESH_TOKEN');
+    }
+
+    const result = await clientAuth.rotateRefreshToken(refreshTok, {
+      ip:         clientAuth.getIp(req),
+      user_agent: req.headers['user-agent'] || null
+    });
+
+    if (!result.ok) {
+      if (isWeb) clearRefreshCookie(res);
+      const msg = result.reason === 'reuse_detected'
+        ? 'Session compromise détectée — reconnectez-vous'
+        : result.reason === 'expire'
+          ? 'Session expirée — reconnectez-vous'
+          : 'Session invalide — reconnectez-vous';
+      return fail(res, msg, 401, 'INVALID_REFRESH_TOKEN');
+    }
+
+    if (isWeb) setRefreshCookie(res, result.tokens.refresh_token, result.tokens.refresh_expires_in);
+    return ok(res, result.tokens);
+  }
+
+  // ── POST /auth/client/logout ───────────────────────────
+  if ((p = M('POST', '/auth/client/logout')) !== null) {
+    const b           = await body(req);
+    const isWeb       = req.headers['x-client-type'] === 'web';
+    const refreshTok  = b.refresh_token || (isWeb ? parseCookie(req, 'refresh_token') : null);
+
+    if (refreshTok) await clientAuth.revokeSession(refreshTok, 'logout');
+    if (isWeb) clearRefreshCookie(res);
+    return ok(res, { message: 'Déconnecté avec succès' });
+  }
+
+  // ── POST /auth/client/password-reset ──────────────────
+  if ((p = M('POST', '/auth/client/password-reset')) !== null) {
+    const b = await body(req);
+    const { email } = b;
+    if (!email) return fail(res, 'Champ requis : email', 400, 'MISSING_FIELDS');
+
+    // Toujours répondre la même chose (anti-enumeration)
+    const clients = await sbRequest('GET',
+      `/clients?email=eq.${encodeURIComponent(email)}&select=id,prenom,email_verified_at&limit=1`);
+    const client = Array.isArray(clients) ? clients[0] : null;
+
+    if (client && client.email_verified_at) {
+      const code = gen6DigitCode();
+      await SB.insert('auth_tokens', {
+        user_id:    client.id,
+        type:       'password_reset',
+        code,
+        expires_at: in15min(),
+        ip:         clientAuth.getIp(req),
+        user_agent: req.headers['user-agent'] || null
+      });
+      await emailService.send('reset', email, {
+        prenom:          client.prenom || 'Client',
+        code,
+        expires_minutes: 15
+      });
+
+      if (DEV_CODES) {
+        return ok(res, {
+          message: 'Si votre adresse est enregistrée, un code vous a été envoyé.',
+          _dev_code: code
+        });
+      }
+    }
+
+    return ok(res, { message: 'Si votre adresse est enregistrée, un code vous a été envoyé.' });
+  }
+
+  // ── POST /auth/client/password-reset/confirm ──────────
+  if ((p = M('POST', '/auth/client/password-reset/confirm')) !== null) {
+    const b = await body(req);
+    const { email, code, new_password } = b;
+    if (!email || !code || !new_password) {
+      return fail(res, 'Champs requis : email, code, new_password', 400, 'MISSING_FIELDS');
+    }
+
+    const pwdCheck = clientAuth.validatePasswordStrength(new_password);
+    if (!pwdCheck.valid) {
+      return fail(res, pwdCheck.errors.join('. '), 400, 'WEAK_PASSWORD');
+    }
+
+    const clients = await sbRequest('GET',
+      `/clients?email=eq.${encodeURIComponent(email)}&select=id&limit=1`);
+    const client = Array.isArray(clients) ? clients[0] : null;
+    if (!client) return fail(res, 'Email ou code invalide', 400, 'INVALID_CODE');
+
+    const tokens = await sbRequest('GET',
+      `/auth_tokens?user_id=eq.${client.id}&type=eq.password_reset&code=eq.${encodeURIComponent(code)}&used_at=is.null&select=id,expires_at&limit=1`);
+    const token = Array.isArray(tokens) ? tokens[0] : null;
+    if (!token) return fail(res, 'Email ou code invalide', 400, 'INVALID_CODE');
+    if (new Date(token.expires_at) < new Date()) {
+      return fail(res, 'Code expiré — refaites une demande de réinitialisation', 400, 'CODE_EXPIRED');
+    }
+
+    const newHash = await clientAuth.hashPassword(new_password);
+    await sbRequest('PATCH', `/auth_tokens?id=eq.${token.id}`, { used_at: nowISO() });
+    await sbRequest('PATCH', `/clients?id=eq.${client.id}`, { password_hash: newHash });
+    await clientAuth.revokeAllSessionsForUser(client.id, 'password_reset');
+
+    return ok(res, { message: 'Mot de passe mis à jour — reconnectez-vous' });
+  }

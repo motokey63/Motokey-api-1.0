@@ -1092,16 +1092,10 @@ const server = http.createServer(async function(req, res){
     return ok(res,{ pong: true, user: req.clientUser.email, id: req.clientUser.id });
   }
 
-  /* ── LIVRAISON 7b : AUTH CLIENT ENDPOINTS ── */
+  /* ── LIVRAISON 7b : AUTH CLIENT ENDPOINTS (Supabase Auth natif) ── */
   // TODO RBAC : sécuriser avec vérification de rôle quand les rôles seront définis
 
   // ── Helpers locaux 7b ──────────────────────────────────
-  function gen6DigitCode() {
-    return String(Math.floor(100000 + Math.random() * 900000));
-  }
-  function in15min() {
-    return new Date(Date.now() + 15 * 60 * 1000).toISOString();
-  }
   function parseCookie(req, name) {
     const c = req.headers['cookie'] || '';
     const m = c.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]*)'));
@@ -1109,275 +1103,185 @@ const server = http.createServer(async function(req, res){
   }
   function setRefreshCookie(res, token, maxAge) {
     res.setHeader('Set-Cookie',
-      `refresh_token=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge}; Path=/auth/client/refresh`);
+      `refresh_token=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Strict; Max-Age=${maxAge || 2592000}; Path=/auth/client/refresh`);
   }
   function clearRefreshCookie(res) {
     res.setHeader('Set-Cookie',
       'refresh_token=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/auth/client/refresh');
   }
-  const DEV_CODES = process.env.AUTH_DEV_RETURN_CODES === 'true';
+  // Raccourcis vers les clients Supabase exposés par supabase.js
+  function sbPub() { return SBLayer ? SBLayer.supabasePublic : null; } // anon — auth.uid() actif
+  function sbSvc() { return SBLayer ? SBLayer.supabase        : null; } // service role — admin ops
 
   // ── POST /auth/client/register ─────────────────────────
   if ((p = M('POST', '/auth/client/register')) !== null) {
+    // TODO RBAC
+    if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
     const b = await body(req);
-    const { email, password, prenom, nom, cgu_accepted } = b;
-
-    if (!email || !password || !prenom || !nom) {
-      return fail(res, 'Champs requis : email, password, prenom, nom', 400, 'MISSING_FIELDS');
-    }
-    if (!cgu_accepted) {
-      return fail(res, 'Vous devez accepter les CGU', 400, 'CGU_NOT_ACCEPTED');
-    }
-    const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRx.test(email)) {
-      return fail(res, 'Email invalide', 400, 'INVALID_EMAIL');
-    }
-    const pwdCheck = clientAuth.validatePasswordStrength(password);
-    if (!pwdCheck.valid) {
-      return fail(res, pwdCheck.errors.join('. '), 400, 'WEAK_PASSWORD');
+    const { email, password, nom, tel } = b;
+    if (!email || !password || !nom) {
+      return fail(res, 'Champs requis : email, password, nom', 400, 'MISSING_FIELDS');
     }
 
-    // Vérifier unicité email
-    const existing = await sbRequest('GET',
-      `/clients?email=eq.${encodeURIComponent(email)}&select=id&limit=1`);
-    if (Array.isArray(existing) && existing.length > 0) {
-      return fail(res, 'Un compte existe déjà avec cet email', 409, 'EMAIL_EXISTS');
+    try {
+      const { data, error } = await sbPub().auth.signUp({
+        email,
+        password,
+        options: { data: { nom: nom.trim(), tel: tel || null } }
+      });
+      // Supabase envoie automatiquement l'OTP de confirmation
+
+      if (!error && data.user) {
+        // Lier auth_user_id sur le profil clients existant, ou créer un nouveau
+        // (garage_id nullable requis — cf. migration 07b-pivot-migration.sql)
+        const garageId = req.headers['x-garage-id'] || null;
+        const rows = await sbRequest('GET',
+          `/clients?email=eq.${encodeURIComponent(email)}&select=id&limit=1`);
+        if (Array.isArray(rows) && rows.length > 0) {
+          await sbRequest('PATCH', `/clients?id=eq.${rows[0].id}`,
+            { auth_user_id: data.user.id, nom: nom.trim(), tel: tel || null });
+        } else {
+          await sbRequest('POST', '/clients', {
+            auth_user_id: data.user.id,
+            email:        email.toLowerCase().trim(),
+            nom:          nom.trim(),
+            tel:          tel || null,
+            garage_id:    garageId
+          });
+        }
+      }
+    } catch (e) {
+      console.error('[7b] register error:', e.message);
     }
 
-    const passwordHash = await clientAuth.hashPassword(password);
-    const newClient = await SB.insert('clients', {
-      email,
-      password_hash: passwordHash,
-      prenom:        prenom.trim(),
-      nom:           nom.trim(),
-    });
-    if (!newClient || !newClient.id) {
-      return fail(res, 'Erreur création du compte', 500, 'SERVER_ERROR');
-    }
-
-    const code = gen6DigitCode();
-    await SB.insert('auth_tokens', {
-      user_id:    newClient.id,
-      type:       'verify_email',
-      code,
-      expires_at: in15min(),
-      ip:         clientAuth.getIp(req),
-      user_agent: req.headers['user-agent'] || null
-    });
-
-    await emailService.send('welcome', email, { prenom: prenom.trim(), email });
-    await emailService.send('verify',  email, { prenom: prenom.trim(), code, expires_minutes: 15 });
-
-    const resp = { message: 'Compte créé — vérifiez votre email pour activer votre compte' };
-    if (DEV_CODES) resp._dev_code = code;
-    return ok(res, resp, 'CREATED', 201);
+    // Anti-énumération : même réponse que l'email soit pris ou non
+    return ok(res,
+      { message: 'Si ce compte est valide, un email de vérification a été envoyé.' },
+      null, 201);
   }
 
   // ── POST /auth/client/verify-email ─────────────────────
   if ((p = M('POST', '/auth/client/verify-email')) !== null) {
+    // TODO RBAC
+    if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
     const b = await body(req);
-    const { email, code } = b;
-    if (!email || !code) {
-      return fail(res, 'Champs requis : email, code', 400, 'MISSING_FIELDS');
+    const { email, token: otp } = b;
+    if (!email || !otp) {
+      return fail(res, 'Champs requis : email, token', 400, 'MISSING_FIELDS');
     }
 
-    const clients = await sbRequest('GET',
-      `/clients?email=eq.${encodeURIComponent(email)}&select=id,email_verified_at&limit=1`);
-    const client = Array.isArray(clients) ? clients[0] : null;
-    if (!client) return fail(res, 'Email ou code invalide', 400, 'INVALID_CODE');
-    if (client.email_verified_at) return fail(res, 'Email déjà vérifié', 400, 'ALREADY_VERIFIED');
+    const { data, error } = await sbPub().auth.verifyOtp({
+      email,
+      token: String(otp),
+      type:  'signup'
+    });
+    if (error) return fail(res, 'Code invalide ou expiré', 400, 'INVALID_OTP');
 
-    const tokens = await sbRequest('GET',
-      `/auth_tokens?user_id=eq.${client.id}&type=eq.verify_email&code=eq.${encodeURIComponent(code)}&used_at=is.null&select=id,expires_at&limit=1`);
-    const token = Array.isArray(tokens) ? tokens[0] : null;
-    if (!token) return fail(res, 'Email ou code invalide', 400, 'INVALID_CODE');
-    if (new Date(token.expires_at) < new Date()) {
-      return fail(res, 'Code expiré — relancez une inscription', 400, 'CODE_EXPIRED');
-    }
-
-    await sbRequest('PATCH', `/auth_tokens?id=eq.${token.id}`, { used_at: nowISO() });
-    await sbRequest('PATCH', `/clients?id=eq.${client.id}`, { email_verified_at: nowISO() });
-
-    return ok(res, { message: 'Email vérifié — vous pouvez maintenant vous connecter' });
+    return ok(res, {
+      message: 'Email vérifié — vous pouvez maintenant vous connecter.',
+      session: data.session || null
+    });
   }
 
   // ── POST /auth/client/login ────────────────────────────
   if ((p = M('POST', '/auth/client/login')) !== null) {
-    if (!clientAuth.rateLimitAuth(req, res, pathname)) return;
+    // TODO RBAC
+    if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
     const b = await body(req);
     const { email, password } = b;
     if (!email || !password) {
       return fail(res, 'Champs requis : email, password', 400, 'MISSING_FIELDS');
     }
 
-    const clients = await sbRequest('GET',
-      `/clients?email=eq.${encodeURIComponent(email)}&select=id,email,prenom,nom,password_hash,email_verified_at,failed_login_count,locked_until,last_login_at&limit=1`);
-    const client = Array.isArray(clients) ? clients[0] : null;
+    const { data, error } = await sbPub().auth.signInWithPassword({ email, password });
+    if (error) return fail(res, 'Email ou mot de passe incorrect', 401, 'INVALID_CREDENTIALS');
 
-    // Réponse identique que le compte existe ou non (anti-enumeration)
-    if (!client || !client.password_hash) {
-      return fail(res, 'Email ou mot de passe incorrect', 401, 'INVALID_CREDENTIALS');
-    }
-    if (!client.email_verified_at) {
-      return fail(res, 'Veuillez vérifier votre email avant de vous connecter', 403, 'EMAIL_NOT_VERIFIED');
-    }
-    if (client.locked_until && new Date(client.locked_until) > new Date()) {
-      const mins = Math.ceil((new Date(client.locked_until) - Date.now()) / 60000);
-      return fail(res, `Compte temporairement verrouillé. Réessayez dans ${mins} minute(s).`, 429, 'ACCOUNT_LOCKED');
-    }
+    // TODO login-alert : envoyer emailService.send('login-alert', ...) si l'IP est nouvelle
+    // (comparer avec data.user.last_sign_in_at une fois la table auth_logs branchée)
 
-    const valid = await clientAuth.verifyPassword(password, client.password_hash);
-    if (!valid) {
-      const newCount = (client.failed_login_count || 0) + 1;
-      const patch    = { failed_login_count: newCount };
-      if (newCount >= 5) patch.locked_until = new Date(Date.now() + 15 * 60 * 1000).toISOString();
-      await sbRequest('PATCH', `/clients?id=eq.${client.id}`, patch);
-      return fail(res, 'Email ou mot de passe incorrect', 401, 'INVALID_CREDENTIALS');
+    const isWeb = req.headers['x-client-type'] === 'web';
+    if (isWeb && data.session) {
+      setRefreshCookie(res, data.session.refresh_token, data.session.expires_in);
     }
-
-    // Succès : reset compteur, maj last_login
-    const currentIp = clientAuth.getIp(req);
-    await sbRequest('PATCH', `/clients?id=eq.${client.id}`, {
-      failed_login_count: 0,
-      locked_until:       null,
-      last_login_at:      nowISO()
-    });
-
-    const jwtUser = { id: client.id, email: client.email };
-    const tkns = await clientAuth.generateTokens(jwtUser, {
-      ip:         currentIp,
-      user_agent: req.headers['user-agent'] || null
-    });
-
-    // Login-alert si connexion précédente connue (IP potentiellement différente)
-    if (client.last_login_at) {
-      const lastSessions = await sbRequest('GET',
-        `/users_client_sessions?user_id=eq.${client.id}&revoque=eq.false&order=created_at.desc&select=ip&limit=1`);
-      const lastIp = Array.isArray(lastSessions) && lastSessions[0] ? lastSessions[0].ip : null;
-      if (!lastIp || lastIp !== currentIp) {
-        await emailService.send('login-alert', client.email, {
-          prenom:     client.prenom || 'Client',
-          ip:         currentIp,
-          user_agent: req.headers['user-agent'] || null,
-          date:       new Date().toLocaleString('fr-FR', { timeZone: 'Europe/Paris' })
-        });
-      }
-    }
-
-    if (req.headers['x-client-type'] === 'web') {
-      setRefreshCookie(res, tkns.refresh_token, tkns.refresh_expires_in);
-    }
-    return ok(res, tkns);
+    return ok(res, { session: data.session });
   }
 
   // ── POST /auth/client/refresh ──────────────────────────
   if ((p = M('POST', '/auth/client/refresh')) !== null) {
-    const b           = await body(req);
-    const isWeb       = req.headers['x-client-type'] === 'web';
-    const refreshTok  = b.refresh_token || (isWeb ? parseCookie(req, 'refresh_token') : null);
+    // TODO RBAC
+    if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
+    const b      = await body(req);
+    const isWeb  = req.headers['x-client-type'] === 'web';
+    const rTok   = b.refresh_token || (isWeb ? parseCookie(req, 'refresh_token') : null);
 
-    if (!refreshTok) {
-      return fail(res, 'refresh_token requis', 400, 'MISSING_REFRESH_TOKEN');
-    }
+    if (!rTok) return fail(res, 'refresh_token requis', 400, 'MISSING_REFRESH_TOKEN');
 
-    const result = await clientAuth.rotateRefreshToken(refreshTok, {
-      ip:         clientAuth.getIp(req),
-      user_agent: req.headers['user-agent'] || null
-    });
-
-    if (!result.ok) {
+    const { data, error } = await sbPub().auth.refreshSession({ refresh_token: rTok });
+    if (error) {
       if (isWeb) clearRefreshCookie(res);
-      const msg = result.reason === 'reuse_detected'
-        ? 'Session compromise détectée — reconnectez-vous'
-        : result.reason === 'expire'
-          ? 'Session expirée — reconnectez-vous'
-          : 'Session invalide — reconnectez-vous';
-      return fail(res, msg, 401, 'INVALID_REFRESH_TOKEN');
+      return fail(res, 'Session expirée — reconnectez-vous', 401, 'INVALID_REFRESH_TOKEN');
     }
 
-    if (isWeb) setRefreshCookie(res, result.tokens.refresh_token, result.tokens.refresh_expires_in);
-    return ok(res, result.tokens);
+    if (isWeb && data.session) {
+      setRefreshCookie(res, data.session.refresh_token, data.session.expires_in);
+    }
+    return ok(res, { session: data.session });
   }
 
   // ── POST /auth/client/logout ───────────────────────────
   if ((p = M('POST', '/auth/client/logout')) !== null) {
-    const b           = await body(req);
-    const isWeb       = req.headers['x-client-type'] === 'web';
-    const refreshTok  = b.refresh_token || (isWeb ? parseCookie(req, 'refresh_token') : null);
+    // TODO RBAC
+    const isWeb  = req.headers['x-client-type'] === 'web';
+    const bearer = (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '').trim();
 
-    if (refreshTok) await clientAuth.revokeSession(refreshTok, 'logout');
+    if (SBLayer && bearer) {
+      try {
+        await sbSvc().auth.admin.signOut(bearer);
+      } catch (e) {
+        console.warn('[7b] logout signOut:', e.message);
+      }
+    }
     if (isWeb) clearRefreshCookie(res);
     return ok(res, { message: 'Déconnecté avec succès' });
   }
 
   // ── POST /auth/client/password-reset ──────────────────
   if ((p = M('POST', '/auth/client/password-reset')) !== null) {
+    // TODO RBAC
+    if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
     const b = await body(req);
     const { email } = b;
     if (!email) return fail(res, 'Champ requis : email', 400, 'MISSING_FIELDS');
 
-    // Toujours répondre la même chose (anti-enumeration)
-    const clients = await sbRequest('GET',
-      `/clients?email=eq.${encodeURIComponent(email)}&select=id,prenom,email_verified_at&limit=1`);
-    const client = Array.isArray(clients) ? clients[0] : null;
-
-    if (client && client.email_verified_at) {
-      const code = gen6DigitCode();
-      await SB.insert('auth_tokens', {
-        user_id:    client.id,
-        type:       'password_reset',
-        code,
-        expires_at: in15min(),
-        ip:         clientAuth.getIp(req),
-        user_agent: req.headers['user-agent'] || null
+    const appUrl = process.env.APP_URL || 'https://motokey.app';
+    try {
+      await sbPub().auth.resetPasswordForEmail(email, {
+        redirectTo: appUrl + '/reset-password'
       });
-      await emailService.send('reset', email, {
-        prenom:          client.prenom || 'Client',
-        code,
-        expires_minutes: 15
-      });
-
-      if (DEV_CODES) {
-        return ok(res, {
-          message: 'Si votre adresse est enregistrée, un code vous a été envoyé.',
-          _dev_code: code
-        });
-      }
+    } catch (e) {
+      console.error('[7b] password-reset error:', e.message);
     }
 
-    return ok(res, { message: 'Si votre adresse est enregistrée, un code vous a été envoyé.' });
+    // Anti-énumération : même réponse que l'email existe ou non
+    return ok(res, { message: 'Si ce compte existe, un email de réinitialisation a été envoyé.' });
   }
 
   // ── POST /auth/client/password-reset/confirm ──────────
   if ((p = M('POST', '/auth/client/password-reset/confirm')) !== null) {
+    // TODO RBAC
+    if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
     const b = await body(req);
-    const { email, code, new_password } = b;
-    if (!email || !code || !new_password) {
-      return fail(res, 'Champs requis : email, code, new_password', 400, 'MISSING_FIELDS');
+    const { access_token, new_password } = b;
+    if (!access_token || !new_password) {
+      return fail(res, 'Champs requis : access_token, new_password', 400, 'MISSING_FIELDS');
     }
 
-    const pwdCheck = clientAuth.validatePasswordStrength(new_password);
-    if (!pwdCheck.valid) {
-      return fail(res, pwdCheck.errors.join('. '), 400, 'WEAK_PASSWORD');
-    }
+    // Valider le token de récupération (type "recovery" émis par Supabase)
+    const { data: { user }, error: userErr } = await sbSvc().auth.getUser(access_token);
+    if (userErr || !user) return fail(res, 'Token invalide ou expiré', 400, 'INVALID_TOKEN');
 
-    const clients = await sbRequest('GET',
-      `/clients?email=eq.${encodeURIComponent(email)}&select=id&limit=1`);
-    const client = Array.isArray(clients) ? clients[0] : null;
-    if (!client) return fail(res, 'Email ou code invalide', 400, 'INVALID_CODE');
-
-    const tokens = await sbRequest('GET',
-      `/auth_tokens?user_id=eq.${client.id}&type=eq.password_reset&code=eq.${encodeURIComponent(code)}&used_at=is.null&select=id,expires_at&limit=1`);
-    const token = Array.isArray(tokens) ? tokens[0] : null;
-    if (!token) return fail(res, 'Email ou code invalide', 400, 'INVALID_CODE');
-    if (new Date(token.expires_at) < new Date()) {
-      return fail(res, 'Code expiré — refaites une demande de réinitialisation', 400, 'CODE_EXPIRED');
-    }
-
-    const newHash = await clientAuth.hashPassword(new_password);
-    await sbRequest('PATCH', `/auth_tokens?id=eq.${token.id}`, { used_at: nowISO() });
-    await sbRequest('PATCH', `/clients?id=eq.${client.id}`, { password_hash: newHash });
-    await clientAuth.revokeAllSessionsForUser(client.id, 'password_reset');
+    const { error } = await sbSvc().auth.admin.updateUserById(user.id, { password: new_password });
+    if (error) return fail(res, 'Impossible de mettre à jour le mot de passe', 500, 'SERVER_ERROR');
 
     return ok(res, { message: 'Mot de passe mis à jour — reconnectez-vous' });
   }
