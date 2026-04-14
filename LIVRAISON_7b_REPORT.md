@@ -1,11 +1,12 @@
 # Livraison 7b — Rapport de validation complet
 
 **Session de validation** : 14 avril 2026  
-**Dernier commit** : 894c41e
+**Dernier commit** : 456b778
 
 ## Commits clés
 - `9ba2966` — pivot vers Supabase Auth natif (archivage code maison bcrypt)
 - `894c41e` — fix deadlock stream sur les 6 handlers /auth/client/*
+- `456b778` — fix password-reset/confirm : accepte OTP recovery (email+code) en plus du flux lien
 
 ## Architecture
 Auth client 100% Supabase Auth natif. Backend wrapper léger autour
@@ -24,7 +25,7 @@ SMTP via Resend branché côté Dashboard Supabase. OTP 8 chiffres
 | POST /auth/client/refresh | ✅ 200 | rotation AT ✅, rotation RT ✅, cookie web HttpOnly/Secure/SameSite=Strict ✅ |
 | POST /auth/client/logout | ✅ 200 | "Déconnecté avec succès", révocation effective ✅ |
 | POST /auth/client/password-reset | ✅ 200 | anti-enum OK (même message email valide/invalide) |
-| POST /auth/client/password-reset/confirm | ⏸️ non testé | en attente token de recovery (email Mehdi) |
+| POST /auth/client/password-reset/confirm | ✅ 200 | OTP recovery 8 chiffres via verifyOtp(type:'recovery'), ancien mdp rejeté ✅, nouveau mdp accepté ✅ |
 
 ## Audit sécurité rapide
 
@@ -59,9 +60,7 @@ SMTP via Resend branché côté Dashboard Supabase. OTP 8 chiffres
    la différence bcrypt/court-circuit
 2. **Lockout Supabase** — vérifier et activer Rate Limiting dans Supabase
    Dashboard > Auth > Rate Limiting (brute force protection)
-3. **password-reset/confirm** — à tester dès réception du token de
-   recovery par email (reprise Tâche 7)
-4. **OTP 8 chiffres** — à ajuster en 6 dans Supabase Dashboard si
+3. **OTP 8 chiffres** — à ajuster en 6 dans Supabase Dashboard si
    souhaité (cosmétique)
 
 ## TODOs hérités des sessions précédentes (non traités ici)
