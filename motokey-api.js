@@ -1117,7 +1117,6 @@ const server = http.createServer(async function(req, res){
   if ((p = M('POST', '/auth/client/register')) !== null) {
     // TODO RBAC
     if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
-    const b = await body(req);
     const { email, password, nom, tel } = b;
     if (!email || !password || !nom) {
       return fail(res, 'Champs requis : email, password, nom', 400, 'MISSING_FIELDS');
@@ -1164,7 +1163,6 @@ const server = http.createServer(async function(req, res){
   if ((p = M('POST', '/auth/client/verify-email')) !== null) {
     // TODO RBAC
     if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
-    const b = await body(req);
     const { email, token: otp } = b;
     if (!email || !otp) {
       return fail(res, 'Champs requis : email, token', 400, 'MISSING_FIELDS');
@@ -1187,7 +1185,6 @@ const server = http.createServer(async function(req, res){
   if ((p = M('POST', '/auth/client/login')) !== null) {
     // TODO RBAC
     if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
-    const b = await body(req);
     const { email, password } = b;
     if (!email || !password) {
       return fail(res, 'Champs requis : email, password', 400, 'MISSING_FIELDS');
@@ -1210,7 +1207,6 @@ const server = http.createServer(async function(req, res){
   if ((p = M('POST', '/auth/client/refresh')) !== null) {
     // TODO RBAC
     if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
-    const b      = await body(req);
     const isWeb  = req.headers['x-client-type'] === 'web';
     const rTok   = b.refresh_token || (isWeb ? parseCookie(req, 'refresh_token') : null);
 
@@ -1249,7 +1245,6 @@ const server = http.createServer(async function(req, res){
   if ((p = M('POST', '/auth/client/password-reset')) !== null) {
     // TODO RBAC
     if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
-    const b = await body(req);
     const { email } = b;
     if (!email) return fail(res, 'Champ requis : email', 400, 'MISSING_FIELDS');
 
@@ -1270,7 +1265,6 @@ const server = http.createServer(async function(req, res){
   if ((p = M('POST', '/auth/client/password-reset/confirm')) !== null) {
     // TODO RBAC
     if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
-    const b = await body(req);
     const { access_token, new_password } = b;
     if (!access_token || !new_password) {
       return fail(res, 'Champs requis : access_token, new_password', 400, 'MISSING_FIELDS');
