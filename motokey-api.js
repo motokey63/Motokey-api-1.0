@@ -1262,19 +1262,31 @@ const server = http.createServer(async function(req, res){
   }
 
   // ── POST /auth/client/password-reset/confirm ──────────
+  // Accepte deux flux :
+  //   1. OTP  : { email, code, new_password }       → verifyOtp(type:'recovery')
+  //   2. Link : { access_token, new_password }       → getUser(access_token)
   if ((p = M('POST', '/auth/client/password-reset/confirm')) !== null) {
     // TODO RBAC
     if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
-    const { access_token, new_password } = b;
-    if (!access_token || !new_password) {
-      return fail(res, 'Champs requis : access_token, new_password', 400, 'MISSING_FIELDS');
+    const { email, code, access_token, new_password } = b;
+    if (!new_password || (!code && !access_token)) {
+      return fail(res, 'Champs requis : new_password + (code+email ou access_token)', 400, 'MISSING_FIELDS');
     }
 
-    // Valider le token de récupération (type "recovery" émis par Supabase)
-    const { data: { user }, error: userErr } = await sbSvc().auth.getUser(access_token);
-    if (userErr || !user) return fail(res, 'Token invalide ou expiré', 400, 'INVALID_TOKEN');
+    let userId;
+    if (code && email) {
+      // Flux OTP recovery (Supabase envoie un code à 6-8 chiffres par email)
+      const { data, error: otpErr } = await sbPub().auth.verifyOtp({ email, token: String(code), type: 'recovery' });
+      if (otpErr || !data?.user) return fail(res, 'Code invalide ou expiré', 400, 'INVALID_TOKEN');
+      userId = data.user.id;
+    } else {
+      // Flux lien (access_token JWT de recovery extrait de l'URL du lien email)
+      const { data: { user }, error: userErr } = await sbSvc().auth.getUser(access_token);
+      if (userErr || !user) return fail(res, 'Token invalide ou expiré', 400, 'INVALID_TOKEN');
+      userId = user.id;
+    }
 
-    const { error } = await sbSvc().auth.admin.updateUserById(user.id, { password: new_password });
+    const { error } = await sbSvc().auth.admin.updateUserById(userId, { password: new_password });
     if (error) return fail(res, 'Impossible de mettre à jour le mot de passe', 500, 'SERVER_ERROR');
 
     return ok(res, { message: 'Mot de passe mis à jour — reconnectez-vous' });
