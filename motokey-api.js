@@ -76,6 +76,7 @@ const url        = require('url');
 const https2     = require('https');
 const clientAuth  = require('./auth/client_auth');
 const emailService = require('./services/emailService');
+const rbac        = require('./auth/rbac');
 
 // Couche Supabase (supabase.js) — chargée si SUPABASE_URL + SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_KEY) présents
 let SBLayer = null;
@@ -438,6 +439,11 @@ const server = http.createServer(async function(req, res){
 
   let b = {};
   if(['POST','PUT','PATCH'].includes(method)) b = await body(req);
+
+  // Extraction du contexte utilisateur (rôle RBAC) depuis le Bearer token.
+  // null si pas de token, token invalide, ou rôle non défini.
+  // N'impacte pas les routes publiques (elles ignorent req.ctx).
+  req.ctx = await rbac.extractRoleFromRequest(req, SBLayer);
 
   function M(m,p){ return match(m,method,p,pathname); }
 
