@@ -81,10 +81,90 @@ function requireAnyRole(ctx, allowedRoles) {
   return allowedRoles.includes(ctx.role);
 }
 
+/**
+ * Résout le garage_id depuis un contexte RBAC Supabase JWT.
+ * Pour les users PRO/CONCESSION/ADMIN qui ont un garage associé.
+ * @param {object|null} ctx     — req.ctx produit par extractRoleFromRequest
+ * @param {object}      SBLayer — module supabase.js
+ * @returns {Promise<string|null>} UUID du garage ou null
+ */
+async function getGarageIdForUser(ctx, SBLayer) {
+  if (!ctx || !ctx.user_id || !SBLayer) return null;
+  try {
+    const { data, error } = await SBLayer.supabase
+      .from('garages')
+      .select('id')
+      .eq('auth_user_id', ctx.user_id)
+      .single();
+    return (error || !data) ? null : data.id;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Rôle inféré pour les comptes garage legacy (vieux JWT HS256).
+ * Dans ces tokens, a.id = PK de la table garages (pas le Supabase user_id).
+ * Si un garage existe avec cet id → role CONCESSION par défaut (ceinture+bretelles
+ * pour les comptes legacy hypothétiques dont on ne connaît pas encore le rôle).
+ *
+ * @param {string} garageId — PK de la table garages (= a.id du vieux JWT)
+ * @param {object} SBLayer
+ * @returns {Promise<{role,level,...}|null>}
+ */
+async function inferLegacyRole(garageId, SBLayer) {
+  if (!garageId || !SBLayer) return null;
+  try {
+    const { data, error } = await SBLayer.supabase
+      .from('garages')
+      .select('id')
+      .eq('id', garageId)
+      .single();
+    if (error || !data) return null;
+    return {
+      user_id:     null,
+      email:       null,
+      role:        'CONCESSION',
+      level:       ROLE_HIERARCHY['CONCESSION'],
+      client_type: null
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * Retire les champs financiers des objets renvoyés aux MECANOs.
+ * Applique récursivement sur tableau ou objet unique.
+ * Sans effet pour tout rôle autre que MECANO.
+ *
+ * Champs retirés : montant_ht, montant_ttc, taux_horaire, prix,
+ *                  total, total_ht, total_ttc, remise, remise_pct,
+ *                  remise_note, remise_type
+ */
+function stripFinancialFields(obj, ctx) {
+  if (!ctx || ctx.role !== 'MECANO') return obj;
+  const FIELDS = [
+    'montant_ht', 'montant_ttc', 'taux_horaire', 'prix',
+    'total', 'total_ht', 'total_ttc',
+    'remise', 'remise_pct', 'remise_note', 'remise_type'
+  ];
+  function strip(o) {
+    if (!o || typeof o !== 'object') return o;
+    const r = Object.assign({}, o);
+    FIELDS.forEach(function(f) { delete r[f]; });
+    return r;
+  }
+  return Array.isArray(obj) ? obj.map(strip) : strip(obj);
+}
+
 module.exports = {
   ROLE_HIERARCHY,
   VALID_ROLES,
   extractRoleFromRequest,
   requireRole,
-  requireAnyRole
+  requireAnyRole,
+  getGarageIdForUser,
+  inferLegacyRole,
+  stripFinancialFields
 };
