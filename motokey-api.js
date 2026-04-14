@@ -1099,7 +1099,7 @@ const server = http.createServer(async function(req, res){
   }
 
   /* ── LIVRAISON 7b : AUTH CLIENT ENDPOINTS (Supabase Auth natif) ── */
-  // TODO RBAC : sécuriser avec vérification de rôle quand les rôles seront définis
+  // RBAC L4 : rôles définis — voir commentaire RBAC dans chaque handler ci-dessous.
 
   // ── Helpers locaux 7b ──────────────────────────────────
   function parseCookie(req, name) {
@@ -1121,7 +1121,8 @@ const server = http.createServer(async function(req, res){
 
   // ── POST /auth/client/register ─────────────────────────
   if ((p = M('POST', '/auth/client/register')) !== null) {
-    // TODO RBAC
+    // RBAC: endpoint public — tout visiteur peut s'inscrire.
+    // Le rôle CLIENT est assigné automatiquement après signUp réussi.
     if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
     const { email, password, nom, tel } = b;
     if (!email || !password || !nom) {
@@ -1137,6 +1138,17 @@ const server = http.createServer(async function(req, res){
       // Supabase envoie automatiquement l'OTP de confirmation
 
       if (!error && data.user) {
+        // Assigner le rôle CLIENT dans app_metadata (non falsifiable côté client).
+        // Si cet update échoue, le signUp reste valide — le user pourra se connecter
+        // mais n'aura pas de rôle jusqu'à correction manuelle.
+        const { error: roleErr } = await sbSvc().auth.admin.updateUserById(
+          data.user.id,
+          { app_metadata: { role: 'CLIENT' } }
+        );
+        if (roleErr) {
+          console.warn('[7b] register: role assignment failed for', data.user.id, '—', roleErr.message);
+        }
+
         // Lier auth_user_id sur le profil clients existant, ou créer un nouveau
         // (garage_id nullable requis — cf. migration 07b-pivot-migration.sql)
         const garageId = req.headers['x-garage-id'] || null;
@@ -1167,7 +1179,7 @@ const server = http.createServer(async function(req, res){
 
   // ── POST /auth/client/verify-email ─────────────────────
   if ((p = M('POST', '/auth/client/verify-email')) !== null) {
-    // TODO RBAC
+    // RBAC: endpoint public — la vérification OTP ne requiert pas d'être authentifié.
     if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
     const { email, token: otp } = b;
     if (!email || !otp) {
@@ -1189,7 +1201,7 @@ const server = http.createServer(async function(req, res){
 
   // ── POST /auth/client/login ────────────────────────────
   if ((p = M('POST', '/auth/client/login')) !== null) {
-    // TODO RBAC
+    // RBAC: endpoint public — les credentials suffisent pour s'authentifier.
     if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
     const { email, password } = b;
     if (!email || !password) {
@@ -1211,7 +1223,7 @@ const server = http.createServer(async function(req, res){
 
   // ── POST /auth/client/refresh ──────────────────────────
   if ((p = M('POST', '/auth/client/refresh')) !== null) {
-    // TODO RBAC
+    // RBAC: endpoint public — le refresh_token est l'unique preuve d'identité requise.
     if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
     const isWeb  = req.headers['x-client-type'] === 'web';
     const rTok   = b.refresh_token || (isWeb ? parseCookie(req, 'refresh_token') : null);
@@ -1232,7 +1244,7 @@ const server = http.createServer(async function(req, res){
 
   // ── POST /auth/client/logout ───────────────────────────
   if ((p = M('POST', '/auth/client/logout')) !== null) {
-    // TODO RBAC
+    // RBAC: authentifié, tous rôles OK — le Bearer est utilisé pour révoquer la session.
     const isWeb  = req.headers['x-client-type'] === 'web';
     const bearer = (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '').trim();
 
@@ -1249,7 +1261,7 @@ const server = http.createServer(async function(req, res){
 
   // ── POST /auth/client/password-reset ──────────────────
   if ((p = M('POST', '/auth/client/password-reset')) !== null) {
-    // TODO RBAC
+    // RBAC: endpoint public — anti-énumération oblige, aucune auth requise.
     if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
     const { email } = b;
     if (!email) return fail(res, 'Champ requis : email', 400, 'MISSING_FIELDS');
@@ -1272,7 +1284,7 @@ const server = http.createServer(async function(req, res){
   //   1. OTP  : { email, code, new_password }       → verifyOtp(type:'recovery')
   //   2. Link : { access_token, new_password }       → getUser(access_token)
   if ((p = M('POST', '/auth/client/password-reset/confirm')) !== null) {
-    // TODO RBAC
+    // RBAC: endpoint public — le code OTP ou le token de recovery tient lieu d'auth.
     if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
     const { email, code, access_token, new_password } = b;
     if (!new_password || (!code && !access_token)) {
