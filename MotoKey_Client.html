@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>MotoKey — Espace Client</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:100vh;}
+
+/* ── Variables (identiques au mode garage) ── */
+:root{
+  --bg:#f0f2f5;--card:#ffffff;--card2:#f8f9fb;
+  --border:#e2e5eb;--border2:#d0d4dc;
+  --tx:#1a1d23;--tx2:#5a6172;--tx3:#9ba3b4;
+  --acc:#ff6b00;--acc2:#ff8c33;--accbg:#fff4ee;
+  --gn:#16a34a;--gnbg:#f0fdf4;--gnbd:#bbf7d0;
+  --bl:#2563eb;--blbg:#eff6ff;--blbd:#bfdbfe;
+  --yw:#d97706;--ywbg:#fffbeb;--ywbd:#fde68a;
+  --rd:#dc2626;--rdbg:#fef2f2;--rdbd:#fecaca;
+  --pu:#7c3aed;--pubg:#f5f3ff;
+  --sh:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.05);
+  --sh2:0 4px 16px rgba(0,0,0,.1);
+}
+
+/* ── Header ── */
+.topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;height:60px;gap:12px;position:sticky;top:0;z-index:100;box-shadow:var(--sh);}
+.logo{font-size:20px;font-weight:900;color:var(--tx);letter-spacing:.5px;white-space:nowrap;}
+.logo em{color:var(--acc);font-style:normal;}
+.logo-badge{font-size:11px;font-weight:600;background:var(--accbg);color:var(--acc);border:1px solid var(--acc2);border-radius:20px;padding:2px 8px;margin-left:8px;white-space:nowrap;}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
+#nav-user-name{font-size:13px;font-weight:600;color:var(--tx2);display:none;}
+#btn-account{display:none;}
+#btn-logout-nav{display:none;}
+
+/* ── Boutons ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:600;transition:all .15s;white-space:nowrap;}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.btn-primary{background:var(--acc);color:#fff;}
+.btn-primary:hover:not(:disabled){background:var(--acc2);}
+.btn-secondary{background:var(--card);color:var(--tx2);border:1px solid var(--border);}
+.btn-secondary:hover:not(:disabled){background:var(--bg);color:var(--tx);}
+.btn-ghost{background:none;color:var(--acc);border:none;padding:6px 4px;font-size:13px;font-weight:600;cursor:pointer;}
+.btn-ghost:hover{text-decoration:underline;}
+.btn-danger{background:var(--rdbg);color:var(--rd);border:1px solid var(--rdbd);}
+.btn-danger:hover:not(:disabled){background:var(--rd);color:#fff;}
+.btn-full{width:100%;}
+
+/* ── Formulaires ── */
+.form-group{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+.form-group label{font-size:13px;font-weight:600;color:var(--tx2);}
+.form-group input{padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;color:var(--tx);background:var(--card);transition:border-color .15s;outline:none;}
+.form-group input:focus{border-color:var(--acc);box-shadow:0 0 0 3px rgba(255,107,0,.1);}
+.form-group input[readonly]{background:var(--bg);color:var(--tx2);cursor:default;}
+.form-hint{font-size:12px;color:var(--tx3);margin-top:2px;}
+
+/* ── Cards ── */
+.card{background:var(--card);border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);padding:24px;}
+.card-sm{padding:20px;}
+
+/* ── Auth container ── */
+.auth-wrap{min-height:calc(100vh - 60px);display:flex;align-items:center;justify-content:center;padding:24px 16px;}
+.auth-box{width:100%;max-width:400px;}
+.auth-box .card{padding:32px;}
+.auth-title{font-size:22px;font-weight:800;color:var(--tx);margin-bottom:4px;}
+.auth-subtitle{font-size:14px;color:var(--tx2);margin-bottom:24px;}
+.auth-footer{text-align:center;margin-top:16px;font-size:13px;color:var(--tx2);}
+.divider{height:1px;background:var(--border);margin:20px 0;}
+
+/* ── OTP input ── */
+.otp-input{font-size:24px;font-weight:700;letter-spacing:8px;text-align:center;padding:14px 12px;}
+
+/* ── App screen layout ── */
+.app-wrap{max-width:800px;margin:0 auto;padding:24px 16px;}
+.section-title{font-size:16px;font-weight:700;color:var(--tx);margin-bottom:12px;}
+.empty-state{text-align:center;padding:48px 24px;color:var(--tx2);}
+.empty-state .empty-icon{font-size:48px;margin-bottom:12px;}
+.empty-state p{font-size:15px;line-height:1.6;}
+
+/* ── Moto card ── */
+.moto-card{background:var(--card);border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);margin-bottom:24px;overflow:hidden;}
+.moto-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;}
+.moto-identity{flex:1;min-width:0;}
+.moto-marque{font-size:20px;font-weight:800;color:var(--tx);}
+.moto-sub{font-size:14px;color:var(--tx2);margin-top:2px;}
+.moto-plaque{display:inline-block;background:#fff;border:2px solid #1a1d23;border-radius:6px;padding:3px 10px;font-size:14px;font-weight:800;letter-spacing:2px;margin-top:6px;}
+.score-badge{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:72px;}
+.score-num{font-size:36px;font-weight:900;line-height:1;}
+.score-num.vert{color:var(--gn);}
+.score-num.bleu{color:var(--bl);}
+.score-num.jaune{color:var(--yw);}
+.score-num.rouge{color:var(--rd);}
+.score-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--tx3);}
+
+/* ── Sections internes d'une moto card ── */
+.moto-section{padding:20px 24px;border-bottom:1px solid var(--border);}
+.moto-section:last-child{border-bottom:none;}
+.moto-section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--tx3);margin-bottom:12px;}
+
+/* ── Garage info ── */
+.garage-info{display:flex;flex-direction:column;gap:4px;}
+.garage-name{font-size:15px;font-weight:700;color:var(--tx);}
+.garage-detail{font-size:13px;color:var(--tx2);}
+
+/* ── Interventions ── */
+.interv-list{display:flex;flex-direction:column;gap:8px;}
+.interv-item{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;background:var(--bg);border-radius:8px;}
+.interv-badge{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:5px;}
+.interv-badge.vert{background:var(--gn);}
+.interv-badge.bleu{background:var(--bl);}
+.interv-badge.jaune{background:var(--yw);}
+.interv-badge.rouge{background:var(--rd);}
+.interv-body{flex:1;min-width:0;}
+.interv-title{font-size:14px;font-weight:600;color:var(--tx);}
+.interv-meta{font-size:12px;color:var(--tx3);margin-top:2px;}
+.interv-empty{font-size:13px;color:var(--tx3);font-style:italic;}
+
+/* ── Plan entretien ── */
+.plan-list{display:flex;flex-direction:column;gap:8px;}
+.plan-item{display:flex;align-items:center;gap:12px;padding:10px 12px;background:var(--bg);border-radius:8px;}
+.plan-statut{font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;}
+.plan-statut.urgent{background:var(--rdbg);color:var(--rd);border:1px solid var(--rdbd);}
+.plan-statut.warning{background:var(--ywbg);color:var(--yw);border:1px solid var(--ywbd);}
+.plan-statut.ok{background:var(--gnbg);color:var(--gn);border:1px solid var(--gnbd);}
+.plan-label{font-size:13px;color:var(--tx);font-weight:500;}
+.plan-km{font-size:12px;color:var(--tx3);}
+
+/* ── Account screen ── */
+.account-section{margin-bottom:24px;}
+.account-section-title{font-size:14px;font-weight:700;color:var(--tx);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);}
+
+/* ── Toast ── */
+#toast-container{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:9999;max-width:340px;}
+.toast{padding:12px 16px;border-radius:10px;font-size:14px;font-weight:500;box-shadow:var(--sh2);animation:toast-in .2s ease;display:flex;align-items:center;gap:8px;}
+.toast.success{background:var(--gnbg);color:var(--gn);border:1px solid var(--gnbd);}
+.toast.error{background:var(--rdbg);color:var(--rd);border:1px solid var(--rdbd);}
+.toast.info{background:var(--blbg);color:var(--bl);border:1px solid var(--blbd);}
+@keyframes toast-in{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+/* ── Responsive ── */
+@media(max-width:600px){
+  .topbar{padding:0 16px;}
+  .auth-box .card{padding:24px 20px;}
+  .moto-header{flex-direction:column;gap:12px;}
+  .score-badge{flex-direction:row;align-items:center;gap:8px;}
+  .score-num{font-size:28px;}
+  #toast-container{left:16px;right:16px;bottom:16px;max-width:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- ── Header ── -->
+<div class="topbar">
+  <div class="logo">Moto<em>Key</em> <span class="logo-badge">Espace Client</span></div>
+  <div class="topbar-right">
+    <span id="nav-user-name"></span>
+    <button class="btn btn-secondary btn-sm" id="btn-account" style="font-size:13px;padding:7px 14px;">Mon compte</button>
+    <button class="btn btn-ghost" id="btn-logout-nav" style="color:var(--rd);">Déconnexion</button>
+  </div>
+</div>
+
+<!-- ── Toast container ── -->
+<div id="toast-container"></div>
+
+<!-- ══════════════════════════════════════════
+     ÉCRAN 1 — LOGIN
+════════════════════════════════════════════ -->
+<div id="screen-login" class="auth-wrap">
+  <div class="auth-box">
+    <div class="card">
+      <div class="auth-title">Connexion</div>
+      <div class="auth-subtitle">Accédez à l'historique de votre moto</div>
+
+      <div class="form-group">
+        <label for="login-email">Adresse email</label>
+        <input type="email" id="login-email" placeholder="vous@exemple.fr" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="login-password">Mot de passe</label>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+
+      <button class="btn btn-primary btn-full" id="btn-login">Se connecter</button>
+
+      <div class="auth-footer">
+        <button class="btn-ghost" id="link-forgot">Mot de passe oublié ?</button>
+        <div class="divider"></div>
+        Pas encore de compte ?
+        <button class="btn-ghost" id="link-register">Créer un compte</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ÉCRAN 2 — REGISTER
+════════════════════════════════════════════ -->
+<div id="screen-register" class="auth-wrap" style="display:none;">
+  <div class="auth-box">
+    <div class="card">
+      <div class="auth-title">Créer mon compte</div>
+      <div class="auth-subtitle">Votre garage vous a enregistré ? Utilisez le même email.</div>
+
+      <div class="form-group">
+        <label for="reg-nom">Nom complet</label>
+        <input type="text" id="reg-nom" placeholder="Jean Dupont" autocomplete="name">
+      </div>
+      <div class="form-group">
+        <label for="reg-email">Adresse email</label>
+        <input type="email" id="reg-email" placeholder="vous@exemple.fr" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label for="reg-tel">Téléphone <span style="font-weight:400;color:var(--tx3)">(optionnel)</span></label>
+        <input type="tel" id="reg-tel" placeholder="06 12 34 56 78" autocomplete="tel">
+      </div>
+      <div class="form-group">
+        <label for="reg-password">Mot de passe</label>
+        <input type="password" id="reg-password" placeholder="8 caractères minimum" autocomplete="new-password">
+        <div class="form-hint">Minimum 8 caractères</div>
+      </div>
+
+      <button class="btn btn-primary btn-full" id="btn-register">Créer mon compte</button>
+
+      <div class="auth-footer">
+        Déjà un compte ?
+        <button class="btn-ghost" id="link-login-from-register">Se connecter</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ÉCRAN 3 — VERIFY EMAIL (OTP)
+════════════════════════════════════════════ -->
+<div id="screen-verify" class="auth-wrap" style="display:none;">
+  <div class="auth-box">
+    <div class="card">
+      <div class="auth-title">Vérification email</div>
+      <div class="auth-subtitle" id="verify-subtitle">Un code a été envoyé à votre adresse email.</div>
+
+      <div class="form-group">
+        <label for="verify-code">Code de vérification</label>
+        <input type="text" id="verify-code" class="otp-input" placeholder="00000000"
+               inputmode="numeric" maxlength="8" autocomplete="one-time-code">
+        <div class="form-hint">Vérifiez vos spams si vous ne recevez pas le code.</div>
+      </div>
+
+      <button class="btn btn-primary btn-full" id="btn-verify">Vérifier</button>
+
+      <div class="auth-footer">
+        <button class="btn-ghost" id="btn-resend-code">Renvoyer le code</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ÉCRAN 4 — RESET REQUEST (mot de passe oublié)
+════════════════════════════════════════════ -->
+<div id="screen-reset-request" class="auth-wrap" style="display:none;">
+  <div class="auth-box">
+    <div class="card">
+      <div class="auth-title">Mot de passe oublié</div>
+      <div class="auth-subtitle">Entrez votre email — nous vous enverrons un code de réinitialisation.</div>
+
+      <div class="form-group">
+        <label for="reset-email">Adresse email</label>
+        <input type="email" id="reset-email" placeholder="vous@exemple.fr" autocomplete="email">
+      </div>
+
+      <button class="btn btn-primary btn-full" id="btn-reset-request">Envoyer le code</button>
+
+      <div class="auth-footer">
+        <button class="btn-ghost" id="link-login-from-reset">Retour à la connexion</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ÉCRAN 5 — RESET CONFIRM (nouveau mot de passe)
+════════════════════════════════════════════ -->
+<div id="screen-reset-confirm" class="auth-wrap" style="display:none;">
+  <div class="auth-box">
+    <div class="card">
+      <div class="auth-title">Nouveau mot de passe</div>
+      <div class="auth-subtitle" id="reset-confirm-subtitle">Entrez le code reçu par email et choisissez un nouveau mot de passe.</div>
+
+      <div class="form-group">
+        <label for="reset-code">Code reçu par email</label>
+        <input type="text" id="reset-code" class="otp-input" placeholder="00000000"
+               inputmode="numeric" maxlength="8" autocomplete="one-time-code">
+      </div>
+      <div class="form-group">
+        <label for="reset-new-password">Nouveau mot de passe</label>
+        <input type="password" id="reset-new-password" placeholder="8 caractères minimum" autocomplete="new-password">
+      </div>
+
+      <button class="btn btn-primary btn-full" id="btn-reset-confirm">Réinitialiser le mot de passe</button>
+
+      <div class="auth-footer">
+        <button class="btn-ghost" id="link-login-from-reset-confirm">Retour à la connexion</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ÉCRAN 6 — APP (vue principale client)
+════════════════════════════════════════════ -->
+<div id="screen-app" style="display:none;">
+  <div class="app-wrap">
+    <!-- Sera rempli en Phase 4 — loadMotos() -->
+    <div id="app-content">
+      <div class="empty-state">
+        <div class="empty-icon">🏍</div>
+        <p>Chargement de vos motos…</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ÉCRAN 7 — MON COMPTE
+════════════════════════════════════════════ -->
+<div id="screen-account" style="display:none;">
+  <div class="app-wrap">
+    <div class="card">
+      <div class="account-section">
+        <div class="account-section-title">Mes informations</div>
+        <div class="form-group">
+          <label for="account-email">Email <span style="font-size:11px;color:var(--tx3)">(non modifiable)</span></label>
+          <input type="email" id="account-email" readonly>
+        </div>
+        <div class="form-group">
+          <label for="account-nom">Nom</label>
+          <input type="text" id="account-nom" placeholder="Jean Dupont">
+        </div>
+        <div class="form-group">
+          <label for="account-tel">Téléphone</label>
+          <input type="tel" id="account-tel" placeholder="06 12 34 56 78">
+        </div>
+        <button class="btn btn-primary" id="btn-save-account">Enregistrer</button>
+      </div>
+
+      <div class="account-section">
+        <div class="account-section-title">Changer le mot de passe</div>
+        <div class="form-group">
+          <label for="account-new-password">Nouveau mot de passe</label>
+          <input type="password" id="account-new-password" placeholder="8 caractères minimum">
+          <div class="form-hint">Un code de vérification sera envoyé à votre email.</div>
+        </div>
+        <button class="btn btn-secondary" id="btn-change-password">Changer le mot de passe</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+        <button class="btn btn-secondary" id="btn-back-from-account">← Mes motos</button>
+        <button class="btn btn-danger" id="btn-logout-account">Se déconnecter</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── JS placeholder — sera complété en Phase 3 ── -->
+<script>
+// Vérification visuelle Phase 2 : ouvrir la console et appeler showScreen('register') etc.
+function showScreen(id) {
+  ['login','register','verify','reset-request','reset-confirm','app','account'].forEach(function(s){
+    var el = document.getElementById('screen-' + s);
+    if(el) el.style.display = (s === id) ? (s === 'app' || s === 'account' ? 'block' : 'flex') : 'none';
+  });
+}
+// Au démarrage : écran login par défaut
+showScreen('login');
+</script>
+</body>
+</html>
