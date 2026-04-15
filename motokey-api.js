@@ -421,6 +421,18 @@ function getAppHTML() {
 
 console.log('✅ Route /app — HTML embarqué (' + _EMBEDDED_HTML.length + ' chars)');
 
+function getClientHTML() {
+  // Lire MotoKey_Client.html depuis le disque (priorité sur fallback embarqué)
+  try {
+    const _fs   = require('fs');
+    const _path = require('path');
+    const local = _fs.readFileSync(_path.join(__dirname, 'MotoKey_Client.html'), 'utf8');
+    if (local && local.length > 100) return local;
+  } catch(e) {}
+  // Fallback minimal si le fichier n'existe pas encore
+  return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>MotoKey — Espace Client</title></head><body style="font-family:sans-serif;padding:2rem"><h1>MotoKey — Espace Client</h1><p>En cours de déploiement…</p></body></html>';
+}
+
 const server = http.createServer(async function(req, res){
   const parsed   = url.parse(req.url, true);
   const pathname = parsed.pathname.replace(/\/+$/,'') || '/';
@@ -438,10 +450,17 @@ const server = http.createServer(async function(req, res){
     return;
   }
 
-  // ── Servir l'app HTML sur /app
+  // ── Servir l'app HTML sur / et /app
   if((pathname==='/'||pathname==='/app') && method==='GET'){
     res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS','Access-Control-Allow-Headers':'Content-Type,Authorization','Cache-Control':'no-cache, no-store, must-revalidate','Pragma':'no-cache','Expires':'0'});
     res.end(getAppHTML());
+    return;
+  }
+
+  // ── Servir l'espace client sur /client
+  if(pathname==='/client' && method==='GET'){
+    res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS','Access-Control-Allow-Headers':'Content-Type,Authorization','Cache-Control':'no-cache, no-store, must-revalidate','Pragma':'no-cache','Expires':'0'});
+    res.end(getClientHTML());
     return;
   }
 
@@ -1380,6 +1399,7 @@ const server = http.createServer(async function(req, res){
         if (Array.isArray(rows) && rows.length > 0) {
           await sbRequest('PATCH', `/clients?id=eq.${rows[0].id}`,
             { auth_user_id: data.user.id, nom: nom.trim(), tel: tel || null });
+          console.log('[7b] register: match email → client existant lié', rows[0].id, 'pour', email);
         } else {
           await sbRequest('POST', '/clients', {
             auth_user_id: data.user.id,
@@ -1388,6 +1408,7 @@ const server = http.createServer(async function(req, res){
             tel:          tel || null,
             garage_id:    garageId
           });
+          console.debug('[7b] register: nouveau client créé pour', email);
         }
       }
     } catch (e) {
