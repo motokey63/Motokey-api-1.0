@@ -373,7 +373,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
 /* ═══════════════════════════════════════════════════════
    CONFIG — changer API_BASE pour le déploiement Railway
 ═══════════════════════════════════════════════════════ */
-const API_BASE = 'http://localhost:3000';
+const API_BASE = window.location.origin;
 const LS_AT    = 'mk_access_token';
 const LS_RT    = 'mk_refresh_token';
 const LS_EMAIL = 'mk_user_email';
