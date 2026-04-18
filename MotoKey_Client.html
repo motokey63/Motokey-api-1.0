@@ -218,8 +218,8 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
       </div>
       <div class="form-group">
         <label for="reg-password">Mot de passe</label>
-        <input type="password" id="reg-password" placeholder="8 caractères minimum" autocomplete="new-password">
-        <div class="form-hint">Minimum 8 caractères</div>
+        <input type="password" id="reg-password" placeholder="12 caractères minimum" autocomplete="new-password">
+        <div class="form-hint">Min. 12 caractères — majuscule, chiffre et caractère spécial requis.</div>
       </div>
 
       <button class="btn btn-primary btn-full" id="btn-register">Créer mon compte</button>
@@ -296,7 +296,8 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
       </div>
       <div class="form-group">
         <label for="reset-new-password">Nouveau mot de passe</label>
-        <input type="password" id="reset-new-password" placeholder="8 caractères minimum" autocomplete="new-password">
+        <input type="password" id="reset-new-password" placeholder="12 caractères minimum" autocomplete="new-password">
+        <div class="form-hint">Min. 12 caractères — majuscule, chiffre et caractère spécial requis.</div>
       </div>
 
       <button class="btn btn-primary btn-full" id="btn-reset-confirm">Réinitialiser le mot de passe</button>
@@ -366,17 +367,425 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
   </div>
 </div>
 
-<!-- ── JS placeholder — sera complété en Phase 3 ── -->
 <script>
-// Vérification visuelle Phase 2 : ouvrir la console et appeler showScreen('register') etc.
+'use strict';
+
+/* ═══════════════════════════════════════════════════════
+   CONFIG — changer API_BASE pour le déploiement Railway
+═══════════════════════════════════════════════════════ */
+const API_BASE = 'http://localhost:3000';
+const LS_AT    = 'mk_access_token';
+const LS_RT    = 'mk_refresh_token';
+const LS_EMAIL = 'mk_user_email';
+
+/* ═══════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════ */
+let verifyMode   = 'register'; // 'register' | 'reset'
+let pendingEmail = '';
+
+/* ═══════════════════════════════════════════════════════
+   UI
+═══════════════════════════════════════════════════════ */
 function showScreen(id) {
-  ['login','register','verify','reset-request','reset-confirm','app','account'].forEach(function(s){
-    var el = document.getElementById('screen-' + s);
-    if(el) el.style.display = (s === id) ? (s === 'app' || s === 'account' ? 'block' : 'flex') : 'none';
+  ['login','register','verify','reset-request','reset-confirm','app','account'].forEach(s => {
+    const el = document.getElementById('screen-' + s);
+    if (el) el.style.display = (s === id)
+      ? (s === 'app' || s === 'account' ? 'block' : 'flex')
+      : 'none';
   });
 }
-// Au démarrage : écran login par défaut
-showScreen('login');
+
+function toast(msg, type = 'info', ms = 4500) {
+  const icons = { success: '✓', error: '✕', info: 'ℹ' };
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.innerHTML = `<span>${icons[type] || ''}</span><span>${msg}</span>`;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(() => {
+    t.style.transition = 'opacity .3s';
+    t.style.opacity = '0';
+    setTimeout(() => t.remove(), 350);
+  }, ms);
+}
+
+function setLoading(btn, on, label = 'Chargement…') {
+  if (on)  { btn._lbl = btn.textContent; btn.textContent = label; btn.disabled = true;  }
+  else     { btn.textContent = btn._lbl || btn.textContent; btn.disabled = false; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   API
+═══════════════════════════════════════════════════════ */
+async function apiFetch(method, path, body, token) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  try {
+    const res = await fetch(API_BASE + path, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined
+    });
+    let data;
+    try { data = await res.json(); } catch { data = {}; }
+    return { ok: res.ok, status: res.status, data };
+  } catch {
+    return { ok: false, status: 0, data: { error: { message: "Serveur inaccessible — l'API est-elle démarrée ?" } } };
+  }
+}
+
+const apiPost = (path, body, token) => apiFetch('POST', path, body, token);
+const apiGet  = (path, token)       => apiFetch('GET',  path, null, token);
+const apiPut  = (path, body, token) => apiFetch('PUT',  path, body, token);
+
+function errMsg(data) {
+  return data?.error?.message || data?.message || 'Erreur inattendue.';
+}
+
+/* Gère les deux structures de réponse Supabase possibles */
+function extractTokens(data) {
+  return {
+    at: data.access_token  || data.session?.access_token  || data.data?.access_token  || data.data?.session?.access_token  || '',
+    rt: data.refresh_token || data.session?.refresh_token || data.data?.refresh_token || data.data?.session?.refresh_token || '',
+  };
+}
+
+/* ═══════════════════════════════════════════════════════
+   TOKENS localStorage
+═══════════════════════════════════════════════════════ */
+function saveTokens(at, rt, email) {
+  if (at)    localStorage.setItem(LS_AT, at);
+  if (rt)    localStorage.setItem(LS_RT, rt);
+  if (email) localStorage.setItem(LS_EMAIL, email);
+}
+
+function clearTokens() {
+  [LS_AT, LS_RT, LS_EMAIL].forEach(k => localStorage.removeItem(k));
+}
+
+function tokenSecsLeft(token) {
+  try {
+    const p = JSON.parse(atob(token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    return p.exp ? p.exp - Math.floor(Date.now() / 1000) : 0;
+  } catch { return 0; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   AUTO-REFRESH SILENCIEUX (toutes les 60s, si < 5min)
+═══════════════════════════════════════════════════════ */
+async function silentRefresh() {
+  const rt = localStorage.getItem(LS_RT);
+  if (!rt) return false;
+  const { ok, data } = await apiPost('/auth/client/refresh', { refresh_token: rt });
+  if (!ok) return false;
+  const { at, rt: rt2 } = extractTokens(data);
+  if (at) { saveTokens(at, rt2 || rt, null); return true; }
+  return false;
+}
+
+function startRefreshTimer() {
+  clearInterval(window._mkTimer);
+  window._mkTimer = setInterval(async () => {
+    const at = localStorage.getItem(LS_AT);
+    if (at && tokenSecsLeft(at) < 300) await silentRefresh();
+  }, 60_000);
+}
+
+/* ═══════════════════════════════════════════════════════
+   NAV
+═══════════════════════════════════════════════════════ */
+function setNavLoggedIn(email) {
+  const n = document.getElementById('nav-user-name');
+  n.textContent = email || ''; n.style.display = email ? 'inline' : 'none';
+  document.getElementById('btn-account').style.display    = 'inline-flex';
+  document.getElementById('btn-logout-nav').style.display = 'inline';
+}
+
+function setNavLoggedOut() {
+  document.getElementById('nav-user-name').style.display  = 'none';
+  document.getElementById('btn-account').style.display    = 'none';
+  document.getElementById('btn-logout-nav').style.display = 'none';
+}
+
+/* ═══════════════════════════════════════════════════════
+   LOGOUT
+═══════════════════════════════════════════════════════ */
+async function doLogout(btn) {
+  const rt = localStorage.getItem(LS_RT);
+  if (btn) setLoading(btn, true, 'Déconnexion…');
+  if (rt) await apiPost('/auth/client/logout', { refresh_token: rt });
+  clearInterval(window._mkTimer);
+  clearTokens();
+  setNavLoggedOut();
+  if (btn) setLoading(btn, false);
+  showScreen('login');
+}
+
+/* ═══════════════════════════════════════════════════════
+   INIT — connexion auto si refresh_token présent
+═══════════════════════════════════════════════════════ */
+async function init() {
+  setNavLoggedOut();
+  const rt    = localStorage.getItem(LS_RT);
+  const at    = localStorage.getItem(LS_AT);
+  const email = localStorage.getItem(LS_EMAIL);
+
+  if (!rt) { showScreen('login'); return; }
+
+  if (at && tokenSecsLeft(at) > 60) {
+    setNavLoggedIn(email);
+    showScreen('app');
+    startRefreshTimer();
+    return;
+  }
+
+  const ok = await silentRefresh();
+  if (ok) {
+    setNavLoggedIn(localStorage.getItem(LS_EMAIL) || email);
+    showScreen('app');
+    startRefreshTimer();
+  } else {
+    clearTokens();
+    showScreen('login');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   ÉCRAN 1 — LOGIN
+═══════════════════════════════════════════════════════ */
+document.getElementById('btn-login').addEventListener('click', async () => {
+  const btn   = document.getElementById('btn-login');
+  const email = document.getElementById('login-email').value.trim();
+  const pwd   = document.getElementById('login-password').value;
+
+  if (!email || !pwd) { toast('Email et mot de passe requis.', 'error'); return; }
+
+  setLoading(btn, true, 'Connexion…');
+  const { ok, data } = await apiPost('/auth/client/login', { email, password: pwd });
+  setLoading(btn, false);
+
+  if (!ok) { toast(errMsg(data), 'error'); return; }
+
+  const { at, rt } = extractTokens(data);
+  saveTokens(at, rt, email);
+  setNavLoggedIn(email);
+  showScreen('app');
+  startRefreshTimer();
+  toast('Bienvenue !', 'success');
+});
+
+document.getElementById('login-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-login').click();
+});
+
+document.getElementById('link-forgot').addEventListener('click', () => {
+  const e = document.getElementById('login-email').value.trim();
+  if (e) document.getElementById('reset-email').value = e;
+  showScreen('reset-request');
+});
+
+document.getElementById('link-register').addEventListener('click', () => showScreen('register'));
+
+/* ═══════════════════════════════════════════════════════
+   ÉCRAN 2 — REGISTER
+═══════════════════════════════════════════════════════ */
+document.getElementById('btn-register').addEventListener('click', async () => {
+  const btn   = document.getElementById('btn-register');
+  const nom   = document.getElementById('reg-nom').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const tel   = document.getElementById('reg-tel').value.trim();
+  const pwd   = document.getElementById('reg-password').value;
+
+  if (!nom || !email || !pwd) { toast('Nom, email et mot de passe requis.', 'error'); return; }
+  if (pwd.length < 12) {
+    toast('Mot de passe trop court — minimum 12 caractères avec majuscule, chiffre et caractère spécial.', 'error');
+    return;
+  }
+
+  setLoading(btn, true, 'Création…');
+  const body = { email, password: pwd, nom };
+  if (tel) body.tel = tel;
+  const { ok, data } = await apiPost('/auth/client/register', body);
+  setLoading(btn, false);
+
+  if (!ok) { toast(errMsg(data), 'error'); return; }
+
+  pendingEmail = email;
+  verifyMode   = 'register';
+  document.getElementById('verify-subtitle').textContent = 'Un code à 8 chiffres a été envoyé à ' + email + '.';
+  document.getElementById('verify-code').value = '';
+  showScreen('verify');
+  toast('Code envoyé ! Vérifiez votre boîte email.', 'success');
+});
+
+document.getElementById('link-login-from-register').addEventListener('click', () => showScreen('login'));
+
+/* ═══════════════════════════════════════════════════════
+   ÉCRAN 3 — VERIFY OTP
+═══════════════════════════════════════════════════════ */
+document.getElementById('btn-verify').addEventListener('click', async () => {
+  const btn   = document.getElementById('btn-verify');
+  const token = document.getElementById('verify-code').value.trim();
+
+  if (!token || token.length < 6) { toast('Entrez le code reçu par email.', 'error'); return; }
+
+  setLoading(btn, true, 'Vérification…');
+  const { ok, data } = await apiPost('/auth/client/verify-email', { email: pendingEmail, token });
+  setLoading(btn, false);
+
+  if (!ok) { toast(errMsg(data), 'error'); return; }
+
+  const { at, rt } = extractTokens(data);
+  if (at && rt) {
+    saveTokens(at, rt, pendingEmail);
+    setNavLoggedIn(pendingEmail);
+    showScreen('app');
+    startRefreshTimer();
+    toast('Email vérifié — bienvenue !', 'success');
+  } else {
+    toast('Email vérifié ! Connectez-vous.', 'success');
+    showScreen('login');
+  }
+});
+
+document.getElementById('verify-code').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-verify').click();
+});
+
+document.getElementById('btn-resend-code').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-resend-code');
+  setLoading(btn, true, 'Envoi…');
+  if (verifyMode === 'register') {
+    const email = document.getElementById('reg-email').value.trim();
+    const pwd   = document.getElementById('reg-password').value;
+    const nom   = document.getElementById('reg-nom').value.trim();
+    await apiPost('/auth/client/register', { email, password: pwd, nom });
+  } else {
+    await apiPost('/auth/client/password-reset', { email: pendingEmail });
+  }
+  setLoading(btn, false);
+  toast('Code renvoyé. Vérifiez vos emails et vos spams.', 'info');
+});
+
+/* ═══════════════════════════════════════════════════════
+   ÉCRAN 4 — RESET REQUEST
+═══════════════════════════════════════════════════════ */
+document.getElementById('btn-reset-request').addEventListener('click', async () => {
+  const btn   = document.getElementById('btn-reset-request');
+  const email = document.getElementById('reset-email').value.trim();
+  if (!email) { toast('Entrez votre adresse email.', 'error'); return; }
+
+  setLoading(btn, true, 'Envoi…');
+  await apiPost('/auth/client/password-reset', { email }); // anti-enum : on ignore ok/err
+  setLoading(btn, false);
+
+  pendingEmail = email;
+  document.getElementById('reset-confirm-subtitle').textContent =
+    'Entrez le code envoyé à ' + email + ' et choisissez votre nouveau mot de passe.';
+  document.getElementById('reset-code').value         = '';
+  document.getElementById('reset-new-password').value = '';
+  showScreen('reset-confirm');
+  toast('Si votre email est enregistré, un code vous a été envoyé.', 'info');
+});
+
+document.getElementById('link-login-from-reset').addEventListener('click', () => showScreen('login'));
+
+/* ═══════════════════════════════════════════════════════
+   ÉCRAN 5 — RESET CONFIRM
+═══════════════════════════════════════════════════════ */
+document.getElementById('btn-reset-confirm').addEventListener('click', async () => {
+  const btn   = document.getElementById('btn-reset-confirm');
+  const token = document.getElementById('reset-code').value.trim();
+  const pwd   = document.getElementById('reset-new-password').value;
+
+  if (!token || token.length < 6) { toast('Entrez le code reçu par email.', 'error'); return; }
+  if (pwd.length < 12) {
+    toast('Mot de passe : minimum 12 caractères avec majuscule, chiffre et caractère spécial.', 'error');
+    return;
+  }
+
+  setLoading(btn, true, 'Réinitialisation…');
+  const { ok, data } = await apiPost('/auth/client/password-reset/confirm', {
+    email: pendingEmail, token, password: pwd
+  });
+  setLoading(btn, false);
+
+  if (!ok) { toast(errMsg(data), 'error'); return; }
+
+  toast('Mot de passe mis à jour. Connectez-vous.', 'success');
+  showScreen('login');
+});
+
+document.getElementById('link-login-from-reset-confirm').addEventListener('click', () => showScreen('login'));
+
+/* ═══════════════════════════════════════════════════════
+   NAV — ACCOUNT + LOGOUT
+═══════════════════════════════════════════════════════ */
+document.getElementById('btn-logout-nav').addEventListener('click', function () { doLogout(this); });
+
+document.getElementById('btn-account').addEventListener('click', async () => {
+  const at    = localStorage.getItem(LS_AT);
+  const email = localStorage.getItem(LS_EMAIL) || '';
+  document.getElementById('account-email').value = email;
+  document.getElementById('account-nom').value   = '';
+  document.getElementById('account-tel').value   = '';
+
+  if (at) {
+    const { ok, data } = await apiGet('/auth/me', at);
+    if (ok) {
+      const u = data.user || data.data?.user || data;
+      if (u.nom  || u.name)  document.getElementById('account-nom').value = u.nom  || u.name  || '';
+      if (u.tel  || u.phone) document.getElementById('account-tel').value = u.tel  || u.phone || '';
+    }
+  }
+  showScreen('account');
+});
+
+/* ═══════════════════════════════════════════════════════
+   ÉCRAN 7 — MON COMPTE
+═══════════════════════════════════════════════════════ */
+document.getElementById('btn-back-from-account').addEventListener('click', () => showScreen('app'));
+document.getElementById('btn-logout-account').addEventListener('click', function () { doLogout(this); });
+
+document.getElementById('btn-save-account').addEventListener('click', async () => {
+  const btn  = document.getElementById('btn-save-account');
+  const at   = localStorage.getItem(LS_AT);
+  const nom  = document.getElementById('account-nom').value.trim();
+  const tel  = document.getElementById('account-tel').value.trim();
+
+  if (!at) { toast('Session expirée — reconnectez-vous.', 'error'); return; }
+
+  setLoading(btn, true, 'Enregistrement…');
+  const { ok, status } = await apiPut('/auth/client/me', { nom, tel }, at);
+  setLoading(btn, false);
+
+  if (ok)                             toast('Profil mis à jour.', 'success');
+  else if (status === 404 || status === 405) toast('Mise à jour de profil bientôt disponible.', 'info');
+  else                                toast('Erreur lors de la mise à jour.', 'error');
+});
+
+document.getElementById('btn-change-password').addEventListener('click', async () => {
+  const btn   = document.getElementById('btn-change-password');
+  const email = localStorage.getItem(LS_EMAIL) || '';
+  if (!email) { toast('Session invalide — reconnectez-vous.', 'error'); return; }
+
+  setLoading(btn, true, 'Envoi du code…');
+  await apiPost('/auth/client/password-reset', { email });
+  setLoading(btn, false);
+
+  pendingEmail = email;
+  document.getElementById('reset-confirm-subtitle').textContent =
+    'Entrez le code envoyé à ' + email + ' et choisissez votre nouveau mot de passe.';
+  document.getElementById('reset-code').value         = '';
+  document.getElementById('reset-new-password').value = '';
+  showScreen('reset-confirm');
+  toast('Code envoyé à ' + email + '.', 'info');
+});
+
+/* ═══════════════════════════════════════════════════════
+   DÉMARRAGE
+═══════════════════════════════════════════════════════ */
+init();
 </script>
 </body>
 </html>
