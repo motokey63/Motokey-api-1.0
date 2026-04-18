@@ -522,6 +522,153 @@ async function doLogout(btn) {
 }
 
 /* ═══════════════════════════════════════════════════════
+   PHASE 4 — RENDU DES MOTOS
+═══════════════════════════════════════════════════════ */
+
+function esc(s) {
+  return s == null ? '' : String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  try { return new Date(d).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' }); }
+  catch { return String(d); }
+}
+
+function fmtStatut(s) {
+  return { urgent:'URGENT', warning:'À faire', due:'Dûe', ok:'OK', future:'À venir' }[s] || s || '';
+}
+
+function renderMotoCard(moto) {
+  const couleur    = moto.couleur_dossier || 'rouge';
+  const garageName = moto.garage?.nom  || moto.garage_nom  || '—';
+  const garageTel  = moto.garage?.tel  || moto.garage_tel  || '';
+  const intervs    = Array.isArray(moto.interventions) ? moto.interventions : [];
+
+  /* ── Score ── */
+  const scoreHtml = `
+    <div class="score-badge">
+      <div class="score-num ${esc(couleur)}">${moto.score ?? '—'}</div>
+      <div class="score-label">Score MotoKey</div>
+    </div>`;
+
+  /* ── Interventions ── */
+  const intervHtml = intervs.length === 0
+    ? `<div class="interv-empty">Aucune intervention enregistrée.</div>`
+    : intervs.map(i => `
+        <div class="interv-item">
+          <div class="interv-badge ${esc(i.type || 'bleu')}"></div>
+          <div class="interv-body">
+            <div class="interv-title">${esc(i.titre)}</div>
+            <div class="interv-meta">${fmtDate(i.date_intervention)}${i.km ? ' · ' + i.km.toLocaleString('fr-FR') + ' km' : ''}${i.technicien_nom ? ' · ' + esc(i.technicien_nom) : ''}</div>
+          </div>
+        </div>`).join('');
+
+  /* ── Plan entretien (si accessible) ── */
+  let planHtml = '';
+  if (moto.alertes && moto.alertes.length > 0) {
+    planHtml = `
+      <div class="moto-section">
+        <div class="moto-section-title">Plan d'entretien</div>
+        <div class="plan-list">
+          ${moto.alertes.map(a => `
+            <div class="plan-item">
+              <div class="plan-statut ${esc(a.statut || 'ok')}">${fmtStatut(a.statut)}</div>
+              <div>
+                <div class="plan-label">${esc(a.nom || a.nom_operation || '')}</div>
+                <div class="plan-km">${a.km_prochain ? 'Prévu à ' + Number(a.km_prochain).toLocaleString('fr-FR') + ' km' : ''}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  /* ── Pneumatiques ── */
+  const pneusHtml = (moto.pneu_av || moto.pneu_ar) ? `
+    <div class="moto-section">
+      <div class="moto-section-title">Pneumatiques</div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;">
+        ${moto.pneu_av ? `<div><div style="font-size:12px;color:var(--tx3);margin-bottom:2px">Avant</div><div style="font-size:13px;font-weight:600">${esc(moto.pneu_av)}</div></div>` : ''}
+        ${moto.pneu_ar ? `<div><div style="font-size:12px;color:var(--tx3);margin-bottom:2px">Arrière</div><div style="font-size:13px;font-weight:600">${esc(moto.pneu_ar)}</div></div>` : ''}
+      </div>
+    </div>` : '';
+
+  return `
+    <div class="moto-card">
+      <div class="moto-header">
+        <div class="moto-identity">
+          <div class="moto-marque">${esc(moto.marque)} ${esc(moto.modele)} <span style="font-weight:400;color:var(--tx2)">${esc(String(moto.annee || ''))}</span></div>
+          <div class="moto-sub">${moto.km ? Number(moto.km).toLocaleString('fr-FR') + ' km' : ''}</div>
+          <div class="moto-plaque">${esc(moto.plaque)}</div>
+        </div>
+        ${scoreHtml}
+      </div>
+
+      <div class="moto-section">
+        <div class="moto-section-title">Garage de référence</div>
+        <div class="garage-info">
+          <div class="garage-name">${esc(garageName)}</div>
+          ${garageTel ? `<div class="garage-detail">${esc(garageTel)}</div>` : ''}
+        </div>
+      </div>
+
+      <div class="moto-section">
+        <div class="moto-section-title">Historique · ${intervs.length} intervention${intervs.length !== 1 ? 's' : ''}</div>
+        <div class="interv-list">${intervHtml}</div>
+      </div>
+
+      ${planHtml}${pneusHtml}
+    </div>`;
+}
+
+async function loadMotos() {
+  const at      = localStorage.getItem(LS_AT);
+  const content = document.getElementById('app-content');
+  content.innerHTML = `<div class="empty-state"><div class="empty-icon" style="font-size:32px">⏳</div><p>Chargement de vos motos…</p></div>`;
+
+  const { ok, data } = await apiGet('/motos', at);
+  if (!ok) {
+    content.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>Impossible de charger vos motos.<br><small style="color:var(--tx3)">${esc(errMsg(data))}</small></p></div>`;
+    return;
+  }
+
+  const motos = Array.isArray(data) ? data : (data.motos || data.data || []);
+  if (!motos.length) {
+    content.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🏍</div>
+        <p>Aucune moto liée à votre compte.<br>Contactez votre garage pour associer votre moto.</p>
+      </div>`;
+    return;
+  }
+
+  /* Charger interventions + alertes entretien en parallèle pour chaque moto */
+  const enriched = await Promise.all(motos.map(async moto => {
+    const [ivRes, alRes] = await Promise.all([
+      apiGet(`/motos/${moto.id}/interventions`, at),
+      apiGet(`/motos/${moto.id}/entretien/alertes`, at)
+    ]);
+    const interventions = ivRes.ok
+      ? (Array.isArray(ivRes.data) ? ivRes.data : (ivRes.data.interventions || ivRes.data.data || []))
+      : [];
+    const alertes = alRes.ok
+      ? (Array.isArray(alRes.data) ? alRes.data : (alRes.data.alertes || alRes.data.data || []))
+      : null; // null = non accessible (403 RBAC) → section masquée
+    return { ...moto, interventions, alertes };
+  }));
+
+  content.innerHTML = enriched.map(renderMotoCard).join('');
+}
+
+/* Helper unique : transition vers l'écran app */
+function goToApp() {
+  showScreen('app');
+  startRefreshTimer();
+  loadMotos();
+}
+
+/* ═══════════════════════════════════════════════════════
    INIT — connexion auto si refresh_token présent
 ═══════════════════════════════════════════════════════ */
 async function init() {
@@ -534,16 +681,14 @@ async function init() {
 
   if (at && tokenSecsLeft(at) > 60) {
     setNavLoggedIn(email);
-    showScreen('app');
-    startRefreshTimer();
+    goToApp();
     return;
   }
 
   const ok = await silentRefresh();
   if (ok) {
     setNavLoggedIn(localStorage.getItem(LS_EMAIL) || email);
-    showScreen('app');
-    startRefreshTimer();
+    goToApp();
   } else {
     clearTokens();
     showScreen('login');
@@ -569,8 +714,7 @@ document.getElementById('btn-login').addEventListener('click', async () => {
   const { at, rt } = extractTokens(data);
   saveTokens(at, rt, email);
   setNavLoggedIn(email);
-  showScreen('app');
-  startRefreshTimer();
+  goToApp();
   toast('Bienvenue !', 'success');
 });
 
@@ -639,8 +783,7 @@ document.getElementById('btn-verify').addEventListener('click', async () => {
   if (at && rt) {
     saveTokens(at, rt, pendingEmail);
     setNavLoggedIn(pendingEmail);
-    showScreen('app');
-    startRefreshTimer();
+    goToApp();
     toast('Email vérifié — bienvenue !', 'success');
   } else {
     toast('Email vérifié ! Connectez-vous.', 'success');
