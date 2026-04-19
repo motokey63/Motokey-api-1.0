@@ -36,7 +36,7 @@ async function extractRoleFromRequest(req, SBLayer) {
   if (!auth || !SBLayer) return null;
 
   try {
-    const { data: { user }, error } = await SBLayer.supabase.auth.getUser(auth);
+    const { data: { user }, error } = await SBLayer.supabasePublic.auth.getUser(auth);
     if (error || !user) return null;
 
     const role = user.app_metadata && user.app_metadata.role;
