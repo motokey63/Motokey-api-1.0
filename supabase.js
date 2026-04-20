@@ -221,8 +221,11 @@ const Motos = {
     if (payload.client_email || payload.client_nom) {
       let client = null;
       if (payload.client_email) {
-        const { data } = await supabase.from('clients').select('id').eq('email', payload.client_email).eq('garage_id', garage_id).single();
+        const { data } = await supabase.from('clients').select('id, garage_id').eq('email', payload.client_email).maybeSingle();
         client = data;
+        if (client && !client.garage_id) {
+          await supabase.from('clients').update({ garage_id }).eq('id', client.id);
+        }
       }
       if (!client) {
         client = await insert('clients', {
