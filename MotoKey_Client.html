@@ -373,7 +373,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
 /* ═══════════════════════════════════════════════════════
    CONFIG — changer API_BASE pour le déploiement Railway
 ═══════════════════════════════════════════════════════ */
-const API_BASE = window.location.origin;
+const API_BASE = (window.location.hostname === 'localhost' || window.location.protocol === 'file:') ? 'https://motokey11-production.up.railway.app' : window.location.origin;
 const LS_AT    = 'mk_access_token';
 const LS_RT    = 'mk_refresh_token';
 const LS_EMAIL = 'mk_user_email';
