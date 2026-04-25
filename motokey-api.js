@@ -1633,6 +1633,66 @@ const server = http.createServer(async function(req, res){
     return ok(res, { ordre_reparation: or, totaux: { total_ht: 0, total_tva: 0, total_ttc: 0 } }, 'Ordre de réparation créé', 201);
   }
 
+  if((p=M('GET','/ordres-reparation/:id'))!==null){
+    // RBAC: MECANO minimum — outil garage
+    // TODO RBAC L4 : MECANO doit voir les tâches mais pas total_mo_ht/taux_horaire ni prix_achat sur les pièces
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const result = await SBLayer.OrdresReparation.getById(p.id, garageId);
+        return ok(res, result);
+      } catch(e) { return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND'); }
+    }
+
+    // ── RAM fallback ──
+    const or = (DB.ordres_reparation||[]).find(function(o){ return o.id===p.id && o.garage_id===garageId; });
+    if (!or) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+    const moto    = DB.motos.find(function(m){ return m.id===or.moto_id; });
+    const taches  = (DB.or_taches||[]).filter(function(t){ return t.or_id===or.id; }).sort(function(a,b){ return (a.ordre||0)-(b.ordre||0); });
+    const pieces  = (DB.or_pieces||[]).filter(function(pp){ return pp.or_id===or.id; });
+    const totaux  = { total_ht: or.total_ht||0, total_tva: or.total_tva||0, total_ttc: or.total_ttc||0, total_mo_ht: or.total_mo_ht||0, total_pieces_ht: or.total_pieces_ht||0 };
+    return ok(res, { ordre_reparation: or, moto: moto||null, taches, pieces, totaux });
+  }
+
+  if((p=M('PUT','/ordres-reparation/:id'))!==null){
+    // RBAC: PRO minimum — édition OR
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    // Validation des transitions de statut côté layer (cf. SBLayer.OrdresReparation.update)
+    // Statuts valides : brouillon → en_cours → termine → annule
+    // (Clôture passe par POST /:id/cloturer pour gérer la sync intervention.)
+    if (b.statut && !['brouillon','en_cours','annule'].includes(b.statut)) {
+      return fail(res, "Transition vers '"+b.statut+"' interdite via PUT (utiliser POST /cloturer pour 'termine')", 400, 'INVALID_TRANSITION');
+    }
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const or = await SBLayer.OrdresReparation.update(p.id, garageId, b);
+        return ok(res, { ordre_reparation: or }, 'Ordre mis à jour');
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+
+    // ── RAM fallback ──
+    const i = (DB.ordres_reparation||[]).findIndex(function(o){ return o.id===p.id && o.garage_id===garageId; });
+    if (i<0) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+    const allowed = ['statut','technicien_id','km_entree','notes_atelier','notes_client'];
+    const patch = {};
+    allowed.forEach(function(k){ if (b[k]!==undefined) patch[k] = b[k]; });
+    DB.ordres_reparation[i] = Object.assign({}, DB.ordres_reparation[i], patch, { id: p.id, garage_id: garageId, updated_at: nowISO() });
+    return ok(res, { ordre_reparation: DB.ordres_reparation[i] }, 'Ordre mis à jour');
+  }
+
   /* 404 */
   fail(res,'Route inconnue: '+method+' '+pathname,404,'NOT_FOUND');
 });
