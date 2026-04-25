@@ -1554,6 +1554,85 @@ const server = http.createServer(async function(req, res){
     return ok(res, { message: 'Mot de passe mis à jour — reconnectez-vous' });
   }
 
+  /* ─── LIVRAISON 3A : ORDRES DE RÉPARATION ─── */
+
+  if((p=M('GET','/ordres-reparation'))!==null){
+    // RBAC: MECANO minimum — outil garage
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    const filters = { statut: query.statut, moto_id: query.moto_id };
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const ordres = await SBLayer.OrdresReparation.list(garageId, filters);
+        return ok(res, { ordres, total: ordres.length });
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+
+    // ── RAM fallback ──
+    let ordres = (DB.ordres_reparation||[]).filter(function(o){ return o.garage_id===garageId; });
+    if (filters.statut)   ordres = ordres.filter(function(o){ return o.statut===filters.statut; });
+    if (filters.moto_id)  ordres = ordres.filter(function(o){ return o.moto_id===filters.moto_id; });
+    ordres.sort(function(a,b){ return b.created_at.localeCompare(a.created_at); });
+    return ok(res, { ordres, total: ordres.length });
+  }
+
+  if((p=M('POST','/ordres-reparation'))!==null){
+    // RBAC: PRO minimum — création OR réservée PRO et au-dessus
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    const { moto_id, devis_id, technicien_id, km_entree, notes_atelier, notes_client } = b;
+    if (!moto_id) return fail(res, 'moto_id requis');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const result = await SBLayer.OrdresReparation.create(garageId, { moto_id, devis_id, technicien_id, km_entree, notes_atelier, notes_client });
+        return ok(res, result, 'Ordre de réparation créé', 201);
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+
+    // ── RAM fallback ──
+    const m = DB.motos.find(function(x){ return x.id===moto_id && x.garage_id===garageId; });
+    if (!m) return fail(res, 'Moto non trouvée', 404, 'NOT_FOUND');
+    DB.ordres_reparation = DB.ordres_reparation || [];
+    const numero_or = 'OR-2026-' + String(DB.ordres_reparation.length + 1).padStart(4, '0');
+    const or = {
+      id: 'or-' + uid(),
+      garage_id: garageId,
+      numero_or,
+      moto_id,
+      client_id: m.client_id || null,
+      devis_id: devis_id || null,
+      technicien_id: technicien_id || null,
+      statut: 'brouillon',
+      km_entree: parseInt(km_entree) || m.km,
+      km_sortie: null,
+      date_ouverture: nowISO(),
+      date_cloture: null,
+      total_mo_ht: 0,
+      total_pieces_ht: 0,
+      total_ht: 0,
+      total_tva: 0,
+      total_ttc: 0,
+      notes_atelier: notes_atelier || '',
+      notes_client: notes_client || '',
+      created_at: nowISO(),
+      updated_at: nowISO()
+    };
+    DB.ordres_reparation.push(or);
+    return ok(res, { ordre_reparation: or, totaux: { total_ht: 0, total_tva: 0, total_ttc: 0 } }, 'Ordre de réparation créé', 201);
+  }
+
   /* 404 */
   fail(res,'Route inconnue: '+method+' '+pathname,404,'NOT_FOUND');
 });
