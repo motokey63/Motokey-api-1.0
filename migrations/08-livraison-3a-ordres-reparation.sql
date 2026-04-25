@@ -24,7 +24,7 @@ BEGIN;
 -- =========================================================================
 DO $$ BEGIN
   CREATE TYPE or_statut AS ENUM (
-    'brouillon','ouvert','en_cours','termine','facture','annule'
+    'brouillon','en_cours','termine','annule'
   );
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
