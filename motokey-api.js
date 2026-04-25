@@ -1789,6 +1789,178 @@ const server = http.createServer(async function(req, res){
     return ok(res, { ordre_reparation: or, intervention, nouveau_score, nouvelle_couleur }, 'Ordre clôturé · Intervention synchronisée');
   }
 
+  /* ── Helper RAM : recalcul des totaux d'un OR à partir de ses tâches et pièces ── */
+  function _recalcTotauxOR(orId, garageId) {
+    const idx = (DB.ordres_reparation||[]).findIndex(function(o){ return o.id===orId && o.garage_id===garageId; });
+    if (idx < 0) return null;
+    const taches = (DB.or_taches||[]).filter(function(t){ return t.or_id===orId; });
+    const pieces = (DB.or_pieces||[]).filter(function(pp){ return pp.or_id===orId; });
+    const total_mo_ht     = taches.reduce(function(s,t){ return s + (t.montant_ht||0); }, 0);
+    const total_pieces_ht = pieces.reduce(function(s,p){ return s + (p.montant_ht||0); }, 0);
+    const total_ht        = total_mo_ht + total_pieces_ht;
+    const total_tva = taches.reduce(function(s,t){ return s + (t.montant_ht||0)*0.20; }, 0)
+                   + pieces.reduce(function(s,p){ return s + (p.montant_ht||0)*((p.tva_pct||20)/100); }, 0);
+    const total_ttc = total_ht + total_tva;
+    DB.ordres_reparation[idx].total_mo_ht     = Math.round(total_mo_ht*100)/100;
+    DB.ordres_reparation[idx].total_pieces_ht = Math.round(total_pieces_ht*100)/100;
+    DB.ordres_reparation[idx].total_ht        = Math.round(total_ht*100)/100;
+    DB.ordres_reparation[idx].total_tva       = Math.round(total_tva*100)/100;
+    DB.ordres_reparation[idx].total_ttc       = Math.round(total_ttc*100)/100;
+    DB.ordres_reparation[idx].updated_at      = nowISO();
+    return DB.ordres_reparation[idx];
+  }
+
+  if((p=M('POST','/ordres-reparation/:id/taches'))!==null){
+    // RBAC: MECANO minimum — atelier
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    const { libelle, description, duree_h, taux_horaire, technicien_id, ordre } = b;
+    if (!libelle) return fail(res, 'libelle requis');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const result = await SBLayer.OrTaches.create(garageId, p.id, { libelle, description, duree_h, taux_horaire, technicien_id, ordre });
+        return ok(res, result, 'Tâche ajoutée', 201);
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+
+    // ── RAM fallback ──
+    const or = (DB.ordres_reparation||[]).find(function(o){ return o.id===p.id && o.garage_id===garageId; });
+    if (!or) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+    DB.or_taches = DB.or_taches || [];
+    const dh = parseFloat(duree_h) || 0;
+    const th = parseFloat(taux_horaire) || 65;
+    const tache = {
+      id: 'ort-'+uid(),
+      garage_id: garageId,
+      or_id: p.id,
+      ordre: parseInt(ordre) || (DB.or_taches.filter(function(t){ return t.or_id===p.id; }).length + 1),
+      libelle,
+      description: description || '',
+      duree_h: dh,
+      taux_horaire: th,
+      montant_ht: Math.round(dh * th * 100)/100,
+      technicien_id: technicien_id || null,
+      statut: 'a_faire',
+      fait_le: null,
+      created_at: nowISO(),
+      updated_at: nowISO()
+    };
+    DB.or_taches.push(tache);
+    const orMaj = _recalcTotauxOR(p.id, garageId);
+    return ok(res, { tache, ordre_reparation: orMaj }, 'Tâche ajoutée', 201);
+  }
+
+  if((p=M('PATCH','/or-taches/:id'))!==null){
+    // RBAC: MECANO minimum — atelier
+    // TODO RBAC L4 : MECANO ne doit pas modifier taux_horaire (lecture seule)
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const result = await SBLayer.OrTaches.update(p.id, garageId, b);
+        return ok(res, result, 'Tâche mise à jour');
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+
+    // ── RAM fallback ──
+    const i = (DB.or_taches||[]).findIndex(function(t){ return t.id===p.id && t.garage_id===garageId; });
+    if (i<0) return fail(res, 'Tâche non trouvée', 404, 'NOT_FOUND');
+    const allowed = ['libelle','description','duree_h','taux_horaire','technicien_id','statut','ordre'];
+    const patch = {};
+    allowed.forEach(function(k){ if (b[k]!==undefined) patch[k] = b[k]; });
+    const newDh = (patch.duree_h !== undefined) ? parseFloat(patch.duree_h) : DB.or_taches[i].duree_h;
+    const newTh = (patch.taux_horaire !== undefined) ? parseFloat(patch.taux_horaire) : DB.or_taches[i].taux_horaire;
+    if (patch.duree_h !== undefined || patch.taux_horaire !== undefined) {
+      patch.montant_ht = Math.round(newDh * newTh * 100)/100;
+    }
+    if (patch.statut === 'fait' && DB.or_taches[i].statut !== 'fait') {
+      patch.fait_le = nowISO();
+    }
+    DB.or_taches[i] = Object.assign({}, DB.or_taches[i], patch, { id: p.id, garage_id: garageId, updated_at: nowISO() });
+    const orMaj = _recalcTotauxOR(DB.or_taches[i].or_id, garageId);
+    return ok(res, { tache: DB.or_taches[i], ordre_reparation: orMaj }, 'Tâche mise à jour');
+  }
+
+  if((p=M('POST','/ordres-reparation/:id/pieces'))!==null){
+    // RBAC: MECANO minimum — atelier
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    const { piece_id, reference, libelle, qte, pu_ht, tva_pct } = b;
+    if (!libelle) return fail(res, 'libelle requis (snapshot pour traçabilité)');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const result = await SBLayer.OrPieces.create(garageId, p.id, { piece_id, reference, libelle, qte, pu_ht, tva_pct });
+        return ok(res, result, 'Pièce ajoutée', 201);
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+
+    // ── RAM fallback ──
+    const or = (DB.ordres_reparation||[]).find(function(o){ return o.id===p.id && o.garage_id===garageId; });
+    if (!or) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+    DB.or_pieces = DB.or_pieces || [];
+    const q  = parseFloat(qte) || 1;
+    const pu = parseFloat(pu_ht) || 0;
+    const piece = {
+      id: 'orp-'+uid(),
+      garage_id: garageId,
+      or_id: p.id,
+      piece_id: piece_id || null,
+      reference: reference || '',
+      libelle,
+      qte: q,
+      pu_ht: pu,
+      tva_pct: parseFloat(tva_pct) || 20,
+      montant_ht: Math.round(q * pu * 100)/100,
+      created_at: nowISO(),
+      updated_at: nowISO()
+    };
+    DB.or_pieces.push(piece);
+    const orMaj = _recalcTotauxOR(p.id, garageId);
+    return ok(res, { piece, ordre_reparation: orMaj }, 'Pièce ajoutée', 201);
+  }
+
+  if((p=M('DELETE','/or-pieces/:id'))!==null){
+    // RBAC: MECANO minimum — atelier
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const result = await SBLayer.OrPieces.delete(p.id, garageId);
+        return ok(res, result, 'Pièce supprimée');
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+
+    // ── RAM fallback ──
+    const i = (DB.or_pieces||[]).findIndex(function(pp){ return pp.id===p.id && pp.garage_id===garageId; });
+    if (i<0) return fail(res, 'Pièce non trouvée', 404, 'NOT_FOUND');
+    const orId = DB.or_pieces[i].or_id;
+    DB.or_pieces.splice(i,1);
+    const orMaj = _recalcTotauxOR(orId, garageId);
+    return ok(res, { deleted_id: p.id, ordre_reparation: orMaj }, 'Pièce supprimée');
+  }
+
   /* 404 */
   fail(res,'Route inconnue: '+method+' '+pathname,404,'NOT_FOUND');
 });
