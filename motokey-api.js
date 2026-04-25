@@ -1693,6 +1693,102 @@ const server = http.createServer(async function(req, res){
     return ok(res, { ordre_reparation: DB.ordres_reparation[i] }, 'Ordre mis à jour');
   }
 
+  if((p=M('POST','/ordres-reparation/:id/cloturer'))!==null){
+    // RBAC: PRO minimum — clôture engage la facturation
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    const km_sortie = parseInt(b.km_sortie);
+    if (!km_sortie || km_sortie <= 0) return fail(res, 'km_sortie requis (entier positif) pour clôturer un OR', 400, 'MISSING_KM');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const result = await SBLayer.OrdresReparation.cloturer(p.id, garageId, { km_sortie });
+        return ok(res, result, 'Ordre clôturé · Intervention synchronisée');
+      } catch(e) {
+        const code = e.message && e.message.indexOf('Transition') >= 0 ? 'INVALID_TRANSITION' : 'DB_ERROR';
+        return fail(res, e.message, 400, code);
+      }
+    }
+
+    // ── RAM fallback ──
+    const i = (DB.ordres_reparation||[]).findIndex(function(o){ return o.id===p.id && o.garage_id===garageId; });
+    if (i<0) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+    const or = DB.ordres_reparation[i];
+
+    // Validation transition : seul en_cours peut être clôturé
+    if (or.statut !== 'en_cours') {
+      return fail(res, "Seul un OR en statut 'en_cours' peut être clôturé (statut actuel: '"+or.statut+"')", 400, 'INVALID_TRANSITION');
+    }
+    if (km_sortie < (or.km_entree || 0)) {
+      return fail(res, 'km_sortie ('+km_sortie+') doit être >= km_entree ('+(or.km_entree||0)+')', 400, 'INVALID_KM');
+    }
+
+    // Mise à jour OR
+    or.statut       = 'termine';
+    or.km_sortie    = km_sortie;
+    or.date_cloture = nowISO();
+    or.updated_at   = nowISO();
+    DB.ordres_reparation[i] = or;
+
+    // Mise à jour km moto
+    const mi = DB.motos.findIndex(function(m){ return m.id===or.moto_id; });
+    if (mi >= 0 && km_sortie > DB.motos[mi].km) {
+      DB.motos[mi].km = km_sortie;
+      DB.motos[mi].updated_at = nowISO();
+    }
+
+    // Sync intervention — logique B :
+    //   - si OR.devis_id : on met à jour l'intervention créée par la validation du devis
+    //   - sinon : on crée une nouvelle intervention de type 'bleu'
+    let intervention = null;
+    if (or.devis_id) {
+      const ii = DB.interventions.findIndex(function(x){ return x.devis_id===or.devis_id; });
+      if (ii >= 0) {
+        DB.interventions[ii] = Object.assign({}, DB.interventions[ii], {
+          km: km_sortie,
+          montant_ht: or.total_ht || 0,
+          description: 'OR '+or.numero_or+' — clôturé',
+          updated_at: nowISO()
+        });
+        intervention = DB.interventions[ii];
+      }
+    }
+    if (!intervention) {
+      intervention = {
+        id: 'int-'+uid(),
+        moto_id: or.moto_id,
+        garage_id: garageId,
+        type: 'bleu',
+        titre: 'OR '+or.numero_or,
+        description: or.notes_atelier || ('Clôture OR '+or.numero_or),
+        km: km_sortie,
+        date: todayFR(),
+        score_confiance: 96,
+        montant_ht: or.total_ht || 0,
+        devis_id: or.devis_id || null,
+        created_at: nowISO()
+      };
+      DB.interventions.push(intervention);
+    }
+
+    // Recalcul score moto
+    let nouveau_score = null, nouvelle_couleur = null;
+    if (mi >= 0) {
+      const allIs = DB.interventions.filter(function(x){ return x.moto_id===or.moto_id; });
+      nouveau_score = calcScore(allIs);
+      nouvelle_couleur = couleur(nouveau_score);
+      DB.motos[mi].score = nouveau_score;
+      DB.motos[mi].couleur_dossier = nouvelle_couleur;
+    }
+
+    return ok(res, { ordre_reparation: or, intervention, nouveau_score, nouvelle_couleur }, 'Ordre clôturé · Intervention synchronisée');
+  }
+
   /* 404 */
   fail(res,'Route inconnue: '+method+' '+pathname,404,'NOT_FOUND');
 });
