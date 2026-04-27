@@ -644,6 +644,268 @@ const Fraude = {
 };
 
 // ══════════════════════════════════════════════════════════
+// ORDRES DE RÉPARATION
+// ══════════════════════════════════════════════════════════
+const OrdresReparation = {
+
+  async list(garage_id, filters = {}) {
+    let q = supabase.from('ordres_reparation')
+      // or_taches chargé pour le mode mécano (compteur à_faire) — V1 OK faible volume,
+      // dénormaliser nb_taches_a_faire sur ordres_reparation si liste lente en production
+      .select('*, motos(marque, modele, plaque, clients(nom)), or_taches(id, statut)')
+      .eq('garage_id', garage_id)
+      .order('date_ouverture', { ascending: false });
+    if (filters.statut)  q = q.eq('statut', filters.statut);
+    if (filters.moto_id) q = q.eq('moto_id', filters.moto_id);
+    const { data, error } = await q;
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
+  async getById(id, garage_id) {
+    const { data, error } = await supabase.from('ordres_reparation')
+      .select('*, motos(marque, modele, plaque, clients(nom, email)), or_taches(*), or_pieces(*)')
+      .eq('id', id).eq('garage_id', garage_id).single();
+    if (error) throw new Error(error.message);
+    const { or_taches, or_pieces, motos, ...or } = data;
+    const taches = (or_taches || []).sort((a, b) => (a.ordre || 0) - (b.ordre || 0));
+    const totaux = {
+      total_mo_ht:     or.total_mo_ht,
+      total_pieces_ht: or.total_pieces_ht,
+      total_ht:        or.total_ht,
+      total_tva:       or.total_tva,
+      total_ttc:       or.total_ttc
+    };
+    return { ordre_reparation: or, moto: motos || null, taches, pieces: or_pieces || [], totaux };
+  },
+
+  async create(garage_id, payload) {
+    const { moto_id, devis_id, technicien_id, km_entree, notes_atelier, notes_client } = payload;
+    const { data: moto, error: me } = await supabase.from('motos')
+      .select('client_id, km').eq('id', moto_id).eq('garage_id', garage_id).single();
+    if (me) throw new Error('Moto non trouvée');
+    const { count } = await supabase.from('ordres_reparation')
+      .select('id', { count: 'exact', head: true }).eq('garage_id', garage_id);
+    const numero_or = `OR-${new Date().getFullYear()}-${String((count || 0) + 1).padStart(4, '0')}`;
+    const or = await insert('ordres_reparation', {
+      garage_id,
+      numero_or,
+      moto_id,
+      client_id:     moto.client_id || null,
+      devis_id:      devis_id      || null,
+      technicien_id: technicien_id || null,
+      statut:        'brouillon',
+      km_entree:     parseInt(km_entree) || moto.km || 0,
+      notes_atelier: notes_atelier || '',
+      notes_client:  notes_client  || ''
+    });
+    const totaux = { total_mo_ht: 0, total_pieces_ht: 0, total_ht: 0, total_tva: 0, total_ttc: 0 };
+    return { ordre_reparation: or, totaux };
+  },
+
+  async update(id, garage_id, payload) {
+    const allowed = ['statut', 'technicien_id', 'km_entree', 'notes_atelier', 'notes_client'];
+    const patch = {};
+    allowed.forEach(k => { if (payload[k] !== undefined) patch[k] = payload[k]; });
+    if (Object.keys(patch).length > 0) await update('ordres_reparation', id, patch);
+    const { data, error } = await supabase.from('ordres_reparation')
+      .select('*').eq('id', id).eq('garage_id', garage_id).single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
+  async cloturer(id, garage_id, { km_sortie }) {
+    const or = await OrdresReparation._getOrRaw(id, garage_id);
+    if (or.statut !== 'en_cours')
+      throw new Error(`Transition interdite : seul un OR 'en_cours' peut être clôturé (statut actuel: '${or.statut}')`);
+    if (km_sortie < (or.km_entree || 0))
+      throw new Error(`km_sortie (${km_sortie}) doit être >= km_entree (${or.km_entree || 0})`);
+
+    const tachesNonFaites = await supabase.from('or_taches')
+      .select('id, statut').eq('or_id', id).neq('statut', 'fait');
+    if (tachesNonFaites.data?.length > 0) {
+      console.warn(`[OR ${id}] Clôturé avec ${tachesNonFaites.data.length} tâche(s) non terminée(s) :`,
+        tachesNonFaites.data.map(t => `#${t.id}(${t.statut})`).join(', '));
+    }
+
+    const orMaj = await OrdresReparation.recalculerTotaux(id);
+    const totaux = {
+      total_mo_ht:     orMaj.total_mo_ht,
+      total_pieces_ht: orMaj.total_pieces_ht,
+      total_ht:        orMaj.total_ht,
+      total_tva:       orMaj.total_tva,
+      total_ttc:       orMaj.total_ttc
+    };
+
+    await supabase.from('ordres_reparation').update({
+      statut: 'termine', km_sortie, date_cloture: new Date().toISOString()
+    }).eq('id', id);
+
+    const { data: moto } = await supabase.from('motos').select('km').eq('id', or.moto_id).single();
+    if (moto && km_sortie > moto.km) {
+      await supabase.from('motos').update({ km: km_sortie }).eq('id', or.moto_id);
+    }
+
+    let intervention, nouveau_score = null, nouvelle_couleur = null;
+    if (or.devis_id) {
+      const { data: intExist } = await supabase.from('interventions')
+        .select('id').eq('devis_id', or.devis_id).maybeSingle();
+      if (intExist) {
+        const { data: intMaj } = await supabase.from('interventions').update({
+          km:          km_sortie,
+          montant_ht:  totaux.total_ht,
+          montant_ttc: totaux.total_ttc,
+          description: `OR ${or.numero_or} — clôturé`
+        }).eq('id', intExist.id).select().single();
+        intervention = intMaj;
+        const { data: motoScore } = await supabase.from('motos')
+          .select('score, couleur_dossier').eq('id', or.moto_id).single();
+        nouveau_score    = motoScore?.score;
+        nouvelle_couleur = motoScore?.couleur_dossier;
+      }
+    }
+    if (!intervention) {
+      const sync = await Interventions.create(garage_id, or.moto_id, {
+        type:        'bleu',
+        titre:       `OR ${or.numero_or}`,
+        description: or.notes_atelier || `Clôture OR ${or.numero_or}`,
+        km:          km_sortie,
+        montant_ht:  totaux.total_ht,
+        montant_ttc: totaux.total_ttc,
+        devis_id:    or.devis_id || null
+      });
+      intervention    = sync.intervention;
+      nouveau_score   = sync.nouveau_score;
+      nouvelle_couleur = sync.nouvelle_couleur;
+    }
+
+    const { data: orFinal } = await supabase.from('ordres_reparation').select('*').eq('id', id).single();
+    return { ordre_reparation: orFinal, intervention, totaux, nouveau_score, nouvelle_couleur };
+  },
+
+  async recalculerTotaux(or_id) {
+    const { data: taches } = await supabase.from('or_taches').select('montant_ht').eq('or_id', or_id);
+    const { data: pieces } = await supabase.from('or_pieces').select('montant_ht, tva_pct').eq('or_id', or_id);
+    const total_mo_ht     = (taches || []).reduce((s, t) => s + (t.montant_ht || 0), 0);
+    const total_pieces_ht = (pieces || []).reduce((s, p) => s + (p.montant_ht || 0), 0);
+    const total_ht        = total_mo_ht + total_pieces_ht;
+    const tva_mo          = (taches || []).reduce((s, t) => s + (t.montant_ht || 0) * 0.20, 0);
+    const tva_pieces      = (pieces || []).reduce((s, p) => s + (p.montant_ht || 0) * ((p.tva_pct || 20) / 100), 0);
+    const { data: orMaj, error } = await supabase.from('ordres_reparation').update({
+      total_mo_ht:     +total_mo_ht.toFixed(2),
+      total_pieces_ht: +total_pieces_ht.toFixed(2),
+      total_ht:        +total_ht.toFixed(2),
+      total_tva:       +(tva_mo + tva_pieces).toFixed(2),
+      total_ttc:       +(total_ht + tva_mo + tva_pieces).toFixed(2)
+    }).eq('id', or_id).select().single();
+    if (error) throw new Error(error.message);
+    return orMaj;
+  },
+
+  async _getOrRaw(id, garage_id) {
+    const { data, error } = await supabase.from('ordres_reparation')
+      .select('*').eq('id', id).eq('garage_id', garage_id).single();
+    if (error) throw new Error(error.message);
+    return data;
+  }
+};
+
+// ══════════════════════════════════════════════════════════
+// OR — TÂCHES
+// ══════════════════════════════════════════════════════════
+const OrTaches = {
+
+  async create(garage_id, or_id, payload) {
+    const { data: or, error: oe } = await supabase.from('ordres_reparation')
+      .select('id').eq('id', or_id).eq('garage_id', garage_id).single();
+    if (oe) throw new Error('Ordre non trouvé');
+    const dh = parseFloat(payload.duree_h)     || 0;
+    const th = parseFloat(payload.taux_horaire) || 0;
+    const tache = await insert('or_taches', {
+      garage_id, or_id,
+      ordre:         parseInt(payload.ordre) || 0,
+      libelle:       payload.libelle,
+      description:   payload.description   || '',
+      duree_h:       dh,
+      taux_horaire:  th,
+      montant_ht:    +(dh * th).toFixed(2),
+      technicien_id: payload.technicien_id || null,
+      statut:        'a_faire'
+    });
+    const orMaj = await OrdresReparation.recalculerTotaux(or_id);
+    return { tache, ordre_reparation: orMaj };
+  },
+
+  async update(id, garage_id, payload) {
+    const { data: existing, error: fe } = await supabase.from('or_taches')
+      .select('*').eq('id', id).eq('garage_id', garage_id).single();
+    if (fe) throw new Error('Tâche non trouvée');
+    const allowed = ['libelle', 'description', 'duree_h', 'taux_horaire', 'technicien_id', 'statut', 'ordre'];
+    const patch = {};
+    allowed.forEach(k => { if (payload[k] !== undefined) patch[k] = payload[k]; });
+    const newDh = patch.duree_h      !== undefined ? parseFloat(patch.duree_h)      : existing.duree_h;
+    const newTh = patch.taux_horaire !== undefined ? parseFloat(patch.taux_horaire) : existing.taux_horaire;
+    if (patch.duree_h !== undefined || patch.taux_horaire !== undefined) {
+      patch.montant_ht = +(newDh * newTh).toFixed(2);
+    }
+    if (patch.statut === 'fait' && existing.statut !== 'fait') {
+      patch.fait_le = new Date().toISOString();
+    }
+    const { data: tache, error } = await supabase.from('or_taches')
+      .update(patch).eq('id', id).select().single();
+    if (error) throw new Error(error.message);
+    const orMaj = await OrdresReparation.recalculerTotaux(existing.or_id);
+    return { tache, ordre_reparation: orMaj };
+  },
+
+  async remove(id, garage_id) {
+    const { data: tache, error: fe } = await supabase.from('or_taches')
+      .select('or_id').eq('id', id).eq('garage_id', garage_id).single();
+    if (fe) throw new Error('Tâche non trouvée');
+    const { error } = await supabase.from('or_taches').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+    const orMaj = await OrdresReparation.recalculerTotaux(tache.or_id);
+    return { deleted_id: id, ordre_reparation: orMaj };
+  }
+};
+
+// ══════════════════════════════════════════════════════════
+// OR — PIÈCES
+// ══════════════════════════════════════════════════════════
+const OrPieces = {
+
+  async create(garage_id, or_id, payload) {
+    const { data: or, error: oe } = await supabase.from('ordres_reparation')
+      .select('id').eq('id', or_id).eq('garage_id', garage_id).single();
+    if (oe) throw new Error('Ordre non trouvé');
+    const q  = parseFloat(payload.qte)   || 1;
+    const pu = parseFloat(payload.pu_ht) || 0;
+    const piece = await insert('or_pieces', {
+      garage_id, or_id,
+      piece_id:  payload.piece_id  || null,
+      reference: payload.reference || '',
+      libelle:   payload.libelle,
+      qte:       q,
+      pu_ht:     pu,
+      tva_pct:   parseFloat(payload.tva_pct) || 20,
+      montant_ht: +(q * pu).toFixed(2)
+    });
+    const orMaj = await OrdresReparation.recalculerTotaux(or_id);
+    return { piece, ordre_reparation: orMaj };
+  },
+
+  async delete(id, garage_id) {
+    const { data: piece, error: fe } = await supabase.from('or_pieces')
+      .select('or_id').eq('id', id).eq('garage_id', garage_id).single();
+    if (fe) throw new Error('Pièce non trouvée');
+    const { error } = await supabase.from('or_pieces').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+    const orMaj = await OrdresReparation.recalculerTotaux(piece.or_id);
+    return { deleted_id: id, ordre_reparation: orMaj };
+  }
+};
+
+// ══════════════════════════════════════════════════════════
 // EXPORT
 // ══════════════════════════════════════════════════════════
 module.exports = {
@@ -658,5 +920,8 @@ module.exports = {
   Transferts,
   Storage,
   Realtime,
-  Fraude
+  Fraude,
+  OrdresReparation,
+  OrTaches,
+  OrPieces
 };
