@@ -153,6 +153,7 @@ input,select,textarea{font-family:inherit}
     <button class="nav-btn" onclick="nav('fiche',this)">Fiche moto</button>
     <button class="nav-btn" onclick="nav('entretien',this)">Entretien</button>
     <button class="nav-btn" onclick="nav('pneus',this)">Pneus</button>
+    <button class="nav-btn" onclick="nav('or',this)">OR</button>
     <button class="nav-btn" onclick="nav('devis',this)">Devis</button>
     <div class="nav-end">
       <span class="nav-user" id="navUser"></span>
@@ -170,6 +171,9 @@ let TOKEN = '';
 let motos = [];
 let selectedMoto = null;
 let devisLines = [];
+let ordresList = [];
+let orMode     = 'comptoir';
+let orFilters  = { statut: '', search: '', periode: '30j' };
 
 // ── API HELPER ──
 async function api(path, method='GET', body=null) {
@@ -228,6 +232,7 @@ function nav(section, btn) {
   else if (section === 'fiche') renderFiche();
   else if (section === 'entretien') renderEntretien();
   else if (section === 'pneus') renderPneus();
+  else if (section === 'or')   loadOR();
   else if (section === 'devis') loadDevis();
 }
 
@@ -278,6 +283,14 @@ function renderDashboard() {
 
 function scoreDot(c){return{vert:'🟢',bleu:'🔵',jaune:'🟡',rouge:'🔴'}[c]||'🔵'}
 function scoreLabel(c){return{vert:'Excellent',bleu:'Bon',jaune:'Moyen',rouge:'Faible'}[c]||'Bon'}
+function badgeStatut(s){
+  const cls={brouillon:'badge-jaune',en_cours:'badge-bleu',termine:'badge-vert',annule:'badge-rouge'}[s]||'badge-bleu';
+  const lbl={brouillon:'Brouillon',en_cours:'En cours',termine:'Terminé',annule:'Annulé'}[s]||s;
+  return `<span class="badge ${cls}">${lbl}</span>`;
+}
+function fmtDate(iso){
+  return new Date(iso).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
 
 function selectMoto(id) {
   selectedMoto = motos.find(m => m.id === id) || null;
@@ -568,6 +581,244 @@ async function saveDevis() {
     toast('✅ Devis créé');
     await loadDevis();
   } catch(e) { err.textContent = e.message; err.style.display='block'; }
+}
+
+// ── ORDRES DE RÉPARATION ──
+async function loadOR() {
+  const m = document.getElementById('main');
+  m.innerHTML = renderORPage();
+  try {
+    const data = await api('/ordres-reparation');
+    ordresList = data.ordres || data || [];
+    renderORTable();
+  } catch(e) {
+    document.getElementById('orTableZone').innerHTML = `<div class="alert alert-warn">Erreur chargement : ${e.message}</div>`;
+  }
+}
+
+function renderORPage() {
+  const sel = 'padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg2);color:var(--text);outline:none;cursor:pointer';
+  const togBtn = (active) => `padding:6px 14px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:.15s;${active?'background:var(--primary);color:#fff':'background:var(--bg2);color:var(--text2)'}`;
+  const statutOpts = [['','Tous (sauf annulé)'],['brouillon','Brouillon'],['en_cours','En cours'],['termine','Terminé'],['annule','Annulé']]
+    .map(([v,l])=>`<option value="${v}"${orFilters.statut===v?' selected':''}>${l}</option>`).join('');
+  const periodeOpts = [['today',"Aujourd'hui"],['7j','7 derniers jours'],['30j','30 derniers jours'],['all','Tout']]
+    .map(([v,l])=>`<option value="${v}"${orFilters.periode===v?' selected':''}>${l}</option>`).join('');
+  return `
+    <div class="section-header">
+      <div>
+        <div class="section-title">Ordres de Réparation</div>
+        <div class="section-sub" id="orSubtitle">Chargement…</div>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="renderNewOR()">+ Nouveau OR</button>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+      <select style="${sel}" onchange="orFilters.statut=this.value;renderORTable()">${statutOpts}</select>
+      <input value="${orFilters.search}" style="flex:1;min-width:180px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg2);color:var(--text);outline:none" placeholder="Numéro, plaque, client…" oninput="orFilters.search=this.value;renderORTable()">
+      <select style="${sel}" onchange="orFilters.periode=this.value;renderORTable()">${periodeOpts}</select>
+      <div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0">
+        <button id="orToggleComptoir" onclick="setOrMode('comptoir')" style="${togBtn(orMode==='comptoir')}">Comptoir</button>
+        <button id="orToggleAtelier"  onclick="setOrMode('atelier')"  style="${togBtn(orMode==='atelier')};border-left:1px solid var(--border)">Atelier</button>
+      </div>
+    </div>
+    <div id="orTableZone"><div class="loading">Chargement…</div></div>`;
+}
+
+function renderORTable() {
+  const cutoff = orFilters.periode==='today'
+    ? (()=>{const d=new Date();d.setHours(0,0,0,0);return d.getTime();})()
+    : orFilters.periode==='7j'  ? Date.now()-7*86400000
+    : orFilters.periode==='30j' ? Date.now()-30*86400000
+    : 0;
+  const sq = orFilters.search.toLowerCase();
+  const filtered = ordresList.filter(or => {
+    if (cutoff && new Date(or.date_ouverture).getTime() < cutoff) return false;
+    if (!orFilters.statut) { if (or.statut==='annule') return false; }
+    else if (or.statut !== orFilters.statut) return false;
+    if (sq) {
+      const hay = ((or.numero_or||'')+' '+(or.motos?.plaque||'')+' '+(or.motos?.clients?.nom||'')).toLowerCase();
+      if (!hay.includes(sq)) return false;
+    }
+    return true;
+  });
+  const total = ordresList.length, shown = filtered.length;
+  const sub = document.getElementById('orSubtitle');
+  if (sub) sub.textContent = shown===total ? `${total} ordre${total>1?'s':''}` : `${shown} sur ${total} ordres`;
+  const zone = document.getElementById('orTableZone');
+  if (!zone) return;
+  if (!filtered.length) {
+    zone.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">${
+      !ordresList.length
+        ? "Aucun ordre de réparation. Cliquez sur '+ Nouveau OR' pour en créer un."
+        : 'Aucun OR ne correspond à ces critères.'
+    }</div></div>`;
+    return;
+  }
+  if (orMode==='comptoir') {
+    const rows = filtered.map(or => {
+      const moto   = or.motos ? `${or.motos.plaque} – ${or.motos.marque} ${or.motos.modele}` : '—';
+      const client = or.motos?.clients?.nom ?? '—';
+      const ttc    = (or.total_ttc||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
+      return `<tr>
+        <td><strong>${or.numero_or}</strong></td>
+        <td>${moto}</td><td>${client}</td>
+        <td style="white-space:nowrap">${fmtDate(or.date_ouverture)}</td>
+        <td>${badgeStatut(or.statut)}</td>
+        <td style="text-align:right;font-weight:600">${ttc}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="selectOR('${or.id}','${or.numero_or}')">Voir</button></td>
+      </tr>`;
+    }).join('');
+    zone.innerHTML = `<table class="table"><thead><tr>
+      <th>N° OR</th><th>Moto</th><th>Client</th><th>Date ouverture</th><th>Statut</th><th style="text-align:right">Total TTC</th><th></th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+  } else {
+    const rows = filtered.map(or => {
+      const moto  = or.motos ? `${or.motos.plaque} – ${or.motos.marque} ${or.motos.modele}` : '—';
+      const t     = or.or_taches || [];
+      const left  = t.filter(t => t.statut!=='fait').length;
+      const label = t.length ? `${left}/${t.length} à faire` : '—';
+      return `<tr>
+        <td><strong>${or.numero_or}</strong></td>
+        <td>${moto}</td><td>${label}</td>
+        <td>${badgeStatut(or.statut)}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="selectOR('${or.id}','${or.numero_or}')">Voir tâches</button></td>
+      </tr>`;
+    }).join('');
+    zone.innerHTML = `<table class="table"><thead><tr>
+      <th>N° OR</th><th>Moto</th><th>Tâches restantes</th><th>Statut</th><th></th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+  }
+}
+
+function setOrMode(mode) {
+  orMode = mode;
+  const togBtn = (active) => `padding:6px 14px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:.15s;${active?'background:var(--primary);color:#fff':'background:var(--bg2);color:var(--text2)'}`;
+  const c = document.getElementById('orToggleComptoir');
+  const a = document.getElementById('orToggleAtelier');
+  if (c) c.setAttribute('style', togBtn(mode==='comptoir'));
+  if (a) a.setAttribute('style', togBtn(mode==='atelier')+';border-left:1px solid var(--border)');
+  renderORTable();
+}
+
+function selectOR(id, numero) { renderFicheOR(id, numero); }
+
+function renderFicheOR(id, numero) {
+  document.getElementById('main').innerHTML = `
+    <div class="section-header">
+      <div><div class="section-title">Fiche ${numero}</div><div class="section-sub">Ordre de Réparation</div></div>
+      <button class="btn btn-secondary btn-sm" onclick="loadOR()">← Retour liste OR</button>
+    </div>
+    <div class="card"><div class="alert alert-info">Fiche OR <strong>${numero}</strong> à venir — détail tâches, pièces et clôture.</div></div>`;
+}
+
+async function renderNewOR() {
+  const m = document.getElementById('main');
+  m.innerHTML = `
+    <div class="section-header">
+      <div><div class="section-title">Nouveau OR</div><div class="section-sub">Création d'un ordre de réparation</div></div>
+      <button class="btn btn-secondary btn-sm" onclick="loadOR()">← Retour liste OR</button>
+    </div>
+    <div class="loading">Chargement motos…</div>`;
+  let motosDisp = [];
+  try {
+    const data = await api('/motos');
+    motosDisp = data.motos || data || [];
+  } catch(e) {
+    m.innerHTML = `
+      <div class="section-header">
+        <div><div class="section-title">Nouveau OR</div></div>
+        <button class="btn btn-secondary btn-sm" onclick="loadOR()">← Retour liste OR</button>
+      </div>
+      <div class="card"><div class="alert alert-warn">Erreur chargement motos : ${e.message}</div></div>`;
+    return;
+  }
+  if (!motosDisp.length) {
+    m.innerHTML = `
+      <div class="section-header">
+        <div><div class="section-title">Nouveau OR</div></div>
+        <button class="btn btn-secondary btn-sm" onclick="loadOR()">← Retour liste OR</button>
+      </div>
+      <div class="card"><div class="empty">
+        <div class="empty-icon">🏍️</div>
+        <div class="empty-text">Aucune moto en base.</div>
+        <div class="empty-sub">Créez d'abord une moto via l'onglet "Fiche moto".</div>
+      </div></div>`;
+    return;
+  }
+  const opts = motosDisp.map(mo => {
+    const cn = (mo.clients?.nom || mo.client_nom || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+    return `<option value="${mo.id}" data-km="${mo.km ?? ''}" data-client="${cn}">${mo.plaque} – ${mo.marque} ${mo.modele}</option>`;
+  }).join('');
+  m.innerHTML = `
+    <div class="section-header">
+      <div><div class="section-title">Nouveau OR</div><div class="section-sub">Création d'un ordre de réparation</div></div>
+      <button class="btn btn-secondary btn-sm" onclick="loadOR()">← Retour liste OR</button>
+    </div>
+    <div class="card" style="max-width:600px">
+      <div id="orCreateErr" class="alert alert-warn" style="display:none"></div>
+      <div class="field">
+        <label>Moto *</label>
+        <select id="orMotoSel" onchange="orUpdateMotoInfo(this)">
+          <option value="">— Choisir une moto —</option>${opts}
+        </select>
+        <div id="orClientInfo" style="font-size:12px;color:var(--text2);margin-top:5px"></div>
+      </div>
+      <div class="field">
+        <label>Kilométrage entrée</label>
+        <input id="orKm" type="number" min="0" placeholder="ex: 12345">
+      </div>
+      <div class="field">
+        <label>Notes atelier</label>
+        <textarea id="orNotesAtelier" rows="3" placeholder="Ce qui est demandé / observé à la réception" style="resize:vertical"></textarea>
+      </div>
+      <div class="field">
+        <label>Notes client</label>
+        <textarea id="orNotesClient" rows="2" placeholder="Visible par le client" style="resize:vertical"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">
+        <button class="btn btn-secondary" onclick="loadOR()">Annuler</button>
+        <button id="orSubmitBtn" class="btn btn-primary" onclick="submitNewOR()">Créer l'OR</button>
+      </div>
+    </div>`;
+}
+
+function orUpdateMotoInfo(sel) {
+  const opt  = sel.selectedOptions[0];
+  const km   = document.getElementById('orKm');
+  const info = document.getElementById('orClientInfo');
+  if (!opt?.value) { km.value = ''; info.textContent = ''; return; }
+  km.value = opt.dataset.km;
+  info.textContent = opt.dataset.client
+    ? `Client lié : ${opt.dataset.client}`
+    : 'Aucun client lié à cette moto';
+}
+
+async function submitNewOR() {
+  const err = document.getElementById('orCreateErr');
+  err.style.display = 'none';
+  const motoId = document.getElementById('orMotoSel').value;
+  const kmVal  = document.getElementById('orKm').value.trim();
+  if (!motoId) {
+    err.textContent = 'Sélectionnez une moto.'; err.style.display = 'block'; return;
+  }
+  if (kmVal !== '' && (isNaN(kmVal) || !Number.isInteger(+kmVal) || +kmVal < 0)) {
+    err.textContent = 'Kilométrage invalide — entrez un entier positif.'; err.style.display = 'block'; return;
+  }
+  const btn = document.getElementById('orSubmitBtn');
+  btn.disabled = true; btn.textContent = 'Création en cours…';
+  const payload = { moto_id: motoId };
+  if (kmVal !== '') payload.km_entree = parseInt(kmVal);
+  const na = document.getElementById('orNotesAtelier').value.trim();
+  const nc = document.getElementById('orNotesClient').value.trim();
+  if (na) payload.notes_atelier = na;
+  if (nc) payload.notes_client  = nc;
+  try {
+    const data = await api('/ordres-reparation', 'POST', payload);
+    toast(`✅ OR ${data.ordre_reparation.numero_or} créé`);
+    await loadOR();
+  } catch(e) {
+    err.textContent = e.message; err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Créer l\'OR';
+  }
 }
 
 // ── HELPERS ──
