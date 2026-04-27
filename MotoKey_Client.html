@@ -849,7 +849,7 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
 
   setLoading(btn, true, 'Réinitialisation…');
   const { ok, data } = await apiPost('/auth/client/password-reset/confirm', {
-    email: pendingEmail, token, password: pwd
+    email: pendingEmail, code: token, new_password: pwd
   });
   setLoading(btn, false);
 
