@@ -646,6 +646,18 @@ const Fraude = {
 // ══════════════════════════════════════════════════════════
 // ORDRES DE RÉPARATION
 // ══════════════════════════════════════════════════════════
+
+// Matrice de transitions autorisées pour PATCH /statut (L3a-ter)
+const _OR_TRANS = {
+  brouillon:     ['valide_client', 'annule'],
+  valide_client: ['brouillon', 'en_cours', 'annule'],
+  en_cours:      ['attente', 'annule'],          // termine via /cloturer
+  attente:       ['en_cours', 'annule'],
+  termine:       ['en_cours', 'annule'],          // facture via /facturer ; en_cours = correction
+  facture:       ['annule'],                      // terminal sauf annulation ADMIN/CONCESSION
+  annule:        []                               // terminal absolu
+};
+
 const OrdresReparation = {
 
   async list(garage_id, filters = {}) {
@@ -802,10 +814,109 @@ const OrdresReparation = {
     return orMaj;
   },
 
+  async logHistorique(or_id, ancien_statut, nouveau_statut, action, payload, ctx) {
+    try {
+      await supabase.from('or_historique').insert({
+        or_id,
+        ancien_statut:  ancien_statut  || null,
+        nouveau_statut: nouveau_statut || null,
+        action,
+        acteur_id:   ctx ? (ctx.user_id || null) : null,
+        acteur_role: ctx ? (ctx.role    || null) : null,
+        payload:     payload           || null
+      });
+    } catch (e) {
+      console.warn('[L3a-ter] logHistorique failed:', e.message);
+    }
+  },
+
+  async changerStatut(id, garage_id, ctx, { nouveau_statut, attente_motif, km_sortie, signature_base64 }) {
+    const or = await OrdresReparation._getOrRaw(id, garage_id);
+    const ancien = or.statut;
+
+    // Transitions réservées aux endpoints dédiés
+    if (ancien === 'en_cours' && nouveau_statut === 'termine')
+      throw new Error('WRONG_ENDPOINT: utiliser POST /ordres-reparation/:id/cloturer');
+    if (ancien === 'termine' && nouveau_statut === 'facture')
+      throw new Error('WRONG_ENDPOINT: utiliser POST /ordres-reparation/:id/facturer');
+
+    const autorise = _OR_TRANS[ancien] || [];
+    if (!autorise.includes(nouveau_statut))
+      throw new Error('INVALID_TRANSITION: ' + ancien + ' → ' + nouveau_statut);
+
+    if (nouveau_statut === 'attente' && !attente_motif)
+      throw new Error('attente_motif requis pour passer en attente');
+
+    const patch = { statut: nouveau_statut };
+    if (attente_motif)    patch.attente_motif    = attente_motif;
+    if (km_sortie)        patch.km_sortie        = parseInt(km_sortie);
+    if (signature_base64) patch.signature_client = signature_base64;
+
+    const { data: orMaj, error } = await supabase.from('ordres_reparation')
+      .update(patch).eq('id', id).eq('garage_id', garage_id).select('*').single();
+    if (error) throw new Error(error.message);
+
+    await OrdresReparation.logHistorique(id, ancien, nouveau_statut, 'statut_change',
+      attente_motif ? { attente_motif } : null, ctx);
+    return orMaj;
+  },
+
+  async attribuerNumeroFacture() {
+    const { data, error } = await supabase.rpc('attribuer_numero_facture');
+    if (error) throw new Error('Séquence facture : ' + error.message);
+    return data;
+  },
+
+  async facturer(id, garage_id, ctx, { signature_base64 } = {}) {
+    const or = await OrdresReparation._getOrRaw(id, garage_id);
+    if (or.statut !== 'termine')
+      throw new Error("Seul un OR 'termine' peut être facturé (statut actuel : '" + or.statut + "')");
+    if (or.numero_facture)
+      throw new Error('Numéro de facture déjà attribué : ' + or.numero_facture);
+
+    const numero_facture = await OrdresReparation.attribuerNumeroFacture();
+    const patch = { statut: 'facture', numero_facture, facture_emise_at: new Date().toISOString() };
+    if (signature_base64) patch.signature_client = signature_base64;
+    // TODO L3a-septies : générer PDF + upload Cloudinary → patch.pdf_url
+
+    const { data: orMaj, error } = await supabase.from('ordres_reparation')
+      .update(patch).eq('id', id).eq('garage_id', garage_id).select('*').single();
+    if (error) throw new Error(error.message);
+
+    await OrdresReparation.logHistorique(id, 'termine', 'facture', 'facturation',
+      { numero_facture, avec_signature: !!signature_base64 }, ctx);
+    return orMaj;
+  },
+
+  async getHistorique(id, garage_id) {
+    await OrdresReparation._getOrRaw(id, garage_id); // vérifie l'accès
+    const { data, error } = await supabase.from('or_historique')
+      .select('*').eq('or_id', id).order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+
+  async getDetailsCompletsPourFacture(id, garage_id) {
+    const { data, error } = await supabase.from('ordres_reparation')
+      .select('*, motos(*, clients(*)), or_taches(*), or_pieces(*), garages(*)')
+      .eq('id', id).eq('garage_id', garage_id).single();
+    if (error) throw new Error(error.message);
+    const { or_taches, or_pieces, motos, garages, ...or } = data;
+    return {
+      or,
+      moto:   motos   || null,
+      client: motos   ? (motos.clients || null) : null,
+      taches: or_taches || [],
+      pieces: or_pieces || [],
+      garage: garages || null
+    };
+  },
+
   async _getOrRaw(id, garage_id) {
     const { data, error } = await supabase.from('ordres_reparation')
-      .select('*').eq('id', id).eq('garage_id', garage_id).single();
+      .select('*').eq('id', id).eq('garage_id', garage_id).maybeSingle();
     if (error) throw new Error(error.message);
+    if (!data)  throw new Error('NOT_FOUND: Ordre non trouvé');
     return data;
   }
 };

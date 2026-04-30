@@ -96,7 +96,7 @@ console.log('================');
 
 const PORT       = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'motokey_secret_2026';
-const VERSION    = '1.0.0';
+const VERSION    = '1.1.0';
 
 /* ─── SUPABASE CLIENT LEGER ─── */
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -1726,6 +1726,51 @@ const server = http.createServer(async function(req, res){
     return ok(res, { ordre_reparation: DB.ordres_reparation[i] }, 'Ordre mis à jour');
   }
 
+  /* ── L3a-ter helpers RAM (mirror de supabase.js) ── */
+  const _OR_TRANS_RAM = {
+    brouillon:     ['valide_client', 'annule'],
+    valide_client: ['brouillon', 'en_cours', 'annule'],
+    en_cours:      ['attente', 'annule'],
+    attente:       ['en_cours', 'annule'],
+    termine:       ['en_cours', 'annule'],
+    facture:       ['annule'],
+    annule:        []
+  };
+
+  function _validerTransitionRAM(ancien, nouveau) {
+    if (ancien === 'en_cours' && nouveau === 'termine')
+      return { ok:false, code:'WRONG_ENDPOINT', msg:'Utiliser POST /ordres-reparation/:id/cloturer' };
+    if (ancien === 'termine' && nouveau === 'facture')
+      return { ok:false, code:'WRONG_ENDPOINT', msg:'Utiliser POST /ordres-reparation/:id/facturer' };
+    const autorise = _OR_TRANS_RAM[ancien] || [];
+    if (!autorise.includes(nouveau))
+      return { ok:false, code:'INVALID_TRANSITION', msg:"Transition '"+ancien+"' → '"+nouveau+"' non autorisée" };
+    if (nouveau === 'attente') return { ok:true, requiresMotif:true };
+    return { ok:true };
+  }
+
+  function _logOrHistoriqueRam(orId, ancienStatut, nouveauStatut, action, payload, ctx) {
+    if (!DB.or_historique) DB.or_historique = [];
+    DB.or_historique.push({
+      id:             'h-'+uid(),
+      or_id:          orId,
+      ancien_statut:  ancienStatut,
+      nouveau_statut: nouveauStatut,
+      action:         action,
+      acteur_id:      ctx ? (ctx.user_id || null) : null,
+      acteur_role:    ctx ? (ctx.role    || null) : null,
+      payload:        payload || null,
+      created_at:     nowISO()
+    });
+  }
+
+  function _attribuerNumeroFactureRam() {
+    const annee = new Date().getFullYear();
+    if (!DB._compteur_factures) DB._compteur_factures = {};
+    DB._compteur_factures[annee] = (DB._compteur_factures[annee] || 0) + 1;
+    return 'FAC-' + annee + '-' + String(DB._compteur_factures[annee]).padStart(4, '0');
+  }
+
   if((p=M('POST','/ordres-reparation/:id/cloturer'))!==null){
     // RBAC: PRO minimum — clôture engage la facturation
     const a = authSilent(req);
@@ -1820,6 +1865,241 @@ const server = http.createServer(async function(req, res){
     }
 
     return ok(res, { ordre_reparation: or, intervention, nouveau_score, nouvelle_couleur }, 'Ordre clôturé · Intervention synchronisée');
+  }
+
+  /* ── L3a-ter Endpoint A : PATCH /ordres-reparation/:id/statut ── */
+  if((p=M('PATCH','/ordres-reparation/:id/statut'))!==null){
+    // TODO RBAC L4 : facture→annule doit être restreint CONCESSION/ADMIN
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+    const { nouveau_statut, attente_motif, signature_base64 } = b;
+    if (!nouveau_statut) return fail(res, 'nouveau_statut requis', 400, 'MISSING_FIELD');
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const orMaj = await SBLayer.OrdresReparation.changerStatut(p.id, garageId, ctx, { nouveau_statut, attente_motif, signature_base64 });
+        return ok(res, { ordre_reparation: orMaj }, 'Statut mis à jour : ' + nouveau_statut);
+      } catch(e) {
+        if (e.message && e.message.startsWith('NOT_FOUND:'))
+          return fail(res, e.message.replace('NOT_FOUND: ', ''), 404, 'NOT_FOUND');
+        if (e.message && e.message.startsWith('WRONG_ENDPOINT:'))
+          return fail(res, e.message.replace('WRONG_ENDPOINT: ', ''), 400, 'WRONG_ENDPOINT');
+        if (e.message && e.message.startsWith('INVALID_TRANSITION:'))
+          return fail(res, e.message.replace('INVALID_TRANSITION: ', ''), 422, 'INVALID_TRANSITION');
+        return fail(res, e.message, 400, 'DB_ERROR');
+      }
+    }
+    // ── RAM fallback ──
+    const iSt = (DB.ordres_reparation||[]).findIndex(function(o){ return o.id===p.id && o.garage_id===garageId; });
+    if (iSt<0) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+    const orSt = DB.ordres_reparation[iSt];
+    const vt = _validerTransitionRAM(orSt.statut, nouveau_statut);
+    if (!vt.ok) return fail(res, vt.msg, vt.code==='WRONG_ENDPOINT' ? 400 : 422, vt.code);
+    if (vt.requiresMotif && !attente_motif) return fail(res, 'attente_motif requis pour passer en attente', 400, 'MISSING_FIELD');
+    const patchSt = { statut: nouveau_statut, updated_at: nowISO() };
+    if (attente_motif)    patchSt.attente_motif    = attente_motif;
+    if (signature_base64) patchSt.signature_client = signature_base64;
+    DB.ordres_reparation[iSt] = Object.assign({}, orSt, patchSt);
+    _logOrHistoriqueRam(p.id, orSt.statut, nouveau_statut, 'statut_change', attente_motif ? { attente_motif } : null, ctx);
+    return ok(res, { ordre_reparation: DB.ordres_reparation[iSt] }, 'Statut mis à jour : ' + nouveau_statut);
+  }
+
+  /* ── L3a-ter Endpoint B : POST /ordres-reparation/:id/facturer ── */
+  if((p=M('POST','/ordres-reparation/:id/facturer'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+    const { signature_base64 } = b;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const orMaj = await SBLayer.OrdresReparation.facturer(p.id, garageId, ctx, { signature_base64 });
+        return ok(res, { ordre_reparation: orMaj, numero_facture: orMaj.numero_facture }, 'OR facturé · ' + orMaj.numero_facture);
+      } catch(e) {
+        if (e.message && e.message.startsWith('NOT_FOUND:'))
+          return fail(res, e.message.replace('NOT_FOUND: ', ''), 404, 'NOT_FOUND');
+        return fail(res, e.message, 400, 'DB_ERROR');
+      }
+    }
+    // ── RAM fallback ──
+    const iFact = (DB.ordres_reparation||[]).findIndex(function(o){ return o.id===p.id && o.garage_id===garageId; });
+    if (iFact<0) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+    const orFact = DB.ordres_reparation[iFact];
+    if (orFact.statut !== 'termine')
+      return fail(res, "Seul un OR 'termine' peut être facturé (statut actuel : '"+orFact.statut+"')", 422, 'INVALID_TRANSITION');
+    if (orFact.numero_facture)
+      return fail(res, 'Numéro de facture déjà attribué : ' + orFact.numero_facture, 400, 'ALREADY_INVOICED');
+    const numero_facture = _attribuerNumeroFactureRam();
+    const patchFact = { statut: 'facture', numero_facture, facture_emise_at: nowISO(), updated_at: nowISO() };
+    if (signature_base64) patchFact.signature_client = signature_base64;
+    DB.ordres_reparation[iFact] = Object.assign({}, orFact, patchFact);
+    _logOrHistoriqueRam(p.id, 'termine', 'facture', 'facturation', { numero_facture, avec_signature: !!signature_base64 }, ctx);
+    return ok(res, { ordre_reparation: DB.ordres_reparation[iFact], numero_facture }, 'OR facturé · ' + numero_facture);
+  }
+
+  /* ── L3a-ter Endpoint C : GET /ordres-reparation/:id/historique ── */
+  if((p=M('GET','/ordres-reparation/:id/historique'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const historique = await SBLayer.OrdresReparation.getHistorique(p.id, garageId);
+        return ok(res, { historique, total: historique.length });
+      } catch(e) {
+        if (e.message && e.message.startsWith('NOT_FOUND:'))
+          return fail(res, e.message.replace('NOT_FOUND: ', ''), 404, 'NOT_FOUND');
+        return fail(res, e.message, 400, 'DB_ERROR');
+      }
+    }
+    // ── RAM fallback ──
+    const orHIdx = (DB.ordres_reparation||[]).findIndex(function(o){ return o.id===p.id && o.garage_id===garageId; });
+    if (orHIdx<0) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+    const historique = (DB.or_historique||[])
+      .filter(function(h){ return h.or_id===p.id; })
+      .sort(function(a,b){ return (b.created_at||'').localeCompare(a.created_at||''); });
+    return ok(res, { historique, total: historique.length });
+  }
+
+  /* ── L3a-ter Endpoint D : GET /ordres-reparation/:id/facture (HTML A4 print-ready) ── */
+  if((p=M('GET','/ordres-reparation/:id/facture'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+    let orF, motoF, clientF, tachesF, piecesF, garageF;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const d = await SBLayer.OrdresReparation.getDetailsCompletsPourFacture(p.id, garageId);
+        orF = d.or; motoF = d.moto; clientF = d.client; tachesF = d.taches; piecesF = d.pieces; garageF = d.garage;
+      } catch(e) {
+        if (e.message && e.message.startsWith('NOT_FOUND:'))
+          return fail(res, e.message.replace('NOT_FOUND: ', ''), 404, 'NOT_FOUND');
+        return fail(res, e.message, 400, 'DB_ERROR');
+      }
+    } else {
+      orF = (DB.ordres_reparation||[]).find(function(o){ return o.id===p.id && o.garage_id===garageId; });
+      if (!orF) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+      motoF   = (DB.motos||[]).find(function(m){ return m.id===orF.moto_id; }) || null;
+      clientF = motoF ? ((DB.clients||[]).find(function(c){ return c.id===motoF.client_id; }) || null) : null;
+      tachesF = (DB.or_taches||[]).filter(function(t){ return t.or_id===p.id; });
+      piecesF = (DB.or_pieces||[]).filter(function(pp){ return pp.or_id===p.id; });
+      garageF = (DB.garages||[]).find(function(g){ return g.id===garageId; }) || null;
+    }
+    if (!orF) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+    if (!orF.numero_facture && !rbac.requireRole(ctx, 'CONCESSION'))
+      return fail(res, 'Facture non émise pour cet OR', 400, 'NOT_INVOICED');
+    const esc2  = function(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); };
+    const fmt2  = function(n){ return Number(n||0).toFixed(2); };
+    const annuleF   = orF.statut === 'annule' && !!orF.numero_facture;
+    const dateFact  = orF.facture_emise_at ? new Date(orF.facture_emise_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR');
+    const dateNow   = new Date().toLocaleDateString('fr-FR');
+    let lignesHTML  = '';
+    (tachesF||[]).forEach(function(t){
+      lignesHTML += '<tr><td>'+esc2(t.libelle||'')+'</td><td class="c">MO</td><td class="r">'+fmt2(t.duree_h||0)+'h</td><td class="r">'+fmt2(t.taux_horaire||0)+' €</td><td class="r">'+fmt2(t.montant_ht||0)+' €</td></tr>';
+    });
+    (piecesF||[]).forEach(function(pp){
+      const lbl = pp.reference ? esc2(pp.reference)+' — '+esc2(pp.libelle||'') : esc2(pp.libelle||'');
+      lignesHTML += '<tr><td>'+lbl+'</td><td class="c">Pièce</td><td class="r">'+fmt2(pp.qte||0)+'</td><td class="r">'+fmt2(pp.pu_ht||0)+' €</td><td class="r">'+fmt2(pp.montant_ht||0)+' €</td></tr>';
+    });
+    const noLignes        = lignesHTML ? '' : '<tr><td colspan="5" style="text-align:center;color:#9ba3b4;font-style:italic">Aucune ligne</td></tr>';
+    const total_mo_ht     = (tachesF||[]).reduce(function(s,t){ return s+(t.montant_ht||0); }, 0);
+    const total_pieces_ht = (piecesF||[]).reduce(function(s,pp){ return s+(pp.montant_ht||0); }, 0);
+    const total_ht        = orF.total_ht  != null ? orF.total_ht  : total_mo_ht + total_pieces_ht;
+    const total_tva       = orF.total_tva != null ? orF.total_tva : total_ht * 0.20;
+    const total_ttc       = orF.total_ttc != null ? orF.total_ttc : total_ht + total_tva;
+    const annuleBanner    = annuleF ? '<div class="annule-banner">FACTURE ANNULÉE</div>' : '';
+    const sigBlock        = orF.signature_client ? '<div class="signature"><h3>Signature client</h3><img src="'+orF.signature_client+'" alt="Signature"></div>' : '';
+    const gNom    = garageF ? esc2(garageF.nom||'')                        : '';
+    const gAdr    = garageF ? esc2(garageF.adresse||'')                    : '';
+    const gEmail  = garageF ? esc2(garageF.email||'')                      : '';
+    const gTel    = garageF ? esc2(garageF.telephone||garageF.tel||'')     : '';
+    const cNom    = clientF ? esc2(clientF.nom||'')                        : '—';
+    const cEmail  = clientF ? esc2(clientF.email||'')                      : '';
+    const motoLbl = motoF   ? esc2((motoF.marque||'')+' '+(motoF.modele||'')+' — '+(motoF.plaque||'')) : '';
+    const numFact = esc2(orF.numero_facture || 'Aperçu');
+    const html =
+      '<!DOCTYPE html>\n<html lang="fr">\n<head>\n<meta charset="UTF-8">\n' +
+      '<meta name="viewport" content="width=device-width,initial-scale=1.0">\n' +
+      '<title>Facture '+numFact+' — MotoKey</title>\n' +
+      '<style>\n' +
+      '*{margin:0;padding:0;box-sizing:border-box}\n' +
+      '@page{size:A4;margin:15mm 12mm}\n' +
+      'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;font-size:12px;color:#1a1d23;background:#fff}\n' +
+      '.toolbar{background:#f0f2f5;padding:10px 16px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #d1d5db}\n' +
+      '.toolbar button{background:#ff6b00;color:#fff;border:none;border-radius:6px;padding:7px 18px;font-size:13px;font-weight:600;cursor:pointer}\n' +
+      '.toolbar .title{font-weight:700;font-size:14px}\n' +
+      '@media print{.toolbar{display:none}}\n' +
+      '.page{max-width:780px;margin:0 auto;padding:20px 24px}\n' +
+      '.header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:2px solid #ff6b00}\n' +
+      '.logo{font-size:22px;font-weight:900;letter-spacing:1px}.logo em{color:#ff6b00;font-style:normal}\n' +
+      '.garage-info{font-size:11px;color:#5a6172;margin-top:4px}\n' +
+      '.facture-title{text-align:right}.facture-title h1{font-size:22px;font-weight:900;color:#1a1d23}\n' +
+      '.facture-title .num{font-size:16px;font-weight:700;color:#ff6b00;margin-top:2px}\n' +
+      '.facture-title .date{font-size:11px;color:#5a6172;margin-top:4px}\n' +
+      '.annule-banner{background:#dc2626;color:#fff;text-align:center;font-size:18px;font-weight:900;letter-spacing:3px;padding:10px;margin-bottom:20px;border-radius:6px}\n' +
+      '.parties{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:24px}\n' +
+      '.bloc-partie h3{font-size:10px;font-weight:700;text-transform:uppercase;color:#9ba3b4;letter-spacing:1px;margin-bottom:6px}\n' +
+      '.bloc-partie p{font-size:12px;line-height:1.6}\n' +
+      '.bloc-partie .name{font-weight:700;font-size:13px}\n' +
+      'table{width:100%;border-collapse:collapse;margin-bottom:16px}\n' +
+      'thead tr{background:#1a1d23;color:#fff}\n' +
+      'thead th{padding:8px 10px;text-align:left;font-size:11px;font-weight:600}\n' +
+      'tbody tr:nth-child(even){background:#f8f9fb}\n' +
+      'tbody td{padding:7px 10px;font-size:11px;border-bottom:1px solid #e2e5eb}\n' +
+      '.c{text-align:center}.r{text-align:right}\n' +
+      '.totaux{margin-left:auto;width:260px}\n' +
+      '.totaux table{margin-bottom:0}\n' +
+      '.totaux td{padding:5px 8px}\n' +
+      '.ttc{font-weight:900;font-size:14px;color:#ff6b00}\n' +
+      '.signature{margin-top:24px;padding-top:16px;border-top:1px solid #e2e5eb}\n' +
+      '.signature h3{font-size:10px;font-weight:700;text-transform:uppercase;color:#9ba3b4;letter-spacing:1px;margin-bottom:8px}\n' +
+      '.signature img{max-height:80px;border:1px solid #e2e5eb;border-radius:4px}\n' +
+      '.footer{margin-top:32px;padding-top:12px;border-top:1px solid #e2e5eb;text-align:center;font-size:10px;color:#9ba3b4}\n' +
+      '</style>\n</head>\n<body>\n' +
+      '<div class="toolbar"><span class="title">Facture '+numFact+'</span>' +
+      '<button onclick="window.print()">Imprimer</button></div>\n' +
+      '<div class="page">\n'+annuleBanner+'\n' +
+      '<div class="header">' +
+        '<div><div class="logo">MOTO<em>KEY</em></div>' +
+        '<div class="garage-info">'+gNom+'<br>'+gAdr+'<br>'+gEmail+'<br>'+gTel+'</div></div>' +
+        '<div class="facture-title"><h1>FACTURE</h1>' +
+        '<div class="num">'+numFact+'</div>' +
+        '<div class="date">Émise le '+dateFact+'</div></div>' +
+      '</div>\n' +
+      '<div class="parties">' +
+        '<div class="bloc-partie"><h3>Émis par</h3>' +
+        '<p class="name">'+gNom+'</p><p>'+gAdr+'</p><p>'+gEmail+'</p><p>'+gTel+'</p></div>' +
+        '<div class="bloc-partie"><h3>Facturé à</h3>' +
+        '<p class="name">'+cNom+'</p><p>'+cEmail+'</p><p>'+motoLbl+'</p></div>' +
+      '</div>\n' +
+      '<table><thead><tr>' +
+        '<th>Désignation</th><th class="c">Type</th>' +
+        '<th class="r">Qté / Durée</th><th class="r">P.U. HT</th><th class="r">Montant HT</th>' +
+      '</tr></thead><tbody>'+lignesHTML+noLignes+'</tbody></table>\n' +
+      '<div class="totaux"><table><tbody>' +
+        '<tr><td>Main-d\'oeuvre HT</td><td class="r">'+fmt2(total_mo_ht)+' €</td></tr>' +
+        '<tr><td>Pièces HT</td><td class="r">'+fmt2(total_pieces_ht)+' €</td></tr>' +
+        '<tr><td>Total HT</td><td class="r">'+fmt2(total_ht)+' €</td></tr>' +
+        '<tr><td>TVA (20%)</td><td class="r">'+fmt2(total_tva)+' €</td></tr>' +
+        '<tr class="ttc"><td><strong>Total TTC</strong></td><td class="r"><strong>'+fmt2(total_ttc)+' €</strong></td></tr>' +
+      '</tbody></table></div>\n' +
+      sigBlock+'\n' +
+      '<div class="footer">Facture générée par MotoKey · '+dateNow+'</div>\n' +
+      '</div>\n</body>\n</html>';
+    res.writeHead(200, {'Content-Type':'text/html; charset=utf-8','X-MotoKey-Version':VERSION,'Access-Control-Allow-Origin':'*'});
+    res.end(html);
+    return;
   }
 
   /* ── Helper RAM : recalcul des totaux d'un OR à partir de ses tâches et pièces ── */
