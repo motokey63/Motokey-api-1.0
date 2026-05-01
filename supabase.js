@@ -1005,6 +1005,25 @@ const OrPieces = {
     return { piece, ordre_reparation: orMaj };
   },
 
+  async update(id, garage_id, payload) {
+    const { data: existing, error: fe } = await supabase.from('or_pieces')
+      .select('*').eq('id', id).eq('garage_id', garage_id).single();
+    if (fe) throw new Error('Pièce non trouvée');
+    const allowed = ['libelle', 'reference', 'qte', 'pu_ht', 'tva_pct'];
+    const patch = {};
+    allowed.forEach(k => { if (payload[k] !== undefined) patch[k] = payload[k]; });
+    const newQ  = patch.qte   !== undefined ? parseFloat(patch.qte)   : existing.qte;
+    const newPu = patch.pu_ht !== undefined ? parseFloat(patch.pu_ht) : existing.pu_ht;
+    if (patch.qte !== undefined || patch.pu_ht !== undefined) {
+      patch.montant_ht = +(newQ * newPu).toFixed(2);
+    }
+    const { data: piece, error } = await supabase.from('or_pieces')
+      .update(patch).eq('id', id).select().single();
+    if (error) throw new Error(error.message);
+    const orMaj = await OrdresReparation.recalculerTotaux(existing.or_id);
+    return { piece, ordre_reparation: orMaj };
+  },
+
   async delete(id, garage_id) {
     const { data: piece, error: fe } = await supabase.from('or_pieces')
       .select('or_id').eq('id', id).eq('garage_id', garage_id).single();
