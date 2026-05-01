@@ -129,6 +129,50 @@ input,select,textarea{font-family:inherit}
   #nav{gap:0;overflow-x:auto}
   .nav-btn{padding:10px 10px;font-size:12px}
 }
+
+/* ── OR FICHE (L3a-quater) ── */
+.or-badge{display:inline-flex;align-items:center;padding:5px 13px;border-radius:14px;font-size:12px;font-weight:700;white-space:nowrap}
+.or-badge-brouillon{background:#f3f4f6;color:#9ba3b4}
+.or-badge-valide_client{background:#eff6ff;color:#2563eb}
+.or-badge-en_cours{background:#fffbeb;color:#d97706}
+.or-badge-attente{background:#f5f3ff;color:#7c3aed}
+.or-badge-termine{background:#f0fdf4;color:#16a34a}
+.or-badge-facture{background:#fff4ee;color:#1a1d23;border:1px solid #ff6b00}
+.or-badge-annule{background:#fef2f2;color:#dc2626;text-decoration:line-through}
+
+.or-header{background:linear-gradient(135deg,#1a1d23 0%,#2d3340 100%);color:#fff;border-radius:14px;padding:20px 24px;margin-bottom:14px}
+.or-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.or-info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.or-info-row:last-child{border-bottom:none}
+.or-info-lbl{color:var(--text2)}
+.or-info-val{font-weight:500;text-align:right;max-width:60%}
+
+.or-totaux{background:#1a1d23;color:#fff;border-radius:12px;padding:18px 20px;margin-bottom:14px}
+.or-totaux-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:rgba(255,255,255,.65)}
+.or-totaux-ttc{font-size:20px;font-weight:800;color:#fff;border-top:1px solid rgba(255,255,255,.15);padding-top:10px;margin-top:8px;display:flex;justify-content:space-between;align-items:center}
+
+.or-timeline{list-style:none;padding:0;margin:0}
+.or-timeline-item{padding:4px 0 14px 28px;border-left:2px solid var(--border);margin-left:6px;position:relative}
+.or-timeline-item:last-child{border-left-color:transparent}
+.or-timeline-dot{position:absolute;left:-7px;top:8px;width:12px;height:12px;border-radius:50%;background:var(--primary);border:2px solid var(--bg2)}
+.or-timeline-time{font-size:11px;color:var(--text2);margin-bottom:4px}
+.or-timeline-trans{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px}
+.or-timeline-detail{font-size:12px;color:var(--text2);font-style:italic}
+
+@media(max-width:768px){.or-grid-2{grid-template-columns:1fr}}
+
+/* ── OR EDIT + MODALS (L3a-quinquies) ── */
+.or-action-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 16px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;margin-bottom:14px}
+.or-action-sep{width:1px;height:24px;background:var(--border);flex-shrink:0;margin:0 2px}
+.or-edit-input{padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg2);color:var(--text);font-family:inherit;box-sizing:border-box}
+.or-edit-input:focus{border-color:var(--primary);outline:none;box-shadow:0 0 0 2px rgba(37,99,235,.1)}
+.or-edit-select{padding:4px 6px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg2);color:var(--text);font-family:inherit;cursor:pointer}
+.or-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+.or-modal-overlay.hidden{display:none}
+.or-modal{background:var(--bg2);border-radius:14px;padding:28px;width:100%;max-width:460px;box-shadow:0 20px 60px rgba(0,0,0,.18)}
+.or-modal h3{font-size:16px;font-weight:700;margin-bottom:6px}
+.or-modal-sub{font-size:13px;color:var(--text2);margin-bottom:18px}
+.or-modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
 </style>
 </head>
 <body>
@@ -165,6 +209,10 @@ input,select,textarea{font-family:inherit}
 
 <div id="toast"></div>
 
+<div id="orModalOverlay" class="or-modal-overlay hidden" onclick="orModalBackdrop(event)">
+  <div class="or-modal" id="orModalBox"></div>
+</div>
+
 <script>
 const API = window.location.origin;
 let TOKEN = '';
@@ -174,6 +222,25 @@ let devisLines = [];
 let ordresList = [];
 let orMode     = 'comptoir';
 let orFilters  = { statut: '', search: '', periode: '30j' };
+let curORId      = null;
+let currentOR    = null;
+let currentORHist = [];
+const orEditState = { editing: false, taches: [], pieces: [], dirty: false };
+
+// ── HASH ROUTING (OR fiche) ──
+function parseORHash() {
+  const h = (window.location.hash || '').replace(/^#/, '');
+  return h.startsWith('or/') ? h.slice(3) : null;
+}
+function goORFiche(orId) {
+  curORId = orId;
+  window.location.hash = '#or/' + orId;
+  renderFicheOR();
+}
+window.addEventListener('hashchange', function() {
+  const id = parseORHash();
+  if (id) { curORId = id; renderFicheOR(); }
+});
 
 // ── API HELPER ──
 async function api(path, method='GET', body=null) {
@@ -290,6 +357,14 @@ function badgeStatut(s){
 }
 function fmtDate(iso){
   return new Date(iso).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function fmtDateOnly(iso){
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+}
+function fmtEur(n){
+  return (n||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
 }
 
 function selectMoto(id) {
@@ -664,7 +739,7 @@ function renderORTable() {
         <td style="white-space:nowrap">${fmtDate(or.date_ouverture)}</td>
         <td>${badgeStatut(or.statut)}</td>
         <td style="text-align:right;font-weight:600">${ttc}</td>
-        <td><button class="btn btn-secondary btn-sm" onclick="selectOR('${or.id}','${or.numero_or}')">Voir</button></td>
+        <td><button class="btn btn-secondary btn-sm" onclick="selectOR('${or.id}')">Voir</button></td>
       </tr>`;
     }).join('');
     zone.innerHTML = `<table class="table"><thead><tr>
@@ -680,7 +755,7 @@ function renderORTable() {
         <td><strong>${or.numero_or}</strong></td>
         <td>${moto}</td><td>${label}</td>
         <td>${badgeStatut(or.statut)}</td>
-        <td><button class="btn btn-secondary btn-sm" onclick="selectOR('${or.id}','${or.numero_or}')">Voir tâches</button></td>
+        <td><button class="btn btn-secondary btn-sm" onclick="selectOR('${or.id}')">Voir tâches</button></td>
       </tr>`;
     }).join('');
     zone.innerHTML = `<table class="table"><thead><tr>
@@ -699,15 +774,646 @@ function setOrMode(mode) {
   renderORTable();
 }
 
-function selectOR(id, numero) { renderFicheOR(id, numero); }
+function selectOR(id) { goORFiche(id); }
 
-function renderFicheOR(id, numero) {
-  document.getElementById('main').innerHTML = `
-    <div class="section-header">
-      <div><div class="section-title">Fiche ${numero}</div><div class="section-sub">Ordre de Réparation</div></div>
-      <button class="btn btn-secondary btn-sm" onclick="loadOR()">← Retour liste OR</button>
-    </div>
-    <div class="card"><div class="alert alert-info">Fiche OR <strong>${numero}</strong> à venir — détail tâches, pièces et clôture.</div></div>`;
+async function renderFicheOR() {
+  const m = document.getElementById('main');
+  if (!curORId) { loadOR(); return; }
+  m.innerHTML = '<div class="or-header" style="opacity:.5"><div style="font-size:14px;color:rgba(255,255,255,.7)">Chargement de la fiche OR…</div></div><div class="loading">Récupération des données…</div>';
+
+  let or;
+  try {
+    const data = await api('/ordres-reparation/' + curORId);
+    or = data.ordre_reparation || data.or || data;
+  } catch(e) {
+    m.innerHTML = '<div class="card"><div class="empty"><div class="empty-icon">⚠️</div>'
+      + '<div class="empty-text">' + e.message + '</div>'
+      + '<div style="margin-top:14px"><button class="btn btn-secondary btn-sm" onclick="window.location.hash=\'\';loadOR()">← Retour à la liste OR</button></div>'
+      + '</div></div>';
+    return;
+  }
+  // Tâches/pièces sont à la racine de la réponse, pas dans ordre_reparation
+  or.or_taches = or.or_taches || data.taches  || [];
+  or.or_pieces  = or.or_pieces  || data.pieces  || [];
+  currentOR = or;
+
+  let hist = [];
+  try {
+    const hData = await api('/ordres-reparation/' + curORId + '/historique');
+    hist = Array.isArray(hData) ? hData : (hData?.historique || hData?.evenements || []);
+  } catch(_) {}
+  currentORHist = hist;
+
+  m.innerHTML = buildFicheOR(or, hist);
+}
+
+// ── OR EDIT STATE HELPERS (L3a-quinquies) ──
+function escHtml(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escAttr(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
+
+function startEdit() {
+  if (!currentOR) return;
+  orEditState.editing = true;
+  orEditState.taches  = JSON.parse(JSON.stringify(currentOR.or_taches || []));
+  orEditState.pieces  = JSON.parse(JSON.stringify(currentOR.or_pieces || []));
+  orEditState.dirty   = false;
+  rerenderFicheEdit();
+}
+function cancelEdit() {
+  orEditState.editing = false;
+  orEditState.taches  = [];
+  orEditState.pieces  = [];
+  orEditState.dirty   = false;
+  rerenderFicheEdit();
+}
+function markDirty() { orEditState.dirty = true; }
+async function reloadFiche() {
+  orEditState.editing = false;
+  orEditState.dirty   = false;
+  await renderFicheOR();
+}
+function rerenderFicheEdit() {
+  if (!currentOR) return;
+  document.getElementById('main').innerHTML = buildFicheOR(currentOR, currentORHist);
+}
+
+// Tâche row helpers
+function orUpdateTache(i, field, val) { if (orEditState.taches[i]) { orEditState.taches[i][field] = val; markDirty(); } }
+function orRemoveTache(i)  { orEditState.taches.splice(i, 1); markDirty(); rerenderFicheEdit(); }
+function orAddTache()      { orEditState.taches.push({ libelle:'', duree_h:0, taux_horaire:65, statut:'a_faire', description:'' }); markDirty(); rerenderFicheEdit(); }
+
+// Pièce row helpers
+function orUpdatePiece(i, field, val) { if (orEditState.pieces[i]) { orEditState.pieces[i][field] = val; markDirty(); } }
+function orRemovePiece(i)  { orEditState.pieces.splice(i, 1); markDirty(); rerenderFicheEdit(); }
+function orAddPiece()      { orEditState.pieces.push({ reference:'', libelle:'', qte:1, pu_ht:0 }); markDirty(); rerenderFicheEdit(); }
+
+// ── OR FICHE RENDER FUNCTIONS (L3a-quater) ──
+
+function orStatutMeta(statut) {
+  return ({
+    brouillon:     {label:'Brouillon',     cls:'or-badge-brouillon'},
+    valide_client: {label:'Validé client', cls:'or-badge-valide_client'},
+    en_cours:      {label:'En cours',      cls:'or-badge-en_cours'},
+    attente:       {label:'En attente',    cls:'or-badge-attente'},
+    termine:       {label:'Terminé',       cls:'or-badge-termine'},
+    facture:       {label:'Facturé',       cls:'or-badge-facture'},
+    annule:        {label:'Annulé',        cls:'or-badge-annule'}
+  })[statut] || {label: statut || '—', cls: 'or-badge-brouillon'};
+}
+
+function _ab(label, onclick, cls) {
+  return '<button class="btn ' + cls + ' btn-sm" onclick="' + onclick + '">' + label + '</button>';
+}
+
+function buildORActionBar(or) {
+  const s = or.statut;
+  const locked = s === 'facture' || s === 'annule';
+  let h = '<div class="or-action-bar">';
+
+  if (orEditState.editing) {
+    h += _ab('💾 Sauvegarder', 'saveEdit()', 'btn-primary');
+    h += _ab('Annuler', 'cancelEdit()', 'btn-secondary');
+    if (orEditState.dirty) h += '<span style="font-size:11px;color:var(--warn);margin-left:4px">● Modifications non sauvegardées</span>';
+  } else {
+    if (s === 'brouillon') {
+      h += _ab('Valider client', 'openTransitionModal(\'valide_client\')', 'btn-primary');
+    }
+    if (s === 'valide_client') {
+      h += _ab('↩ Brouillon', 'openTransitionModal(\'brouillon\')', 'btn-secondary');
+      h += _ab('▶ Démarrer', 'openTransitionModal(\'en_cours\')', 'btn-primary');
+    }
+    if (s === 'en_cours') {
+      h += _ab('⏸ En attente', 'openTransitionModal(\'attente\')', 'btn-secondary');
+      h += _ab('✓ Clôturer', 'openCloture()', 'btn-primary');
+    }
+    if (s === 'attente') {
+      h += _ab('▶ Reprendre', 'openTransitionModal(\'en_cours\')', 'btn-primary');
+    }
+    if (s === 'termine') {
+      h += _ab('📄 Facturer', 'openFacturation()', 'btn-primary');
+      h += _ab('↩ Reprendre', 'openTransitionModal(\'en_cours\')', 'btn-secondary');
+    }
+    if (!locked) {
+      h += '<div class="or-action-sep"></div>';
+      h += _ab('✕ Annuler l\'OR', 'openTransitionModal(\'annule\')', 'btn-danger');
+      h += '<div class="or-action-sep"></div>';
+      h += _ab('✏️ Modifier', 'startEdit()', 'btn-secondary');
+    }
+  }
+
+  h += '</div>';
+  return h;
+}
+
+function buildFicheOR(or, hist) {
+  const taches = orEditState.editing ? orEditState.taches : (or.or_taches || []);
+  const pieces = orEditState.editing ? orEditState.pieces : (or.or_pieces || []);
+  return buildORHeader(or)
+       + buildORActionBar(or)
+       + buildORMotoClient(or)
+       + buildORTaches(taches)
+       + buildORPieces(pieces)
+       + buildORTotaux(or, taches, pieces)
+       + buildORHistorique(hist);
+}
+
+function buildORHeader(or) {
+  const sm     = orStatutMeta(or.statut);
+  const numero = or.numero_or || or.numero || '—';
+  const motif  = or.notes_client || or.motif_client || or.notes_atelier || 'Sans motif';
+  const date   = fmtDateOnly(or.date_ouverture || or.created_at || or.date_creation);
+  const mecano = or.mecano_assigne;
+
+  let h = '<div class="or-header">';
+  h += '<button class="btn btn-secondary btn-sm" style="background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.25);margin-bottom:14px" onclick="window.location.hash=\'\';loadOR()">← Retour aux OR</button>';
+  h += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap">';
+
+  h += '<div>';
+  h += '<div style="font-size:11px;color:rgba(255,255,255,.5);font-weight:600;letter-spacing:1.5px;text-transform:uppercase">' + numero + '</div>';
+  h += '<div style="font-size:20px;font-weight:800;margin:4px 0 10px">' + motif + '</div>';
+  h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+  h += '<span class="or-badge ' + sm.cls + '">' + sm.label + '</span>';
+  if (or.statut === 'attente' && or.attente_motif) {
+    h += '<span style="font-size:12px;color:rgba(255,255,255,.65);font-style:italic">📌 ' + or.attente_motif + '</span>';
+  }
+  if (or.statut === 'facture' && or.numero_facture) {
+    h += '<span style="font-size:12px;color:#ff6b00;font-weight:700">' + or.numero_facture + '</span>';
+    // TODO RBAC L4 : bouton "Voir la facture" réservé MECANO+ (pas CLIENT)
+    h += '<button class="btn btn-sm" style="background:#ff6b00;color:#fff;border:none;padding:5px 12px" onclick="window.open(API+\'/ordres-reparation/' + or.id + '/facture\',\'_blank\')">📄 Voir la facture</button>';
+  }
+  if (or.statut === 'annule') {
+    h += '<span style="font-size:12px;color:rgba(255,255,255,.45)">OR annulé</span>';
+  }
+  h += '</div></div>';
+
+  h += '<div style="text-align:right;font-size:12px;color:rgba(255,255,255,.65);flex-shrink:0">';
+  h += '<div>Ouvert le ' + date + '</div>';
+  if (mecano) h += '<div style="margin-top:2px">Mécano : ' + mecano + '</div>';
+  h += '<div style="font-size:22px;font-weight:800;color:#fff;margin-top:8px">' + fmtEur(or.total_ttc) + '</div>';
+  h += '<div style="font-size:10px;color:rgba(255,255,255,.4)">TTC</div>';
+  h += '</div>';
+
+  h += '</div></div>';
+  return h;
+}
+
+function buildORMotoClient(or) {
+  const moto   = or.motos || {};
+  const client = moto.clients || {};
+  const cnom   = client.nom   || moto.client_nom   || or.client_nom   || '—';
+  const cemail = client.email || moto.client_email || or.client_email || '—';
+  const ctel   = client.tel   || moto.client_tel   || or.client_tel   || '—';
+  const kmE    = (or.km_entree  || 0).toLocaleString('fr-FR');
+  const kmS    = or.km_sortie ? ' → ' + or.km_sortie.toLocaleString('fr-FR') + ' km' : '';
+
+  let h = '<div class="or-grid-2">';
+
+  h += '<div class="card"><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">🏍️ Moto</div>';
+  h += '<div class="or-info-row"><span class="or-info-lbl">Marque / Modèle</span><span class="or-info-val">' + (moto.marque||'—') + ' ' + (moto.modele||'') + '</span></div>';
+  h += '<div class="or-info-row"><span class="or-info-lbl">Plaque</span><span class="or-info-val" style="font-weight:700">' + (moto.plaque||'—') + '</span></div>';
+  if (moto.annee) h += '<div class="or-info-row"><span class="or-info-lbl">Année</span><span class="or-info-val">' + moto.annee + '</span></div>';
+  if (moto.vin)   h += '<div class="or-info-row"><span class="or-info-lbl">VIN</span><span class="or-info-val" style="font-family:monospace;font-size:11px">' + moto.vin + '</span></div>';
+  h += '<div class="or-info-row"><span class="or-info-lbl">Km</span><span class="or-info-val">' + kmE + ' km' + kmS + '</span></div>';
+  h += '</div>';
+
+  h += '<div class="card"><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">👤 Client</div>';
+  h += '<div class="or-info-row"><span class="or-info-lbl">Nom</span><span class="or-info-val">' + cnom + '</span></div>';
+  h += '<div class="or-info-row"><span class="or-info-lbl">Email</span><span class="or-info-val">' + cemail + '</span></div>';
+  h += '<div class="or-info-row"><span class="or-info-lbl">Téléphone</span><span class="or-info-val">' + ctel + '</span></div>';
+  h += '</div>';
+
+  h += '</div>';
+  return h;
+}
+
+function buildORTaches(taches) {
+  const etatMeta = {
+    a_faire:  {l:'À faire',  c:'#d97706'},
+    en_cours: {l:'En cours', c:'#2563eb'},
+    fait:     {l:'Fait',     c:'#16a34a'},
+    skip:     {l:'Ignoré',   c:'#9ca3af'},
+    probleme: {l:'Problème', c:'#dc2626'}
+  };
+  const editing = orEditState.editing;
+
+  let h = '<div class="card" style="margin-bottom:14px">';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  h += '<div style="font-size:13px;font-weight:700">🔧 Tâches</div>';
+  if (editing) h += '<button class="btn btn-secondary btn-sm" onclick="orAddTache()">+ Ajouter</button>';
+  h += '</div>';
+
+  if (!taches.length) {
+    h += '<div class="empty" style="padding:20px"><div class="empty-icon" style="font-size:24px">📭</div><div class="empty-text" style="font-size:13px">Aucune tâche</div></div>';
+  } else if (!editing) {
+    h += '<table class="table"><thead><tr><th>#</th><th>Libellé</th><th style="text-align:right">Durée</th><th style="text-align:right">Taux</th><th style="text-align:right">Total HT</th><th>Statut</th></tr></thead><tbody>';
+    taches.forEach(function(t, i) {
+      const dh  = parseFloat(t.duree_h || t.temps_estime_h) || 0;
+      const thr = parseFloat(t.taux_horaire) || 0;
+      const tot = t.montant_ht != null ? t.montant_ht : (t.total_ht != null ? t.total_ht : dh * thr);
+      const st  = t.statut || t.etat || 'a_faire';
+      const em  = etatMeta[st] || {l: st || '—', c:'#9ca3af'};
+      h += '<tr>';
+      h += '<td style="color:var(--text2)">' + (t.ordre || t.ordre_affichage || i+1) + '</td>';
+      h += '<td><div style="font-weight:500">' + escHtml(t.libelle||'—') + '</div>' + (t.description ? '<div style="font-size:11px;color:var(--text2);margin-top:2px">' + escHtml(t.description) + '</div>' : '') + '</td>';
+      h += '<td style="text-align:right;color:var(--text2)">' + (dh ? dh+'h' : '—') + '</td>';
+      h += '<td style="text-align:right;color:var(--text2)">' + (thr ? thr+'€/h' : '—') + '</td>';
+      h += '<td style="text-align:right;font-weight:600">' + fmtEur(tot) + '</td>';
+      h += '<td><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:' + em.c + '22;color:' + em.c + '">' + em.l + '</span></td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
+  } else {
+    h += '<table class="table"><thead><tr><th>Libellé</th><th style="width:80px;text-align:right">Durée h</th><th style="width:85px;text-align:right">Taux €/h</th><th style="width:90px;text-align:right">Total HT</th><th style="width:110px">Statut</th><th style="width:36px"></th></tr></thead><tbody>';
+    taches.forEach(function(t, i) {
+      const dh  = parseFloat(t.duree_h || t.temps_estime_h) || 0;
+      const thr = parseFloat(t.taux_horaire) || 0;
+      const tot = dh * thr;
+      const st  = t.statut || t.etat || 'a_faire';
+      h += '<tr>';
+      h += '<td><input class="or-edit-input" style="width:100%" value="' + escAttr(t.libelle||'') + '" placeholder="Libellé" oninput="orUpdateTache(' + i + ',\'libelle\',this.value)"></td>';
+      h += '<td><input type="number" class="or-edit-input" style="width:68px;text-align:right" value="' + (dh||'') + '" step="0.5" min="0" oninput="orUpdateTache(' + i + ',\'duree_h\',this.value)"></td>';
+      h += '<td><input type="number" class="or-edit-input" style="width:73px;text-align:right" value="' + (thr||'') + '" step="5" min="0" oninput="orUpdateTache(' + i + ',\'taux_horaire\',this.value)"></td>';
+      h += '<td style="text-align:right;color:var(--text2)">' + fmtEur(tot) + '</td>';
+      h += '<td><select class="or-edit-select" style="width:100%" onchange="orUpdateTache(' + i + ',\'statut\',this.value)">';
+      [['a_faire','À faire'],['en_cours','En cours'],['fait','Fait'],['skip','Ignoré'],['probleme','Problème']].forEach(function(sv){
+        h += '<option value="' + sv[0] + '"' + (st===sv[0]?' selected':'') + '>' + sv[1] + '</option>';
+      });
+      h += '</select></td>';
+      h += '<td><button class="btn btn-danger btn-sm" style="padding:3px 8px" onclick="orRemoveTache(' + i + ')">✕</button></td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
+  }
+
+  h += '</div>';
+  return h;
+}
+
+function buildORPieces(pieces) {
+  const editing = orEditState.editing;
+  let h = '<div class="card" style="margin-bottom:14px">';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  h += '<div style="font-size:13px;font-weight:700">🔩 Pièces</div>';
+  if (editing) h += '<button class="btn btn-secondary btn-sm" onclick="orAddPiece()">+ Ajouter</button>';
+  h += '</div>';
+
+  if (!pieces.length) {
+    h += '<div class="empty" style="padding:20px"><div class="empty-icon" style="font-size:24px">📦</div><div class="empty-text" style="font-size:13px">Aucune pièce</div></div>';
+  } else if (!editing) {
+    h += '<table class="table"><thead><tr><th>Référence</th><th>Désignation</th><th style="text-align:right">Qté</th><th style="text-align:right">PU HT</th><th style="text-align:right">Total HT</th></tr></thead><tbody>';
+    pieces.forEach(function(p) {
+      const q   = p.qte != null ? p.qte : (p.quantite || 0);
+      const pu  = parseFloat(p.pu_ht) || 0;
+      const tot = p.montant_ht != null ? p.montant_ht : (p.total_ht != null ? p.total_ht : q * pu);
+      const des = p.libelle || p.designation || '—';
+      h += '<tr>';
+      h += '<td style="font-family:monospace;font-size:12px;color:var(--text2)">' + escHtml(p.reference||'—') + '</td>';
+      h += '<td style="font-weight:500">' + escHtml(des) + '</td>';
+      h += '<td style="text-align:right">' + q + '</td>';
+      h += '<td style="text-align:right;color:var(--text2)">' + fmtEur(pu) + '</td>';
+      h += '<td style="text-align:right;font-weight:600">' + fmtEur(tot) + '</td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
+  } else {
+    h += '<table class="table"><thead><tr><th style="width:110px">Référence</th><th>Désignation</th><th style="width:65px;text-align:right">Qté</th><th style="width:90px;text-align:right">PU HT</th><th style="width:90px;text-align:right">Total HT</th><th style="width:36px"></th></tr></thead><tbody>';
+    pieces.forEach(function(p, i) {
+      const q   = p.qte != null ? p.qte : (p.quantite || 1);
+      const pu  = parseFloat(p.pu_ht) || 0;
+      const tot = (parseFloat(q) || 0) * pu;
+      const des = p.libelle || p.designation || '';
+      h += '<tr>';
+      h += '<td><input class="or-edit-input" style="width:100%" value="' + escAttr(p.reference||'') + '" placeholder="Réf." oninput="orUpdatePiece(' + i + ',\'reference\',this.value)"></td>';
+      h += '<td><input class="or-edit-input" style="width:100%" value="' + escAttr(des) + '" placeholder="Désignation" oninput="orUpdatePiece(' + i + ',\'libelle\',this.value)"></td>';
+      h += '<td><input type="number" class="or-edit-input" style="width:55px;text-align:right" value="' + q + '" min="0.01" step="1" oninput="orUpdatePiece(' + i + ',\'qte\',this.value)"></td>';
+      h += '<td><input type="number" class="or-edit-input" style="width:78px;text-align:right" value="' + pu + '" min="0" step="0.01" oninput="orUpdatePiece(' + i + ',\'pu_ht\',this.value)"></td>';
+      h += '<td style="text-align:right;color:var(--text2)">' + fmtEur(tot) + '</td>';
+      h += '<td><button class="btn btn-danger btn-sm" style="padding:3px 8px" onclick="orRemovePiece(' + i + ')">✕</button></td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
+  }
+
+  h += '</div>';
+  return h;
+}
+
+function buildORTotauxInner(or) {
+  const mo     = or._totalMO     ?? 0;
+  const pieces = or._totalPieces ?? 0;
+  const ht     = or.total_ht  || 0;
+  const tva    = or.total_tva || ht * 0.20;
+  const ttc    = or.total_ttc || ht * 1.20;
+  return '<div class="or-totaux-row"><span>Sous-total main-d\'œuvre</span><span>' + fmtEur(mo) + '</span></div>'
+       + '<div class="or-totaux-row"><span>Sous-total pièces</span><span>' + fmtEur(pieces) + '</span></div>'
+       + '<div class="or-totaux-row"><span>Total HT</span><span>' + fmtEur(ht) + '</span></div>'
+       + '<div class="or-totaux-row"><span>TVA 20%</span><span>' + fmtEur(tva) + '</span></div>'
+       + '<div class="or-totaux-ttc"><span>Total TTC</span><span style="color:#ff6b00">' + fmtEur(ttc) + '</span></div>';
+}
+
+function buildORTotaux(or, taches, pieces) {
+  taches = taches || or.or_taches || [];
+  pieces = pieces || or.or_pieces || [];
+  const editing = orEditState.editing;
+  const mo = taches.reduce(function(s, t) {
+    const dh = parseFloat(t.duree_h || t.temps_estime_h) || 0;
+    const th = parseFloat(t.taux_horaire) || 0;
+    const stored = t.montant_ht != null ? t.montant_ht : t.total_ht;
+    return s + (editing || stored == null ? dh * th : stored);
+  }, 0);
+  const pc = pieces.reduce(function(s, p) {
+    const q  = parseFloat(p.qte != null ? p.qte : p.quantite) || 0;
+    const pu = parseFloat(p.pu_ht) || 0;
+    const stored = p.montant_ht != null ? p.montant_ht : p.total_ht;
+    return s + (editing || stored == null ? q * pu : stored);
+  }, 0);
+  const baseHt = editing ? mo + pc : (or.total_ht ?? mo + pc);
+  const enriched = Object.assign({}, or, {
+    _totalMO: mo, _totalPieces: pc,
+    total_ht:  baseHt,
+    total_tva: editing ? baseHt * 0.20 : (or.total_tva ?? baseHt * 0.20),
+    total_ttc: editing ? baseHt * 1.20 : (or.total_ttc ?? baseHt * 1.20)
+  });
+  return '<div class="or-totaux" id="orTotauxBox">' + buildORTotauxInner(enriched) + '</div>';
+}
+
+function buildORHistorique(hist) {
+  let h = '<div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:14px">📋 Historique</div>';
+  if (!hist.length) {
+    h += '<div class="empty" style="padding:20px"><div class="empty-text" style="font-size:13px">Aucun historique disponible</div></div>';
+    return h + '</div>';
+  }
+  const sorted = hist.slice().sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+  h += '<ul class="or-timeline">';
+  sorted.forEach(function(ev) {
+    const smA = ev.ancien_statut  ? orStatutMeta(ev.ancien_statut)  : null;
+    const smN = ev.nouveau_statut ? orStatutMeta(ev.nouveau_statut) : null;
+    const acteur  = ev.acteur_role || 'Système';
+    const payload = ev.payload || {};
+    let detail = '';
+    if (ev.action === 'creation') detail = 'OR créé';
+    else if (payload.attente_motif || payload.motif) detail = '📌 ' + (payload.attente_motif || payload.motif);
+    else if (payload.km_sortie != null) detail = '🏁 km sortie : ' + Number(payload.km_sortie).toLocaleString('fr-FR') + ' km';
+    else if (payload.numero_facture) detail = '📄 ' + payload.numero_facture;
+    else if (payload.annulation_motif) detail = '❌ ' + payload.annulation_motif;
+
+    h += '<li class="or-timeline-item"><div class="or-timeline-dot"></div>';
+    h += '<div class="or-timeline-time">' + fmtDate(ev.created_at) + ' · ' + acteur + '</div>';
+    h += '<div class="or-timeline-trans">';
+    if (smA) h += '<span class="or-badge ' + smA.cls + '" style="padding:2px 9px;font-size:11px">' + smA.label + '</span>';
+    if (smA && smN) h += '<span style="color:var(--text2)">→</span>';
+    if (smN) h += '<span class="or-badge ' + smN.cls + '" style="padding:2px 9px;font-size:11px">' + smN.label + '</span>';
+    if (!smA && !smN && ev.action) h += '<span style="color:var(--text2);font-size:13px">' + ev.action + '</span>';
+    h += '</div>';
+    if (detail) h += '<div class="or-timeline-detail">' + detail + '</div>';
+    h += '</li>';
+  });
+  h += '</ul></div>';
+  return h;
+}
+
+// ── OR SAVE EDIT (L3a-quinquies) ──
+async function saveEdit() {
+  if (!currentOR) return;
+  const orId      = currentOR.id;
+  const origTaches = currentOR.or_taches || [];
+  const origPieces = currentOR.or_pieces || [];
+  const newTaches  = orEditState.taches;
+  const newPieces  = orEditState.pieces;
+  const errors     = [];
+
+  const origTacheMap = {};
+  origTaches.forEach(function(t){ if (t.id) origTacheMap[t.id] = t; });
+  const newTacheIds  = new Set(newTaches.map(function(t){ return t.id; }).filter(Boolean));
+
+  // DELETE taches supprimées
+  for (var i = 0; i < origTaches.length; i++) {
+    var ot = origTaches[i];
+    if (ot.id && !newTacheIds.has(ot.id)) {
+      try { await api('/or-taches/' + ot.id, 'DELETE'); }
+      catch(e) { errors.push('Suppr. tâche : ' + e.message); }
+    }
+  }
+  // POST nouvelles / PATCH modifiées
+  for (var j = 0; j < newTaches.length; j++) {
+    var nt = newTaches[j];
+    if (!nt.id) {
+      if (!(nt.libelle || '').trim()) continue;
+      try {
+        await api('/ordres-reparation/' + orId + '/taches', 'POST', {
+          libelle:      nt.libelle.trim(),
+          description:  nt.description || '',
+          duree_h:      parseFloat(nt.duree_h) || 0,
+          taux_horaire: parseFloat(nt.taux_horaire) || 65,
+          statut:       nt.statut || 'a_faire'
+        });
+      } catch(e) { errors.push('Ajout tâche : ' + e.message); }
+    } else {
+      var orig_t = origTacheMap[nt.id];
+      if (orig_t) {
+        var patch_t = {};
+        if ((nt.libelle || '') !== (orig_t.libelle || ''))           patch_t.libelle      = nt.libelle || '';
+        if ((nt.description || '') !== (orig_t.description || ''))  patch_t.description  = nt.description || '';
+        var newDh = parseFloat(nt.duree_h || nt.temps_estime_h) || 0;
+        var oldDh = parseFloat(orig_t.duree_h || orig_t.temps_estime_h) || 0;
+        if (Math.abs(newDh - oldDh) > 0.001) patch_t.duree_h = newDh;
+        var newThr = parseFloat(nt.taux_horaire) || 0;
+        var oldThr = parseFloat(orig_t.taux_horaire) || 0;
+        if (Math.abs(newThr - oldThr) > 0.001) patch_t.taux_horaire = newThr;
+        var newSt = nt.statut || nt.etat || 'a_faire';
+        var oldSt = orig_t.statut || orig_t.etat || 'a_faire';
+        if (newSt !== oldSt) patch_t.statut = newSt;
+        if (Object.keys(patch_t).length > 0) {
+          try { await api('/or-taches/' + nt.id, 'PATCH', patch_t); }
+          catch(e) { errors.push('Modif. tâche : ' + e.message); }
+        }
+      }
+    }
+  }
+
+  const origPieceMap = {};
+  origPieces.forEach(function(p){ if (p.id) origPieceMap[p.id] = p; });
+  const newPieceIds  = new Set(newPieces.map(function(p){ return p.id; }).filter(Boolean));
+
+  // DELETE pièces supprimées
+  for (var k = 0; k < origPieces.length; k++) {
+    var op = origPieces[k];
+    if (op.id && !newPieceIds.has(op.id)) {
+      try { await api('/or-pieces/' + op.id, 'DELETE'); }
+      catch(e) { errors.push('Suppr. pièce : ' + e.message); }
+    }
+  }
+  // POST nouvelles / PATCH modifiées
+  for (var l = 0; l < newPieces.length; l++) {
+    var np = newPieces[l];
+    var des = np.libelle || np.designation || '';
+    if (!np.id) {
+      if (!des.trim()) continue;
+      try {
+        await api('/ordres-reparation/' + orId + '/pieces', 'POST', {
+          reference: np.reference || '',
+          libelle:   des.trim(),
+          qte:       parseFloat(np.qte) || 1,
+          pu_ht:     parseFloat(np.pu_ht) || 0
+        });
+      } catch(e) { errors.push('Ajout pièce : ' + e.message); }
+    } else {
+      var orig_p = origPieceMap[np.id];
+      if (orig_p) {
+        var patch_p = {};
+        var newQ = parseFloat(np.qte != null ? np.qte : np.quantite) || 1;
+        var oldQ = parseFloat(orig_p.qte != null ? orig_p.qte : orig_p.quantite) || 1;
+        if (Math.abs(newQ - oldQ) > 0.001) patch_p.qte = newQ;
+        var newPu = parseFloat(np.pu_ht) || 0;
+        var oldPu = parseFloat(orig_p.pu_ht) || 0;
+        if (Math.abs(newPu - oldPu) > 0.001) patch_p.pu_ht = newPu;
+        if ((np.reference || '') !== (orig_p.reference || '')) patch_p.reference = np.reference || '';
+        var newDes = np.libelle || np.designation || '';
+        var oldDes = orig_p.libelle || orig_p.designation || '';
+        if (newDes !== oldDes) patch_p.libelle = newDes;
+        if (Object.keys(patch_p).length > 0) {
+          try { await api('/or-pieces/' + np.id, 'PATCH', patch_p); }
+          catch(e) { errors.push('Modif. pièce : ' + e.message); }
+        }
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    showToast('⚠️ ' + errors.length + ' erreur(s) : ' + errors[0]);
+  } else {
+    showToast('Modifications sauvegardées');
+  }
+  orEditState.editing = false;
+  orEditState.dirty   = false;
+  await reloadFiche();
+}
+
+// ── OR MODALS (L3a-quinquies) ──
+function openORModal(html) {
+  document.getElementById('orModalBox').innerHTML = html;
+  document.getElementById('orModalOverlay').classList.remove('hidden');
+}
+function closeORModal() {
+  document.getElementById('orModalOverlay').classList.add('hidden');
+}
+function orModalBackdrop(e) { if (e.target === e.currentTarget) closeORModal(); }
+
+function openTransitionModal(nouveau_statut) {
+  const titles = {
+    brouillon:     'Repasser en brouillon',
+    valide_client: 'Valider côté client',
+    en_cours:      'Démarrer / reprendre',
+    attente:       'Mettre en attente',
+    annule:        'Annuler l\'OR'
+  };
+  const nextMeta = orStatutMeta(nouveau_statut);
+  let h = '<h3>' + (titles[nouveau_statut] || nextMeta.label) + '</h3>';
+
+  if (nouveau_statut === 'attente') {
+    h += '<div class="or-modal-sub">Précisez le motif de mise en attente.</div>';
+    h += '<div class="field"><label>Motif *</label><input id="mAttenteMotif" class="or-edit-input" style="width:100%;padding:8px 10px" placeholder="Ex : en attente pièce, accord client…"></div>';
+  } else if (nouveau_statut === 'annule') {
+    h += '<div class="or-modal-sub">L\'OR sera marqué annulé.</div>';
+    h += '<div class="field"><label>Motif (optionnel)</label><input id="mAnnuleMotif" class="or-edit-input" style="width:100%;padding:8px 10px" placeholder="Motif d\'annulation…"></div>';
+  } else {
+    h += '<div class="or-modal-sub">Confirmer le passage au statut <strong>' + nextMeta.label + '</strong>&nbsp;?</div>';
+  }
+
+  h += '<div id="transModalErr" class="alert alert-warn" style="display:none;margin-top:12px"></div>';
+  h += '<div class="or-modal-actions">';
+  h += '<button class="btn btn-secondary btn-sm" onclick="closeORModal()">Annuler</button>';
+  h += '<button class="btn btn-primary btn-sm" onclick="submitTransition(\'' + nouveau_statut + '\')">Confirmer</button>';
+  h += '</div>';
+  openORModal(h);
+}
+
+async function submitTransition(nouveau_statut) {
+  const payload = { nouveau_statut };
+  if (nouveau_statut === 'attente') {
+    const motif = (document.getElementById('mAttenteMotif')?.value || '').trim();
+    if (!motif) {
+      const el = document.getElementById('transModalErr');
+      el.textContent = 'Le motif est requis pour la mise en attente.';
+      el.style.display = 'block';
+      return;
+    }
+    payload.attente_motif = motif;
+  }
+  if (nouveau_statut === 'annule') {
+    const m = (document.getElementById('mAnnuleMotif')?.value || '').trim();
+    if (m) payload.annulation_motif = m;
+  }
+  try {
+    await api('/ordres-reparation/' + curORId + '/statut', 'PATCH', payload);
+    closeORModal();
+    showToast('Statut mis à jour');
+    await reloadFiche();
+  } catch(e) {
+    const el = document.getElementById('transModalErr');
+    if (el) { el.textContent = e.message; el.style.display = 'block'; }
+  }
+}
+
+function openCloture() {
+  const kmE = currentOR ? (currentOR.km_entree || 0) : 0;
+  let h = '<h3>Clôturer l\'OR</h3>';
+  h += '<div class="or-modal-sub">Saisissez le kilométrage de sortie pour clôturer l\'OR et figer les totaux.</div>';
+  h += '<div class="field"><label>Km de sortie *</label><input type="number" id="mKmSortie" class="or-edit-input" style="width:100%;padding:8px 10px" min="' + kmE + '" placeholder="' + kmE + '"></div>';
+  h += '<div id="clotureErr" class="alert alert-warn" style="display:none;margin-top:12px"></div>';
+  h += '<div class="or-modal-actions">';
+  h += '<button class="btn btn-secondary btn-sm" onclick="closeORModal()">Annuler</button>';
+  h += '<button class="btn btn-primary btn-sm" onclick="submitCloture()">Clôturer</button>';
+  h += '</div>';
+  openORModal(h);
+}
+
+async function submitCloture() {
+  const km = parseInt(document.getElementById('mKmSortie')?.value || '0', 10);
+  const kmE = currentOR ? (currentOR.km_entree || 0) : 0;
+  if (!km || km < kmE) {
+    const el = document.getElementById('clotureErr');
+    el.textContent = 'Km de sortie invalide (doit être ≥ km entrée : ' + kmE + ').';
+    el.style.display = 'block';
+    return;
+  }
+  try {
+    await api('/ordres-reparation/' + curORId + '/cloturer', 'POST', { km_sortie: km });
+    closeORModal();
+    showToast('OR clôturé');
+    await reloadFiche();
+  } catch(e) {
+    const el = document.getElementById('clotureErr');
+    if (el) { el.textContent = e.message; el.style.display = 'block'; }
+  }
+}
+
+function openFacturation() {
+  const ttc = currentOR ? (currentOR.total_ttc || 0) : 0;
+  let h = '<h3>Facturer l\'OR</h3>';
+  h += '<div class="or-modal-sub">Un numéro de facture sera attribué automatiquement. Cette action est définitive.</div>';
+  h += '<div style="background:var(--bg);border-radius:10px;padding:16px;text-align:center;margin-bottom:4px">';
+  h += '<div style="font-size:12px;color:var(--text2)">Montant TTC</div>';
+  h += '<div style="font-size:30px;font-weight:800;color:var(--primary)">' + fmtEur(ttc) + '</div>';
+  h += '</div>';
+  h += '<div id="factureErr" class="alert alert-warn" style="display:none;margin-top:12px"></div>';
+  h += '<div class="or-modal-actions">';
+  h += '<button class="btn btn-secondary btn-sm" onclick="closeORModal()">Annuler</button>';
+  h += '<button class="btn btn-sm" style="background:#ff6b00;color:#fff;border:none;font-weight:600;border-radius:8px;padding:6px 14px;cursor:pointer" onclick="submitFacturation()">Facturer</button>';
+  h += '</div>';
+  openORModal(h);
+}
+
+async function submitFacturation() {
+  try {
+    await api('/ordres-reparation/' + curORId + '/facturer', 'POST', {});
+    closeORModal();
+    showToast('Facture générée');
+    await reloadFiche();
+  } catch(e) {
+    const el = document.getElementById('factureErr');
+    if (el) { el.textContent = e.message; el.style.display = 'block'; }
+  }
 }
 
 async function renderNewOR() {

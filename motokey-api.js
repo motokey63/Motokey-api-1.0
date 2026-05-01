@@ -2274,6 +2274,112 @@ const server = http.createServer(async function(req, res){
     return ok(res, { deleted_id: p.id, ordre_reparation: orMaj }, 'Pièce supprimée');
   }
 
+  /* ── DELETE /or-taches/:id ── */
+  if((p=M('DELETE','/or-taches/:id'))!==null){
+    // TODO RBAC L4 : MECANO et CLIENT refusés — accès financier réservé PRO+
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const result = await SBLayer.OrTaches.remove(p.id, garageId);
+        const orMaj = result.ordre_reparation || {};
+        return ok(res, {
+          deleted_id: p.id,
+          or_id: orMaj.id,
+          totaux: { total_taches_ht: orMaj.total_mo_ht, total_pieces_ht: orMaj.total_pieces_ht,
+                    total_ht: orMaj.total_ht, total_tva: orMaj.total_tva, total_ttc: orMaj.total_ttc }
+        }, 'Tâche supprimée');
+      } catch(e) { return fail(res, e.message, e.message.includes('non trouvée') ? 404 : 500, 'DB_ERROR'); }
+    }
+
+    // ── RAM fallback ──
+    const iT = (DB.or_taches||[]).findIndex(function(t){ return t.id===p.id; });
+    if (iT < 0) return fail(res, 'Tâche non trouvée', 404, 'TACHE_NOT_FOUND');
+    const tacheOrId = DB.or_taches[iT].or_id;
+    const tacheGid  = DB.or_taches[iT].garage_id;
+    if (tacheGid !== garageId) return fail(res, 'Accès refusé', 403, 'FORBIDDEN');
+    const orParent = (DB.ordres_reparation||[]).find(function(o){ return o.id===tacheOrId; });
+    if (orParent && ['facture','annule'].includes(orParent.statut)) {
+      return fail(res, 'OR clôturé, modification impossible', 409, 'OR_LOCKED');
+    }
+    DB.or_taches.splice(iT, 1);
+    const orMaj = _recalcTotauxOR(tacheOrId, garageId);
+    return ok(res, {
+      deleted_id: p.id,
+      or_id: tacheOrId,
+      totaux: { total_taches_ht: orMaj?.total_mo_ht, total_pieces_ht: orMaj?.total_pieces_ht,
+                total_ht: orMaj?.total_ht, total_tva: orMaj?.total_tva, total_ttc: orMaj?.total_ttc }
+    }, 'Tâche supprimée');
+  }
+
+  /* ── PATCH /or-pieces/:id ── */
+  if((p=M('PATCH','/or-pieces/:id'))!==null){
+    // TODO RBAC L4 : MECANO et CLIENT refusés — accès financier réservé PRO+
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    // Accepter les deux noms de champs (spec vs schéma DB)
+    const payload = {
+      libelle:    b.libelle    || b.designation || undefined,
+      reference:  b.reference  !== undefined ? b.reference : undefined,
+      qte:        b.qte        !== undefined ? b.qte        : (b.quantite       !== undefined ? b.quantite       : undefined),
+      pu_ht:      b.pu_ht      !== undefined ? b.pu_ht      : (b.prix_unitaire_ht !== undefined ? b.prix_unitaire_ht : undefined),
+      tva_pct:    b.tva_pct    !== undefined ? b.tva_pct    : undefined
+    };
+    const hasField = Object.values(payload).some(function(v){ return v !== undefined; });
+    if (!hasField) return fail(res, 'Aucun champ valide fourni', 400, 'INVALID_INPUT');
+    if (payload.qte !== undefined && parseFloat(payload.qte) <= 0) return fail(res, 'quantite doit être > 0', 400, 'INVALID_INPUT');
+    if (payload.pu_ht !== undefined && parseFloat(payload.pu_ht) < 0) return fail(res, 'prix_unitaire_ht doit être ≥ 0', 400, 'INVALID_INPUT');
+    if (payload.libelle !== undefined && !payload.libelle.trim()) return fail(res, 'designation ne peut pas être vide', 400, 'INVALID_INPUT');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const result = await SBLayer.OrPieces.update(p.id, garageId, payload);
+        const orMaj = result.ordre_reparation || {};
+        return ok(res, {
+          piece: result.piece,
+          totaux: { total_taches_ht: orMaj.total_mo_ht, total_pieces_ht: orMaj.total_pieces_ht,
+                    total_ht: orMaj.total_ht, total_tva: orMaj.total_tva, total_ttc: orMaj.total_ttc }
+        }, 'Pièce mise à jour');
+      } catch(e) { return fail(res, e.message, e.message.includes('non trouvée') ? 404 : 500, 'DB_ERROR'); }
+    }
+
+    // ── RAM fallback ──
+    const iP = (DB.or_pieces||[]).findIndex(function(pp){ return pp.id===p.id; });
+    if (iP < 0) return fail(res, 'Pièce non trouvée', 404, 'PIECE_NOT_FOUND');
+    if (DB.or_pieces[iP].garage_id !== garageId) return fail(res, 'Accès refusé', 403, 'FORBIDDEN');
+    const pieceOrId  = DB.or_pieces[iP].or_id;
+    const orParentP  = (DB.ordres_reparation||[]).find(function(o){ return o.id===pieceOrId; });
+    if (orParentP && ['facture','annule'].includes(orParentP.statut)) {
+      return fail(res, 'OR clôturé, modification impossible', 409, 'OR_LOCKED');
+    }
+    const patchP = {};
+    if (payload.libelle   !== undefined) patchP.libelle   = payload.libelle.trim();
+    if (payload.reference !== undefined) patchP.reference = payload.reference;
+    if (payload.tva_pct   !== undefined) patchP.tva_pct   = parseFloat(payload.tva_pct);
+    const newQ  = payload.qte   !== undefined ? parseFloat(payload.qte)   : DB.or_pieces[iP].qte;
+    const newPu = payload.pu_ht !== undefined ? parseFloat(payload.pu_ht) : DB.or_pieces[iP].pu_ht;
+    patchP.qte        = newQ;
+    patchP.pu_ht      = newPu;
+    patchP.montant_ht = Math.round(newQ * newPu * 100) / 100;
+    DB.or_pieces[iP] = Object.assign({}, DB.or_pieces[iP], patchP, { id: p.id, garage_id: garageId, updated_at: nowISO() });
+    const orMajP = _recalcTotauxOR(pieceOrId, garageId);
+    return ok(res, {
+      piece: DB.or_pieces[iP],
+      totaux: { total_taches_ht: orMajP?.total_mo_ht, total_pieces_ht: orMajP?.total_pieces_ht,
+                total_ht: orMajP?.total_ht, total_tva: orMajP?.total_tva, total_ttc: orMajP?.total_ttc }
+    }, 'Pièce mise à jour');
+  }
+
   /* 404 */
   fail(res,'Route inconnue: '+method+' '+pathname,404,'NOT_FOUND');
 });
