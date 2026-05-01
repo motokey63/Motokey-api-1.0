@@ -129,6 +129,37 @@ input,select,textarea{font-family:inherit}
   #nav{gap:0;overflow-x:auto}
   .nav-btn{padding:10px 10px;font-size:12px}
 }
+
+/* ── OR FICHE (L3a-quater) ── */
+.or-badge{display:inline-flex;align-items:center;padding:5px 13px;border-radius:14px;font-size:12px;font-weight:700;white-space:nowrap}
+.or-badge-brouillon{background:#f3f4f6;color:#9ba3b4}
+.or-badge-valide_client{background:#eff6ff;color:#2563eb}
+.or-badge-en_cours{background:#fffbeb;color:#d97706}
+.or-badge-attente{background:#f5f3ff;color:#7c3aed}
+.or-badge-termine{background:#f0fdf4;color:#16a34a}
+.or-badge-facture{background:#fff4ee;color:#1a1d23;border:1px solid #ff6b00}
+.or-badge-annule{background:#fef2f2;color:#dc2626;text-decoration:line-through}
+
+.or-header{background:linear-gradient(135deg,#1a1d23 0%,#2d3340 100%);color:#fff;border-radius:14px;padding:20px 24px;margin-bottom:14px}
+.or-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.or-info-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.or-info-row:last-child{border-bottom:none}
+.or-info-lbl{color:var(--text2)}
+.or-info-val{font-weight:500;text-align:right;max-width:60%}
+
+.or-totaux{background:#1a1d23;color:#fff;border-radius:12px;padding:18px 20px;margin-bottom:14px}
+.or-totaux-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;color:rgba(255,255,255,.65)}
+.or-totaux-ttc{font-size:20px;font-weight:800;color:#fff;border-top:1px solid rgba(255,255,255,.15);padding-top:10px;margin-top:8px;display:flex;justify-content:space-between;align-items:center}
+
+.or-timeline{list-style:none;padding:0;margin:0}
+.or-timeline-item{padding:4px 0 14px 28px;border-left:2px solid var(--border);margin-left:6px;position:relative}
+.or-timeline-item:last-child{border-left-color:transparent}
+.or-timeline-dot{position:absolute;left:-7px;top:8px;width:12px;height:12px;border-radius:50%;background:var(--primary);border:2px solid var(--bg2)}
+.or-timeline-time{font-size:11px;color:var(--text2);margin-bottom:4px}
+.or-timeline-trans{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px}
+.or-timeline-detail{font-size:12px;color:var(--text2);font-style:italic}
+
+@media(max-width:768px){.or-grid-2{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -174,6 +205,23 @@ let devisLines = [];
 let ordresList = [];
 let orMode     = 'comptoir';
 let orFilters  = { statut: '', search: '', periode: '30j' };
+let curORId    = null;
+let currentOR  = null;
+
+// ── HASH ROUTING (OR fiche) ──
+function parseORHash() {
+  const h = (window.location.hash || '').replace(/^#/, '');
+  return h.startsWith('or/') ? h.slice(3) : null;
+}
+function goORFiche(orId) {
+  curORId = orId;
+  window.location.hash = '#or/' + orId;
+  renderFicheOR();
+}
+window.addEventListener('hashchange', function() {
+  const id = parseORHash();
+  if (id) { curORId = id; renderFicheOR(); }
+});
 
 // ── API HELPER ──
 async function api(path, method='GET', body=null) {
@@ -290,6 +338,14 @@ function badgeStatut(s){
 }
 function fmtDate(iso){
   return new Date(iso).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+function fmtDateOnly(iso){
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
+}
+function fmtEur(n){
+  return (n||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
 }
 
 function selectMoto(id) {
@@ -664,7 +720,7 @@ function renderORTable() {
         <td style="white-space:nowrap">${fmtDate(or.date_ouverture)}</td>
         <td>${badgeStatut(or.statut)}</td>
         <td style="text-align:right;font-weight:600">${ttc}</td>
-        <td><button class="btn btn-secondary btn-sm" onclick="selectOR('${or.id}','${or.numero_or}')">Voir</button></td>
+        <td><button class="btn btn-secondary btn-sm" onclick="selectOR('${or.id}')">Voir</button></td>
       </tr>`;
     }).join('');
     zone.innerHTML = `<table class="table"><thead><tr>
@@ -680,7 +736,7 @@ function renderORTable() {
         <td><strong>${or.numero_or}</strong></td>
         <td>${moto}</td><td>${label}</td>
         <td>${badgeStatut(or.statut)}</td>
-        <td><button class="btn btn-secondary btn-sm" onclick="selectOR('${or.id}','${or.numero_or}')">Voir tâches</button></td>
+        <td><button class="btn btn-secondary btn-sm" onclick="selectOR('${or.id}')">Voir tâches</button></td>
       </tr>`;
     }).join('');
     zone.innerHTML = `<table class="table"><thead><tr>
@@ -699,15 +755,247 @@ function setOrMode(mode) {
   renderORTable();
 }
 
-function selectOR(id, numero) { renderFicheOR(id, numero); }
+function selectOR(id) { goORFiche(id); }
 
-function renderFicheOR(id, numero) {
-  document.getElementById('main').innerHTML = `
-    <div class="section-header">
-      <div><div class="section-title">Fiche ${numero}</div><div class="section-sub">Ordre de Réparation</div></div>
-      <button class="btn btn-secondary btn-sm" onclick="loadOR()">← Retour liste OR</button>
-    </div>
-    <div class="card"><div class="alert alert-info">Fiche OR <strong>${numero}</strong> à venir — détail tâches, pièces et clôture.</div></div>`;
+async function renderFicheOR() {
+  const m = document.getElementById('main');
+  if (!curORId) { loadOR(); return; }
+  m.innerHTML = '<div class="or-header" style="opacity:.5"><div style="font-size:14px;color:rgba(255,255,255,.7)">Chargement de la fiche OR…</div></div><div class="loading">Récupération des données…</div>';
+
+  let or;
+  try {
+    const data = await api('/ordres-reparation/' + curORId);
+    or = data.ordre_reparation || data.or || data;
+  } catch(e) {
+    m.innerHTML = '<div class="card"><div class="empty"><div class="empty-icon">⚠️</div>'
+      + '<div class="empty-text">' + e.message + '</div>'
+      + '<div style="margin-top:14px"><button class="btn btn-secondary btn-sm" onclick="window.location.hash=\'\';loadOR()">← Retour à la liste OR</button></div>'
+      + '</div></div>';
+    return;
+  }
+  currentOR = or;
+
+  let hist = [];
+  try {
+    const hData = await api('/ordres-reparation/' + curORId + '/historique');
+    hist = Array.isArray(hData) ? hData : (hData?.historique || hData?.evenements || []);
+  } catch(_) {}
+
+  m.innerHTML = buildFicheOR(or, hist);
+}
+
+// ── OR FICHE RENDER FUNCTIONS (L3a-quater) ──
+
+function orStatutMeta(statut) {
+  return ({
+    brouillon:     {label:'Brouillon',     cls:'or-badge-brouillon'},
+    valide_client: {label:'Validé client', cls:'or-badge-valide_client'},
+    en_cours:      {label:'En cours',      cls:'or-badge-en_cours'},
+    attente:       {label:'En attente',    cls:'or-badge-attente'},
+    termine:       {label:'Terminé',       cls:'or-badge-termine'},
+    facture:       {label:'Facturé',       cls:'or-badge-facture'},
+    annule:        {label:'Annulé',        cls:'or-badge-annule'}
+  })[statut] || {label: statut || '—', cls: 'or-badge-brouillon'};
+}
+
+function buildFicheOR(or, hist) {
+  return buildORHeader(or)
+       + buildORMotoClient(or)
+       + buildORTaches(or.or_taches || or.taches || [])
+       + buildORPieces(or.or_pieces || or.pieces || [])
+       + buildORTotaux(or)
+       + buildORHistorique(hist);
+}
+
+function buildORHeader(or) {
+  const sm     = orStatutMeta(or.statut);
+  const numero = or.numero_or || or.numero || '—';
+  const motif  = or.notes_client || or.motif_client || or.notes_atelier || 'Sans motif';
+  const date   = fmtDateOnly(or.date_ouverture || or.created_at || or.date_creation);
+  const mecano = or.mecano_assigne;
+
+  let h = '<div class="or-header">';
+  h += '<button class="btn btn-secondary btn-sm" style="background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.25);margin-bottom:14px" onclick="window.location.hash=\'\';loadOR()">← Retour aux OR</button>';
+  h += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap">';
+
+  h += '<div>';
+  h += '<div style="font-size:11px;color:rgba(255,255,255,.5);font-weight:600;letter-spacing:1.5px;text-transform:uppercase">' + numero + '</div>';
+  h += '<div style="font-size:20px;font-weight:800;margin:4px 0 10px">' + motif + '</div>';
+  h += '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+  h += '<span class="or-badge ' + sm.cls + '">' + sm.label + '</span>';
+  if (or.statut === 'attente' && or.attente_motif) {
+    h += '<span style="font-size:12px;color:rgba(255,255,255,.65);font-style:italic">📌 ' + or.attente_motif + '</span>';
+  }
+  if (or.statut === 'facture' && or.numero_facture) {
+    h += '<span style="font-size:12px;color:#ff6b00;font-weight:700">' + or.numero_facture + '</span>';
+    // TODO RBAC L4 : bouton "Voir la facture" réservé MECANO+ (pas CLIENT)
+    h += '<button class="btn btn-sm" style="background:#ff6b00;color:#fff;border:none;padding:5px 12px" onclick="window.open(API+\'/ordres-reparation/' + or.id + '/facture\',\'_blank\')">📄 Voir la facture</button>';
+  }
+  if (or.statut === 'annule') {
+    h += '<span style="font-size:12px;color:rgba(255,255,255,.45)">OR annulé</span>';
+  }
+  h += '</div></div>';
+
+  h += '<div style="text-align:right;font-size:12px;color:rgba(255,255,255,.65);flex-shrink:0">';
+  h += '<div>Ouvert le ' + date + '</div>';
+  if (mecano) h += '<div style="margin-top:2px">Mécano : ' + mecano + '</div>';
+  h += '<div style="font-size:22px;font-weight:800;color:#fff;margin-top:8px">' + fmtEur(or.total_ttc) + '</div>';
+  h += '<div style="font-size:10px;color:rgba(255,255,255,.4)">TTC</div>';
+  h += '</div>';
+
+  h += '</div></div>';
+  return h;
+}
+
+function buildORMotoClient(or) {
+  const moto   = or.motos || {};
+  const client = moto.clients || {};
+  const cnom   = client.nom   || moto.client_nom   || or.client_nom   || '—';
+  const cemail = client.email || moto.client_email || or.client_email || '—';
+  const ctel   = client.tel   || moto.client_tel   || or.client_tel   || '—';
+  const kmE    = (or.km_entree  || 0).toLocaleString('fr-FR');
+  const kmS    = or.km_sortie ? ' → ' + or.km_sortie.toLocaleString('fr-FR') + ' km' : '';
+
+  let h = '<div class="or-grid-2">';
+
+  h += '<div class="card"><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">🏍️ Moto</div>';
+  h += '<div class="or-info-row"><span class="or-info-lbl">Marque / Modèle</span><span class="or-info-val">' + (moto.marque||'—') + ' ' + (moto.modele||'') + '</span></div>';
+  h += '<div class="or-info-row"><span class="or-info-lbl">Plaque</span><span class="or-info-val" style="font-weight:700">' + (moto.plaque||'—') + '</span></div>';
+  if (moto.annee) h += '<div class="or-info-row"><span class="or-info-lbl">Année</span><span class="or-info-val">' + moto.annee + '</span></div>';
+  if (moto.vin)   h += '<div class="or-info-row"><span class="or-info-lbl">VIN</span><span class="or-info-val" style="font-family:monospace;font-size:11px">' + moto.vin + '</span></div>';
+  h += '<div class="or-info-row"><span class="or-info-lbl">Km</span><span class="or-info-val">' + kmE + ' km' + kmS + '</span></div>';
+  h += '</div>';
+
+  h += '<div class="card"><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">👤 Client</div>';
+  h += '<div class="or-info-row"><span class="or-info-lbl">Nom</span><span class="or-info-val">' + cnom + '</span></div>';
+  h += '<div class="or-info-row"><span class="or-info-lbl">Email</span><span class="or-info-val">' + cemail + '</span></div>';
+  h += '<div class="or-info-row"><span class="or-info-lbl">Téléphone</span><span class="or-info-val">' + ctel + '</span></div>';
+  h += '</div>';
+
+  h += '</div>';
+  return h;
+}
+
+function buildORTaches(taches) {
+  const etatMeta = {
+    a_faire:  {l:'À faire',  c:'#d97706'},
+    en_cours: {l:'En cours', c:'#2563eb'},
+    fait:     {l:'Fait',     c:'#16a34a'},
+    skip:     {l:'Ignoré',   c:'#9ca3af'},
+    probleme: {l:'Problème', c:'#dc2626'}
+  };
+
+  let h = '<div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:700;margin-bottom:14px">🔧 Tâches</div>';
+  if (!taches.length) {
+    h += '<div class="empty" style="padding:20px"><div class="empty-icon" style="font-size:24px">📭</div><div class="empty-text" style="font-size:13px">Aucune tâche</div></div>';
+  } else {
+    h += '<table class="table"><thead><tr><th>#</th><th>Libellé</th><th style="text-align:right">Tps est.</th><th style="text-align:right">Taux</th><th style="text-align:right">Total HT</th><th>État</th></tr></thead><tbody>';
+    taches.forEach(function(t, i) {
+      const tph = parseFloat(t.temps_estime_h) || 0;
+      const th  = parseFloat(t.taux_horaire)   || 0;
+      const tot = t.total_ht != null ? t.total_ht : tph * th;
+      const em  = etatMeta[t.etat || 'a_faire'] || {l: t.etat || '—', c: '#9ca3af'};
+      h += '<tr>';
+      h += '<td style="color:var(--text2)">' + (t.ordre_affichage || i+1) + '</td>';
+      h += '<td><div style="font-weight:500">' + (t.libelle||'—') + '</div>' + (t.description ? '<div style="font-size:11px;color:var(--text2);margin-top:2px">'+t.description+'</div>' : '') + '</td>';
+      h += '<td style="text-align:right;color:var(--text2)">' + (tph ? tph+'h' : '—') + '</td>';
+      h += '<td style="text-align:right;color:var(--text2)">' + (th ? th+'€/h' : '—') + '</td>';
+      h += '<td style="text-align:right;font-weight:600">' + fmtEur(tot) + '</td>';
+      h += '<td><span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:' + em.c + '22;color:' + em.c + '">' + em.l + '</span></td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function buildORPieces(pieces) {
+  let h = '<div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:700;margin-bottom:14px">🔩 Pièces</div>';
+  if (!pieces.length) {
+    h += '<div class="empty" style="padding:20px"><div class="empty-icon" style="font-size:24px">📦</div><div class="empty-text" style="font-size:13px">Aucune pièce</div></div>';
+  } else {
+    h += '<table class="table"><thead><tr><th>Référence</th><th>Désignation</th><th style="text-align:right">Qté</th><th style="text-align:right">PU HT</th><th style="text-align:right">Total HT</th></tr></thead><tbody>';
+    pieces.forEach(function(p) {
+      const tot = p.total_ht != null ? p.total_ht : (parseFloat(p.quantite)||0) * (parseFloat(p.pu_ht)||0);
+      h += '<tr>';
+      h += '<td style="font-family:monospace;font-size:12px;color:var(--text2)">' + (p.reference||'—') + '</td>';
+      h += '<td style="font-weight:500">' + (p.designation||'—') + '</td>';
+      h += '<td style="text-align:right">' + (p.quantite||0) + '</td>';
+      h += '<td style="text-align:right;color:var(--text2)">' + fmtEur(p.pu_ht) + '</td>';
+      h += '<td style="text-align:right;font-weight:600">' + fmtEur(tot) + '</td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function buildORTotauxInner(or) {
+  const mo     = or._totalMO     ?? 0;
+  const pieces = or._totalPieces ?? 0;
+  const ht     = or.total_ht  || 0;
+  const tva    = or.total_tva || ht * 0.20;
+  const ttc    = or.total_ttc || ht * 1.20;
+  return '<div class="or-totaux-row"><span>Sous-total main-d\'œuvre</span><span>' + fmtEur(mo) + '</span></div>'
+       + '<div class="or-totaux-row"><span>Sous-total pièces</span><span>' + fmtEur(pieces) + '</span></div>'
+       + '<div class="or-totaux-row"><span>Total HT</span><span>' + fmtEur(ht) + '</span></div>'
+       + '<div class="or-totaux-row"><span>TVA 20%</span><span>' + fmtEur(tva) + '</span></div>'
+       + '<div class="or-totaux-ttc"><span>Total TTC</span><span style="color:#ff6b00">' + fmtEur(ttc) + '</span></div>';
+}
+
+function buildORTotaux(or) {
+  const taches = or.or_taches || or.taches || [];
+  const pieces = or.or_pieces || or.pieces || [];
+  const mo = taches.reduce(function(s, t) {
+    return s + (t.total_ht != null ? t.total_ht : (parseFloat(t.temps_estime_h)||0) * (parseFloat(t.taux_horaire)||0));
+  }, 0);
+  const pc = pieces.reduce(function(s, p) {
+    return s + (p.total_ht != null ? p.total_ht : (parseFloat(p.quantite)||0) * (parseFloat(p.pu_ht)||0));
+  }, 0);
+  const enriched = Object.assign({}, or, {
+    _totalMO: mo, _totalPieces: pc,
+    total_ht:  or.total_ht  ?? mo + pc,
+    total_tva: or.total_tva ?? (or.total_ht ?? mo + pc) * 0.20,
+    total_ttc: or.total_ttc ?? (or.total_ht ?? mo + pc) * 1.20
+  });
+  return '<div class="or-totaux" id="orTotauxBox">' + buildORTotauxInner(enriched) + '</div>';
+}
+
+function buildORHistorique(hist) {
+  let h = '<div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:14px">📋 Historique</div>';
+  if (!hist.length) {
+    h += '<div class="empty" style="padding:20px"><div class="empty-text" style="font-size:13px">Aucun historique disponible</div></div>';
+    return h + '</div>';
+  }
+  const sorted = hist.slice().sort(function(a, b) { return new Date(b.created_at) - new Date(a.created_at); });
+  h += '<ul class="or-timeline">';
+  sorted.forEach(function(ev) {
+    const smA = ev.ancien_statut  ? orStatutMeta(ev.ancien_statut)  : null;
+    const smN = ev.nouveau_statut ? orStatutMeta(ev.nouveau_statut) : null;
+    const acteur  = ev.acteur_role || 'Système';
+    const payload = ev.payload || {};
+    let detail = '';
+    if (ev.action === 'creation') detail = 'OR créé';
+    else if (payload.attente_motif || payload.motif) detail = '📌 ' + (payload.attente_motif || payload.motif);
+    else if (payload.km_sortie != null) detail = '🏁 km sortie : ' + Number(payload.km_sortie).toLocaleString('fr-FR') + ' km';
+    else if (payload.numero_facture) detail = '📄 ' + payload.numero_facture;
+    else if (payload.annulation_motif) detail = '❌ ' + payload.annulation_motif;
+
+    h += '<li class="or-timeline-item"><div class="or-timeline-dot"></div>';
+    h += '<div class="or-timeline-time">' + fmtDate(ev.created_at) + ' · ' + acteur + '</div>';
+    h += '<div class="or-timeline-trans">';
+    if (smA) h += '<span class="or-badge ' + smA.cls + '" style="padding:2px 9px;font-size:11px">' + smA.label + '</span>';
+    if (smA && smN) h += '<span style="color:var(--text2)">→</span>';
+    if (smN) h += '<span class="or-badge ' + smN.cls + '" style="padding:2px 9px;font-size:11px">' + smN.label + '</span>';
+    if (!smA && !smN && ev.action) h += '<span style="color:var(--text2);font-size:13px">' + ev.action + '</span>';
+    h += '</div>';
+    if (detail) h += '<div class="or-timeline-detail">' + detail + '</div>';
+    h += '</li>';
+  });
+  h += '</ul></div>';
+  return h;
 }
 
 async function renderNewOR() {
