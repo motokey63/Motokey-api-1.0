@@ -782,8 +782,9 @@ async function renderFicheOR() {
   m.innerHTML = '<div class="or-header" style="opacity:.5"><div style="font-size:14px;color:rgba(255,255,255,.7)">Chargement de la fiche OR…</div></div><div class="loading">Récupération des données…</div>';
 
   let or;
+  let data;
   try {
-    const data = await api('/ordres-reparation/' + curORId);
+    data = await api('/ordres-reparation/' + curORId);
     or = data.ordre_reparation || data.or || data;
   } catch(e) {
     m.innerHTML = '<div class="card"><div class="empty"><div class="empty-icon">⚠️</div>'
