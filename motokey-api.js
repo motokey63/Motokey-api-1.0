@@ -2380,6 +2380,82 @@ const server = http.createServer(async function(req, res){
     }, 'Pièce mise à jour');
   }
 
+  /* ── GET /catalogue-pieces?q=:query&limit=:limit ── */
+  if((p=M('GET','/catalogue-pieces'))!==null){
+    // TODO RBAC L4 : MECANO autorisé en lecture, CLIENT refusé
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    const q     = (query.q || '').trim();
+    const limit = Math.min(parseInt(query.limit) || 20, 50);
+    if (q.length < 3) return ok(res, { resultats: [] }, 'Query trop courte (min 3 caractères)');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const resultats = await SBLayer.CataloguePieces.search(garageId, q, { limit });
+        return ok(res, { resultats }, resultats.length + ' résultat(s)');
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+    return ok(res, { resultats: [] }, 'Mode RAM — catalogue non disponible');
+  }
+
+  /* ── GET /catalogue-pieces/by-ean/:ean ── */
+  if((p=M('GET','/catalogue-pieces/by-ean/:ean'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    const ean = (p.ean || '').trim();
+    if (!/^\d{8,14}$/.test(ean)) return fail(res, 'EAN invalide (8 à 14 chiffres)', 400, 'INVALID_INPUT');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const piece = await SBLayer.CataloguePieces.getByEan(garageId, ean);
+        if (!piece) return fail(res, 'EAN non trouvé dans le catalogue', 404, 'EAN_NOT_FOUND');
+        return ok(res, { piece }, 'EAN trouvé');
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+    return fail(res, 'Lookup EAN non disponible en mode RAM', 503, 'NOT_IMPLEMENTED');
+  }
+
+  /* ── POST /catalogue-pieces ── */
+  if((p=M('POST','/catalogue-pieces'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    if (!b.libelle || !b.libelle.trim()) return fail(res, 'libelle requis', 400, 'INVALID_INPUT');
+    if (b.prix_vente_ht === undefined || parseFloat(b.prix_vente_ht) < 0) {
+      return fail(res, 'prix_vente_ht requis et doit être ≥ 0', 400, 'INVALID_INPUT');
+    }
+    if (b.ean && !/^\d{8,14}$/.test(b.ean.trim())) {
+      return fail(res, 'EAN invalide (8 à 14 chiffres)', 400, 'INVALID_INPUT');
+    }
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const piece = await SBLayer.CataloguePieces.create(garageId, ctx.user_id, b);
+        return ok(res, { piece }, 'Pièce ajoutée au catalogue', 201);
+      } catch(e) {
+        if (e.message.includes('duplicate') || e.message.includes('unique')) {
+          return fail(res, 'Référence ou EAN déjà existant dans le catalogue', 409, 'CONFLICT');
+        }
+        return fail(res, e.message, 500, 'DB_ERROR');
+      }
+    }
+    return fail(res, 'Création catalogue non disponible en mode RAM', 503, 'NOT_IMPLEMENTED');
+  }
+
   /* 404 */
   fail(res,'Route inconnue: '+method+' '+pathname,404,'NOT_FOUND');
 });

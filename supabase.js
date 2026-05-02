@@ -1036,6 +1036,70 @@ const OrPieces = {
 };
 
 // ══════════════════════════════════════════════════════════
+// CATALOGUE PIÈCES (L3c-a)
+// ══════════════════════════════════════════════════════════
+const CataloguePieces = {
+
+  async search(garage_id, query, { limit = 20 } = {}) {
+    const q = (query || '').trim().toLowerCase();
+    if (q.length < 3) return [];
+    const { data, error } = await supabase
+      .from('catalogue_pieces')
+      .select('id, reference, ean, libelle, marque, categorie, prix_vente_ht, tva_pct, stock_qte')
+      .eq('garage_id', garage_id)
+      .eq('actif', true)
+      .or(`libelle.ilike.%${q}%,reference.ilike.%${q}%,marque.ilike.%${q}%`)
+      .order('libelle')
+      .limit(limit);
+    if (error) throw new Error(error.message);
+    return data || [];
+  },
+
+  // Fondation L3c-b — disponible maintenant, utilisé par le scanner
+  async getByEan(garage_id, ean) {
+    if (!ean) return null;
+    const { data, error } = await supabase
+      .from('catalogue_pieces')
+      .select('*')
+      .eq('garage_id', garage_id)
+      .eq('ean', ean.trim())
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
+  async create(garage_id, user_id, payload) {
+    if (!payload.libelle || !payload.libelle.trim()) throw new Error('Champ requis: libelle');
+    if (payload.prix_vente_ht === undefined || payload.prix_vente_ht === null || payload.prix_vente_ht === '') {
+      throw new Error('Champ requis: prix_vente_ht');
+    }
+    const insert = {
+      garage_id,
+      reference:             payload.reference    || null,
+      ean:                   payload.ean          || null,
+      libelle:               payload.libelle.trim(),
+      marque:                payload.marque       || null,
+      categorie:             payload.categorie    || null,
+      prix_achat_ht:         parseFloat(payload.prix_achat_ht)  || 0,
+      prix_vente_ht:         parseFloat(payload.prix_vente_ht),
+      tva_pct:               parseFloat(payload.tva_pct)        || 20,
+      stock_qte:             parseInt(payload.stock_qte)        || 0,
+      stock_min:             parseInt(payload.stock_min)        || 0,
+      actif:                 true,
+      created_by:            user_id || null,
+      created_at_garage_id:  garage_id
+    };
+    const { data, error } = await supabase
+      .from('catalogue_pieces')
+      .insert(insert)
+      .select()
+      .single();
+    if (error) throw new Error(error.message);
+    return data;
+  }
+};
+
+// ══════════════════════════════════════════════════════════
 // EXPORT
 // ══════════════════════════════════════════════════════════
 module.exports = {
@@ -1053,5 +1117,6 @@ module.exports = {
   Fraude,
   OrdresReparation,
   OrTaches,
-  OrPieces
+  OrPieces,
+  CataloguePieces
 };

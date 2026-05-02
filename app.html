@@ -173,6 +173,15 @@ input,select,textarea{font-family:inherit}
 .or-modal h3{font-size:16px;font-weight:700;margin-bottom:6px}
 .or-modal-sub{font-size:13px;color:var(--text2);margin-bottom:18px}
 .or-modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:20px}
+.piece-picker-results{max-height:300px;overflow-y:auto;margin-top:10px}
+.piece-picker-result{padding:10px 12px;border-radius:8px;cursor:pointer;transition:background .1s;border:1px solid transparent}
+.piece-picker-result:hover{background:var(--bg);border-color:var(--border)}
+.piece-picker-result+.piece-picker-result{margin-top:4px}
+.piece-picker-result-main{font-weight:600;font-size:13px}
+.piece-picker-result-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.piece-picker-empty{padding:16px;text-align:center;color:var(--text2);font-size:13px}
+.piece-picker-loading{padding:12px;text-align:center;color:var(--text2);font-size:13px}
+.piece-picker-fallback{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);text-align:center}
 </style>
 </head>
 <body>
@@ -226,6 +235,7 @@ let curORId      = null;
 let currentOR    = null;
 let currentORHist = [];
 const orEditState = { editing: false, taches: [], pieces: [], dirty: false };
+const orPiecePicker = { searchDebounce: null };
 
 // ── HASH ROUTING (OR fiche) ──
 function parseORHash() {
@@ -846,7 +856,82 @@ function orAddTache()      { orEditState.taches.push({ libelle:'', duree_h:0, ta
 // Pièce row helpers
 function orUpdatePiece(i, field, val) { if (orEditState.pieces[i]) { orEditState.pieces[i][field] = val; markDirty(); } }
 function orRemovePiece(i)  { orEditState.pieces.splice(i, 1); markDirty(); rerenderFicheEdit(); }
-function orAddPiece()      { orEditState.pieces.push({ reference:'', libelle:'', qte:1, pu_ht:0 }); markDirty(); rerenderFicheEdit(); }
+function orAddPiece()      { openPiecePicker(); }
+function fallbackManualPiece() {
+  closeORModal();
+  orEditState.pieces.push({ reference:'', libelle:'', qte:1, pu_ht:0 });
+  markDirty();
+  rerenderFicheEdit();
+}
+
+// ── CATALOGUE PIÈCES PICKER (L3c-a) ──
+function openPiecePicker() {
+  var h = '<h3>🔩 Choisir une pièce</h3>';
+  h += '<div class="or-modal-sub">Tapez au moins 3 caractères pour rechercher dans le catalogue.</div>';
+  h += '<input type="text" id="piecePickerInput" class="or-edit-input" style="width:100%;padding:8px 10px;font-size:14px" placeholder="Référence, désignation, marque…" oninput="onPiecePickerInput(this.value)" autocomplete="off">';
+  h += '<div id="piecePickerResults" class="piece-picker-results"></div>';
+  h += '<div class="piece-picker-fallback"><button class="btn btn-secondary btn-sm" onclick="fallbackManualPiece()">Saisir manuellement</button></div>';
+  h += '<div class="or-modal-actions"><button class="btn btn-secondary btn-sm" onclick="closeORModal()">Annuler</button></div>';
+  openORModal(h);
+  setTimeout(function() { var inp = document.getElementById('piecePickerInput'); if (inp) inp.focus(); }, 80);
+}
+
+function onPiecePickerInput(val) {
+  clearTimeout(orPiecePicker.searchDebounce);
+  if ((val || '').trim().length < 3) {
+    var el = document.getElementById('piecePickerResults');
+    if (el) el.innerHTML = '';
+    return;
+  }
+  orPiecePicker.searchDebounce = setTimeout(function() { searchCataloguePieces(val.trim()); }, 250);
+}
+
+async function searchCataloguePieces(q) {
+  var el = document.getElementById('piecePickerResults');
+  if (!el) return;
+  el.innerHTML = '<div class="piece-picker-loading">Recherche…</div>';
+  try {
+    var data = await api('/catalogue-pieces?q=' + encodeURIComponent(q));
+    var resultats = data.resultats || [];
+    orPiecePicker.lastResults = resultats;
+    if (!resultats.length) {
+      el.innerHTML = '<div class="piece-picker-empty">Aucun résultat pour « ' + escHtml(q) + ' »</div>';
+      return;
+    }
+    var h = '';
+    resultats.forEach(function(piece) {
+      var sub = [];
+      if (piece.reference) sub.push(piece.reference);
+      if (piece.marque)    sub.push(piece.marque);
+      if (piece.categorie) sub.push(piece.categorie);
+      if (piece.stock_qte != null) sub.push('stock : ' + piece.stock_qte);
+      var prix = piece.prix_vente_ht != null ? fmtEur(piece.prix_vente_ht) + ' HT' : '';
+      h += '<div class="piece-picker-result" data-piece-id="' + escAttr(piece.id) + '" onclick="selectCataloguePieceById(this.dataset.pieceId)">';
+      h += '<div class="piece-picker-result-main">' + escHtml(piece.libelle) + (prix ? '<span style="float:right;color:var(--primary)">' + prix + '</span>' : '') + '</div>';
+      if (sub.length) h += '<div class="piece-picker-result-sub">' + escHtml(sub.join(' · ')) + '</div>';
+      h += '</div>';
+    });
+    el.innerHTML = h;
+  } catch(e) {
+    el.innerHTML = '<div class="piece-picker-empty" style="color:#e53e3e">Erreur : ' + escHtml(e.message) + '</div>';
+  }
+}
+
+function selectCataloguePieceById(id) {
+  var piece = (orPiecePicker.lastResults || []).find(function(p) { return p.id === id; });
+  if (!piece) return;
+  orEditState.pieces.push({
+    piece_id:  piece.id,
+    reference: piece.reference || '',
+    libelle:   piece.libelle,
+    qte:       1,
+    pu_ht:     parseFloat(piece.prix_vente_ht) || 0,
+    tva_pct:   parseFloat(piece.tva_pct)       || 20
+  });
+  markDirty();
+  closeORModal();
+  rerenderFicheEdit();
+}
 
 // ── OR FICHE RENDER FUNCTIONS (L3a-quater) ──
 
@@ -1252,10 +1337,12 @@ async function saveEdit() {
       if (!des.trim()) continue;
       try {
         await api('/ordres-reparation/' + orId + '/pieces', 'POST', {
+          piece_id:  np.piece_id  || null,
           reference: np.reference || '',
           libelle:   des.trim(),
-          qte:       parseFloat(np.qte) || 1,
-          pu_ht:     parseFloat(np.pu_ht) || 0
+          qte:       parseFloat(np.qte)     || 1,
+          pu_ht:     parseFloat(np.pu_ht)   || 0,
+          tva_pct:   parseFloat(np.tva_pct) || 20
         });
       } catch(e) { errors.push('Ajout pièce : ' + e.message); }
     } else {
