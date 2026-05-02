@@ -6,9 +6,12 @@
 BEGIN;
 
 ALTER TABLE catalogue_pieces
-  ADD COLUMN IF NOT EXISTS ean                   TEXT,
-  ADD COLUMN IF NOT EXISTS created_by            UUID REFERENCES auth.users(id),
-  ADD COLUMN IF NOT EXISTS created_at_garage_id  UUID REFERENCES garages(id);
+  ADD COLUMN IF NOT EXISTS ean        TEXT,
+  ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES auth.users(id);
+
+-- Force le bon type (la colonne pouvait préexister en BIGINT)
+ALTER TABLE catalogue_pieces DROP COLUMN IF EXISTS created_at_garage_id;
+ALTER TABLE catalogue_pieces ADD COLUMN created_at_garage_id UUID REFERENCES garages(id);
 
 -- Index pour autocomplete rapide (ilike %q%)
 CREATE INDEX IF NOT EXISTS idx_catalogue_pieces_garage_libelle
