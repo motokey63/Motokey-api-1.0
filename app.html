@@ -183,6 +183,7 @@ input,select,textarea{font-family:inherit}
 .piece-picker-loading{padding:12px;text-align:center;color:var(--text2);font-size:13px}
 .piece-picker-fallback{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);text-align:center}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 </head>
 <body>
 
@@ -868,7 +869,10 @@ function fallbackManualPiece() {
 function openPiecePicker() {
   var h = '<h3>🔩 Choisir une pièce</h3>';
   h += '<div class="or-modal-sub">Tapez au moins 3 caractères pour rechercher dans le catalogue.</div>';
-  h += '<input type="text" id="piecePickerInput" class="or-edit-input" style="width:100%;padding:8px 10px;font-size:14px" placeholder="Référence, désignation, marque…" oninput="onPiecePickerInput(this.value)" autocomplete="off">';
+  h += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:0">';
+  h += '<input type="text" id="piecePickerInput" class="or-edit-input" style="flex:1;padding:8px 10px;font-size:14px" placeholder="Référence, désignation, marque…" oninput="onPiecePickerInput(this.value)" autocomplete="off">';
+  h += '<button class="btn btn-secondary btn-sm" onclick="openEanScanner()" style="white-space:nowrap;flex-shrink:0">📷 Scanner</button>';
+  h += '</div>';
   h += '<div id="piecePickerResults" class="piece-picker-results"></div>';
   h += '<div class="piece-picker-fallback"><button class="btn btn-secondary btn-sm" onclick="fallbackManualPiece()">Saisir manuellement</button></div>';
   h += '<div class="or-modal-actions"><button class="btn btn-secondary btn-sm" onclick="closeORModal()">Annuler</button></div>';
@@ -1404,6 +1408,213 @@ function closeORModal() {
 }
 function orModalBackdrop(e) { if (e.target === e.currentTarget) closeORModal(); }
 
+// ── EAN SCANNER (L3c-b) ──
+var eanScannerReader = null;
+var eanScannerLastCode = null;
+var eanScannerLastTime = 0;
+var eanScannerSession = [];
+var EAN_DEBOUNCE_MS = 1500;
+
+function openEanScanner() {
+  eanScannerSession = [];
+  eanScannerLastCode = null;
+  eanScannerLastTime = 0;
+  var modal = document.getElementById('eanScannerModal');
+  // Reset video / fallback visibility
+  var vid = document.getElementById('eanVideo');
+  var fb  = document.getElementById('eanCameraFallback');
+  if (vid) vid.style.display = 'block';
+  if (fb)  fb.style.display  = 'none';
+  renderEanScanner();
+  modal.style.display = 'flex';
+  document.addEventListener('keydown', eanScannerKeyHandler);
+  initEanCamera();
+}
+
+function renderEanScanner() {
+  var totalQte = 0;
+  var totalHt  = 0;
+  eanScannerSession.forEach(function(p) {
+    totalQte += p.qte;
+    totalHt  += p.pu_ht * p.qte;
+  });
+  var hdrEl = document.getElementById('eanSessionHdr');
+  if (hdrEl) hdrEl.textContent = 'Pièces scannées (' + totalQte + ')' + (totalHt > 0 ? ' · ' + fmtEur(totalHt) + ' HT' : '');
+  var listEl = document.getElementById('eanSessionList');
+  if (!listEl) return;
+  if (!eanScannerSession.length) {
+    listEl.innerHTML = '<div class="ean-empty">Aucune pièce scannée</div>';
+  } else {
+    var h = '';
+    eanScannerSession.forEach(function(p, i) {
+      var ref = [p.ean || '', p.reference || ''].filter(Boolean).join(' · ');
+      h += '<div class="ean-row" id="ean-row-' + i + '">';
+      h += '<div class="ean-row-info">';
+      h += '<div class="ean-row-name">' + escHtml(p.libelle) + '</div>';
+      if (ref) h += '<div class="ean-row-ref">' + escHtml(ref) + '</div>';
+      h += '</div>';
+      h += '<div class="ean-qty-wrap">';
+      h += '<button class="ean-qty-btn" onclick="eanQty(' + i + ',-1)">−</button>';
+      h += '<span class="ean-qty-num">' + p.qte + '</span>';
+      h += '<button class="ean-qty-btn" onclick="eanQty(' + i + ',1)">+</button>';
+      h += '</div>';
+      h += '<div class="ean-row-price">' + fmtEur(p.pu_ht * p.qte) + '</div>';
+      h += '<button class="ean-del-btn" onclick="eanDel(' + i + ')" title="Supprimer">×</button>';
+      h += '</div>';
+    });
+    listEl.innerHTML = h;
+  }
+  var finBtn = document.getElementById('eanFinishBtn');
+  if (finBtn) finBtn.textContent = 'Terminer (' + totalQte + ')';
+}
+
+async function initEanCamera() {
+  if (!window.ZXing) { showEanFallback(); return; }
+  var hints = new Map([[ZXing.DecodeHintType.POSSIBLE_FORMATS,
+    [ZXing.BarcodeFormat.EAN_13, ZXing.BarcodeFormat.EAN_8, ZXing.BarcodeFormat.UPC_A]]]);
+  // Rear camera first, then any camera
+  var tries = [{ video: { facingMode: 'environment' } }, { video: true }];
+  for (var ci = 0; ci < tries.length; ci++) {
+    try {
+      eanScannerReader = new ZXing.BrowserMultiFormatReader(hints);
+      await eanScannerReader.decodeFromConstraints(tries[ci], 'eanVideo', onZxingResult);
+      return;
+    } catch(e) {
+      try { eanScannerReader.reset(); } catch(x) {}
+      eanScannerReader = null;
+    }
+  }
+  showEanFallback();
+}
+
+function showEanFallback() {
+  var vid = document.getElementById('eanVideo');
+  var fb  = document.getElementById('eanCameraFallback');
+  if (vid) vid.style.display = 'none';
+  if (fb)  fb.style.display  = 'block';
+}
+
+function onZxingResult(result) {
+  if (!result) return;
+  var code = result.getText();
+  var now  = Date.now();
+  if (code === eanScannerLastCode && now - eanScannerLastTime < EAN_DEBOUNCE_MS) return;
+  eanScannerLastCode = code;
+  eanScannerLastTime = now;
+  handleScannedEan(code);
+}
+
+async function handleScannedEan(ean) {
+  try {
+    var data = await api('/catalogue-pieces/by-ean/' + encodeURIComponent(ean));
+    addEanToSession(data.piece, ean);
+  } catch(e) {
+    var msg = (e && e.message) || '';
+    if (msg.includes('non trouv') || msg.includes('introuvable') || msg.includes('NOT_FOUND')) {
+      toast('EAN ' + ean + ' introuvable');
+    } else {
+      toast('Erreur EAN ' + ean + ' : ' + msg);
+    }
+  }
+}
+
+function addEanToSession(piece, ean) {
+  var idx = -1;
+  for (var i = 0; i < eanScannerSession.length; i++) {
+    if (eanScannerSession[i].piece_id === piece.id) { idx = i; break; }
+  }
+  if (idx !== -1) {
+    eanScannerSession[idx].qte += 1;
+    renderEanScanner();
+    flashEanRow(idx);
+  } else {
+    eanScannerSession.push({
+      piece_id:  piece.id,
+      reference: piece.reference || '',
+      libelle:   piece.libelle,
+      qte:       1,
+      pu_ht:     parseFloat(piece.prix_vente_ht) || 0,
+      tva_pct:   parseFloat(piece.tva_pct) || 20,
+      ean:       piece.ean || ean
+    });
+    renderEanScanner();
+    flashEanRow(eanScannerSession.length - 1);
+  }
+}
+
+function flashEanRow(idx) {
+  var rowEl = document.getElementById('ean-row-' + idx);
+  if (!rowEl) return;
+  rowEl.classList.add('ean-row-flash');
+  setTimeout(function() { rowEl.classList.remove('ean-row-flash'); }, 200);
+}
+
+function eanQty(i, delta) {
+  if (!eanScannerSession[i]) return;
+  eanScannerSession[i].qte = Math.max(1, eanScannerSession[i].qte + delta);
+  renderEanScanner();
+}
+
+function eanDel(i) {
+  eanScannerSession.splice(i, 1);
+  renderEanScanner();
+}
+
+async function eanManualLookup() {
+  var inp = document.getElementById('eanManualInput');
+  if (!inp) return;
+  var ean = inp.value.trim();
+  if (!ean) return;
+  if (!/^\d{8,14}$/.test(ean)) { toast('EAN invalide (8 à 14 chiffres)'); return; }
+  inp.value = '';
+  await handleScannedEan(ean);
+}
+
+function finishEanSession() {
+  eanScannerSession.forEach(function(p) {
+    orEditState.pieces.push({
+      piece_id:  p.piece_id,
+      reference: p.reference,
+      libelle:   p.libelle,
+      qte:       p.qte,
+      pu_ht:     p.pu_ht,
+      tva_pct:   p.tva_pct
+    });
+  });
+  markDirty();
+  closeEanScanner();
+  rerenderFicheEdit();
+}
+
+function closeEanScanner() {
+  document.removeEventListener('keydown', eanScannerKeyHandler);
+  releaseEanCamera();
+  var modal = document.getElementById('eanScannerModal');
+  if (modal) modal.style.display = 'none';
+  eanScannerSession = [];
+}
+
+function releaseEanCamera() {
+  if (eanScannerReader) {
+    try { eanScannerReader.reset(); } catch(e) {}
+    eanScannerReader = null;
+  }
+  var vid = document.getElementById('eanVideo');
+  if (vid) vid.srcObject = null;
+}
+
+function cancelEanScanner() {
+  if (eanScannerSession.length > 0) {
+    var total = eanScannerSession.reduce(function(s, p) { return s + p.qte; }, 0);
+    if (!confirm(total + ' pièce(s) vont être perdues. Confirmer l\'abandon ?')) return;
+  }
+  closeEanScanner();
+}
+
+function eanScannerKeyHandler(e) {
+  if (e.key === 'Escape') cancelEanScanner();
+}
+
 function openTransitionModal(nouveau_statut) {
   const titles = {
     brouillon:     'Repasser en brouillon',
@@ -1639,5 +1850,67 @@ function motoSelect(id, onchange) {
   return `<select id="${id}" ${oc} style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg2);color:var(--text)"><option value="">— Choisir —</option>${opts}</select>`;
 }
 </script>
+
+<!-- ═══════════════════════════════════════════════════════════
+     EAN SCANNER MODAL (L3c-b)
+════════════════════════════════════════════════════════════ -->
+<style>
+#eanScannerModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:2000;align-items:center;justify-content:center;padding:12px}
+.ean-scanner-box{background:var(--bg2);border-radius:14px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.ean-scanner-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
+.ean-scanner-hdr h3{margin:0;font-size:15px;font-weight:700}
+.ean-scanner-x{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text2);padding:2px 6px;border-radius:6px;line-height:1}
+.ean-scanner-x:hover{background:var(--bg);color:var(--text)}
+.ean-cam-section{position:relative;background:#111;min-height:120px;display:flex;align-items:center;justify-content:center}
+#eanVideo{width:100%;max-height:220px;object-fit:cover;display:block}
+#eanCameraFallback{display:none;padding:18px 16px;text-align:center;color:var(--text2);font-size:13px;line-height:1.5}
+.ean-session-section{padding:12px 14px;border-bottom:1px solid var(--border)}
+#eanSessionHdr{font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+#eanSessionList{min-height:32px}
+.ean-row{display:flex;align-items:center;gap:6px;padding:7px 0;border-bottom:1px solid var(--border);transition:outline .08s,background .08s}
+.ean-row:last-child{border-bottom:none}
+.ean-row-flash{outline:2px solid #38a169;border-radius:6px;background:rgba(56,161,105,.08)}
+.ean-row-info{flex:1;min-width:0}
+.ean-row-name{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ean-row-ref{font-size:11px;color:var(--text2);margin-top:1px}
+.ean-qty-wrap{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.ean-qty-btn{width:26px;height:26px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;color:var(--text)}
+.ean-qty-num{font-weight:700;min-width:22px;text-align:center;font-size:13px}
+.ean-row-price{min-width:58px;text-align:right;font-size:13px;flex-shrink:0}
+.ean-del-btn{border:none;background:none;cursor:pointer;color:#e53e3e;font-size:20px;line-height:1;padding:0 2px;flex-shrink:0}
+.ean-empty{padding:14px;text-align:center;color:var(--text2);font-size:13px}
+.ean-manual-section{padding:12px 14px;border-top:1px solid var(--border)}
+.ean-manual-label{font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px}
+.ean-manual-row{display:flex;gap:8px}
+.ean-scanner-actions{padding:12px 14px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border)}
+</style>
+
+<div id="eanScannerModal" onclick="if(event.target===this)cancelEanScanner()">
+  <div class="ean-scanner-box">
+    <div class="ean-scanner-hdr">
+      <h3>📷 Scanner code-barres</h3>
+      <button class="ean-scanner-x" onclick="cancelEanScanner()" title="Fermer">✕</button>
+    </div>
+    <div class="ean-cam-section">
+      <video id="eanVideo" playsinline muted></video>
+      <div id="eanCameraFallback">📵 Caméra inaccessible<br>Utilisez la saisie manuelle ci-dessous</div>
+    </div>
+    <div class="ean-session-section">
+      <div id="eanSessionHdr">Pièces scannées (0)</div>
+      <div id="eanSessionList"><div class="ean-empty">Aucune pièce scannée</div></div>
+    </div>
+    <div class="ean-manual-section">
+      <label class="ean-manual-label">Saisie manuelle (fallback)</label>
+      <div class="ean-manual-row">
+        <input type="text" id="eanManualInput" class="or-edit-input" style="flex:1;padding:7px 10px;font-size:14px" placeholder="EAN (8–14 chiffres)" inputmode="numeric" onkeydown="if(event.key==='Enter')eanManualLookup()">
+        <button class="btn btn-secondary btn-sm" onclick="eanManualLookup()">Rechercher</button>
+      </div>
+    </div>
+    <div class="ean-scanner-actions">
+      <button class="btn btn-secondary btn-sm" onclick="cancelEanScanner()">Annuler</button>
+      <button class="btn btn-primary btn-sm" id="eanFinishBtn" onclick="finishEanSession()">Terminer (0)</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
