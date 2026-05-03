@@ -992,9 +992,26 @@ function buildORActionBar(or) {
 }
 
 function buildFicheOR(or, hist) {
-  const taches = orEditState.editing ? orEditState.taches : (or.or_taches || []);
-  const pieces = orEditState.editing ? orEditState.pieces : (or.or_pieces || []);
-  return buildORHeader(or)
+  const taches  = orEditState.editing ? orEditState.taches : (or.or_taches || []);
+  const pieces  = orEditState.editing ? orEditState.pieces : (or.or_pieces || []);
+  const editing = orEditState.editing;
+  const mo = taches.reduce(function(s, t) {
+    const dh = parseFloat(t.duree_h || t.temps_estime_h) || 0;
+    const th = parseFloat(t.taux_horaire) || 0;
+    const st = t.montant_ht != null ? t.montant_ht : t.total_ht;
+    return s + (editing || st == null ? dh * th : st);
+  }, 0);
+  const pc = pieces.reduce(function(s, p) {
+    const q  = parseFloat(p.qte != null ? p.qte : p.quantite) || 0;
+    const pu = parseFloat(p.pu_ht) || 0;
+    const st = p.montant_ht != null ? p.montant_ht : p.total_ht;
+    return s + (editing || st == null ? q * pu : st);
+  }, 0);
+  const baseHt   = editing ? mo + pc : (or.total_ht ?? mo + pc);
+  const enriched = Object.assign({}, or, {
+    total_ttc: editing ? baseHt * 1.20 : (or.total_ttc ?? baseHt * 1.20)
+  });
+  return buildORHeader(enriched)
        + buildORActionBar(or)
        + buildORMotoClient(or)
        + buildORTaches(taches)
