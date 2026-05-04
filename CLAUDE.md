@@ -121,11 +121,12 @@ ADMIN
 | **L3a frontend partiel** | Bouton nav OR, liste OR avec filtres, vues comptoir/atelier, formulaire création OR | Voir `loadOR()`, `renderORPage()`, `renderORTable()`, `renderNewOR()` dans `app.html` |
 | **L4 RBAC** | Middleware `requireRole`, `extractRoleFromRequest`, RLS durci | Validée en prod (commit `db28556`) |
 | **L7b endpoints** | `register`, `login`, `logout`, `password-reset`, `password-reset/confirm` (lien + OTP) | 7/7 validés en prod (commit `4cf896e`). Envoi email réel pending `RESEND_API_KEY` côté Railway env. |
+| **L3c-a** | Catalogue pièces (table `catalogue_pieces`) + autocomplete dans formulaire OR édition | Commit `1dfe935`, fix UUID `6998ca8`. Backend + frontend livrés. |
+| **L3c-b** | Scanner code-barres EAN-13/8/UPC-A via `zxing@0.21.3` dans picker pièces OR | Commit `310add6` (04/05/2026). Multi-scan avec dédup par `piece_id` (qte += 1 sur rescan). Debounce 1.5s. Fallback saisie manuelle si caméra inaccessible. Libération caméra sur tous chemins de sortie (X, Annuler, Terminer, Échap, backdrop). Validé prod : OR-2026-0003 reçu 2 pièces dont 1 catalogue (07BB37SA Plaquettes Brembo). Test C11 cleanup caméra : à valider en conditions réelles atelier (tablette). |
 
 ### 🔍 Statut à vérifier
 
 - **L3b** (Atelier iPad UX, gros tap targets) — aucun commit explicite trouvé. Le code est peut-être dans `app.html` (vues atelier existent) sans avoir été nommé "L3b" dans les messages de commit. À auditer si besoin.
-- **L3c** (Catalogue pièces + scanner code-barres) — aucun commit explicite. Statut inconnu.
 
 ### ⏳ À faire
 
