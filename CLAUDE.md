@@ -85,7 +85,7 @@ Système de gestion de garage moto pour Garage Motolab. Concept : "3ème clé di
 
 ---
 
-## RBAC (Livraison 4) — LIVRÉE EN PROD
+## RBAC (Livraisons L4 / L4 v2) — LIVRÉE EN PROD
 
 Hiérarchie :
 
@@ -94,19 +94,37 @@ ADMIN
   └── CONCESSION (marque officielle, peut créer interventions VERTES + tout ce qu'un Pro fait)
         └── PRO (max BLEU)
               └── CLIENT (max JAUNE)
-                    └── (sous-rôle) MÉCANO (atelier iPad uniquement, pas d'accès finances)
+                    └── (sous-rôle) MÉCANO (atelier iPad, accès financier autorisé depuis L4 v2)
 ```
 
-État technique :
-- `extractRoleFromRequest()` extrait le rôle depuis le JWT Supabase
+État technique (L4 v2 — commits e2baba5 / ef04588 / ce87bb4, 06/05/2026) :
+- `extractRoleFromRequest()` extrait le rôle depuis le JWT Supabase (`app_metadata.role`)
 - `requireRole()` middleware sur les endpoints sensibles
 - RLS durci sur `clients`, `motos`, `interventions`, `garages`
-- Migration `client_type` + colonnes pro/particulier appliquée
+- 21 endpoints élargis de PRO→MECANO (motos, interventions, devis, OR, vérif)
+- `stripFinancialFields` **retiré** — MECANO accède désormais aux champs financiers
+- `/transfert` et `/entites-facturation` restent PRO+ (zones admin)
+- `rbac_role` exposé dans la réponse `POST /auth/login` (lu depuis `app_metadata.role`, fallback `CONCESSION`)
+- `CURRENT_ROLE` stocké en frontend au login — utilisé par `isMecano()` / `isPro()`
+- Timer inactivité MECANO : `startInactivityTimer()` + `_resetInactivity()` (GET session-policy au boot)
+- Section Paramètres dans nav (`renderParams()`) : entité / users / abonnement / politique session — masquée pour MECANO
+
+**Endpoints session-policy (L4 v2) :**
+- `GET /garage/session-policy` — MECANO+ — lit `mecano_session_timeout_minutes`
+- `PATCH /garage/session-policy` — PRO+ — modifie timeout (15 / 60 / 480 min)
+
+**Migration SQL requise en prod :**
+- `sql/migrations/10_mecano_session_timeout.sql` — `ALTER TABLE garages ADD COLUMN mecano_session_timeout_minutes` — à appliquer via Supabase Dashboard SQL Editor
+
+**⚠️ Dette L4 v2 (avant 1er garage testeur réel) :**
+- Backfill `app_metadata.role` sur tous les comptes garage existants
+- Processus création compte MECANO : forcer `app_metadata.role = 'MECANO'` à la création
+- Test négatif : compte MECANO sans `app_metadata.role` ne bypass pas les restrictions UI
 
 **Pour tout nouveau code :**
 - Inclure les champs `role` et `garage_id` dans les payloads / tables / responses pertinents
-- Appliquer `requireRole('PRO')` (ou plus haut) sur les endpoints qui modifient des données métier
-- L'endpoint POST `/ordres-reparation` a déjà `requireRole('PRO')` comme référence d'usage
+- Appliquer `requireRole('MECANO')` (minimum) sur les endpoints garage — `requireRole('PRO')` pour modifications admin
+- Référence : `GET /garage/session-policy` (MECANO+) et `PATCH /garage/session-policy` (PRO+)
 
 ---
 
@@ -123,6 +141,7 @@ ADMIN
 | **L7b endpoints** | `register`, `login`, `logout`, `password-reset`, `password-reset/confirm` (lien + OTP) | 7/7 validés en prod (commit `4cf896e`). Envoi email réel pending `RESEND_API_KEY` côté Railway env. |
 | **L3c-a** | Catalogue pièces (table `catalogue_pieces`) + autocomplete dans formulaire OR édition | Commit `1dfe935`, fix UUID `6998ca8`. Backend + frontend livrés. |
 | **L3c-b** | Scanner code-barres EAN-13/8/UPC-A via `zxing@0.21.3` dans picker pièces OR | Commit `310add6` (04/05/2026). Multi-scan avec dédup par `piece_id` (qte += 1 sur rescan). Debounce 1.5s. Fallback saisie manuelle si caméra inaccessible. Libération caméra sur tous chemins de sortie (X, Annuler, Terminer, Échap, backdrop). Validé prod : OR-2026-0003 reçu 2 pièces dont 1 catalogue (07BB37SA Plaquettes Brembo). Test C11 cleanup caméra : à valider en conditions réelles atelier (tablette). |
+| **L4 v2 RBAC** | 21 endpoints PRO→MECANO, stripFinancialFields supprimé, rbac_role exposé au login, timer inactivité MECANO, section Paramètres avec politique session | Commits `e2baba5` / `ef04588` / `ce87bb4` (06/05/2026). Migration SQL `10_mecano_session_timeout.sql` **à appliquer manuellement en prod** (Supabase Dashboard). Dette hardening avant 1er garage testeur. |
 
 ### 🔍 Statut à vérifier
 
