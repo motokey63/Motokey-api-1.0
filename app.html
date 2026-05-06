@@ -209,6 +209,7 @@ input,select,textarea{font-family:inherit}
     <button class="nav-btn" onclick="nav('pneus',this)">Pneus</button>
     <button class="nav-btn" onclick="nav('or',this)">OR</button>
     <button class="nav-btn" onclick="nav('devis',this)">Devis</button>
+    <button class="nav-btn" id="navParams" onclick="nav('params',this)">Paramètres</button>
     <div class="nav-end">
       <span class="nav-user" id="navUser"></span>
       <button class="btn-logout" onclick="doLogout()">Déconnexion</button>
@@ -237,6 +238,16 @@ let currentOR    = null;
 let currentORHist = [];
 const orEditState = { editing: false, taches: [], pieces: [], dirty: false };
 const orPiecePicker = { searchDebounce: null };
+
+// ── RBAC frontend ──
+let CURRENT_ROLE = 'CONCESSION';
+function isMecano() { return CURRENT_ROLE === 'MECANO'; }
+function isPro()    { return CURRENT_ROLE !== 'MECANO'; }
+
+// ── Timer inactivité (MECANO) ──
+let _inactTimer = null;
+let _inactLastActivity = Date.now();
+let _inactTimeoutMs = 0;
 
 // ── HASH ROUTING (OR fiche) ──
 function parseORHash() {
@@ -280,9 +291,12 @@ async function doLogin() {
   try {
     const data = await api('/auth/login', 'POST', { email, password: pass, role: 'garage' });
     TOKEN = data.token;
+    CURRENT_ROLE = data.rbac_role || 'CONCESSION';
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('appShell').style.display = 'block';
     document.getElementById('navUser').textContent = data.garage?.nom || email;
+    applyRoleUI();
+    startInactivityTimer();
     await loadDashboard();
   } catch(e) {
     err.textContent = e.message;
@@ -291,7 +305,8 @@ async function doLogin() {
 }
 
 function doLogout() {
-  TOKEN = ''; motos = []; selectedMoto = null;
+  clearInterval(_inactTimer); _inactTimer = null; _inactTimeoutMs = 0;
+  TOKEN = ''; CURRENT_ROLE = 'CONCESSION'; motos = []; selectedMoto = null;
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('appShell').style.display = 'none';
 }
@@ -299,6 +314,107 @@ function doLogout() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') doLogin();
 });
+
+// ── RBAC UI ──
+function applyRoleUI() {
+  const hide = isMecano();
+  document.getElementById('navParams').style.display = hide ? 'none' : '';
+}
+
+// ── TIMER INACTIVITÉ (C2) ── MECANO uniquement
+async function startInactivityTimer() {
+  clearInterval(_inactTimer); _inactTimer = null;
+  if (!isMecano()) return;
+  try {
+    const d = await api('/garage/session-policy');
+    _inactTimeoutMs = (d.mecano_session_timeout_minutes || 60) * 60 * 1000;
+  } catch(e) {
+    _inactTimeoutMs = 60 * 60 * 1000;
+  }
+  _inactLastActivity = Date.now();
+  ['mousemove','keydown','touchstart','click','scroll'].forEach(function(ev) {
+    document.addEventListener(ev, _resetInactivity, { passive: true });
+  });
+  _inactTimer = setInterval(function() {
+    if (_inactTimeoutMs > 0 && Date.now() - _inactLastActivity >= _inactTimeoutMs) {
+      clearInterval(_inactTimer); _inactTimer = null;
+      ['mousemove','keydown','touchstart','click','scroll'].forEach(function(ev) {
+        document.removeEventListener(ev, _resetInactivity);
+      });
+      doLogout();
+      toast('Session expirée — inactivité MÉCANO');
+    }
+  }, 30000);
+}
+function _resetInactivity() { _inactLastActivity = Date.now(); }
+
+// ── PARAMS GARAGE (C1 / C3) ──
+async function renderParams() {
+  const m = document.getElementById('main');
+  if (isMecano()) {
+    m.innerHTML = '<div class="card" style="max-width:640px"><div class="alert alert-warn">Paramètres non disponibles pour le rôle MÉCANO — contactez le gérant du garage.</div></div>';
+    return;
+  }
+  m.innerHTML = '<div class="loading">Chargement…</div>';
+  let curTimeout = 60;
+  try {
+    const d = await api('/garage/session-policy');
+    curTimeout = d.mecano_session_timeout_minutes || 60;
+  } catch(e) {}
+  m.innerHTML =
+    '<div class="section-header"><div><div class="section-title">Paramètres</div><div class="section-sub">Configuration du garage</div></div></div>' +
+
+    // Section entité — masquée pour MECANO (déjà court-circuité ci-dessus)
+    '<div id="paramsSectionEntite" class="card" style="margin-bottom:16px;max-width:700px">' +
+      '<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">Entité</div>' +
+      '<div class="row-2">' +
+        '<div class="field"><label>Raison sociale</label><input id="pNom" placeholder="Motolab"></div>' +
+        '<div class="field"><label>SIRET</label><input id="pSiret" placeholder="12345678900012"></div>' +
+      '</div>' +
+      '<div class="row-2">' +
+        '<div class="field"><label>Adresse</label><input id="pAdresse" placeholder="12 rue des Motos, 75001 Paris"></div>' +
+        '<div class="field"><label>Téléphone</label><input id="pTel" placeholder="06 12 34 56 78"></div>' +
+      '</div>' +
+      '<div class="field"><label>RIB / IBAN</label><input id="pRib" placeholder="FR76…"></div>' +
+      '<div style="margin-top:6px"><button class="btn btn-primary btn-sm" onclick="toast(\'Enregistrement entité — à venir\')">Enregistrer</button></div>' +
+    '</div>' +
+
+    // Section gestion utilisateurs — masquée pour MECANO
+    '<div id="paramsSectionUsers" class="card" style="margin-bottom:16px;max-width:700px">' +
+      '<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">Utilisateurs</div>' +
+      '<p style="font-size:13px;color:var(--text2);margin-bottom:12px">Comptes MÉCANO et accès PRO du garage.</p>' +
+      '<button class="btn btn-secondary btn-sm" onclick="toast(\'Gestion utilisateurs — à venir\')">Gérer les utilisateurs</button>' +
+    '</div>' +
+
+    // Section abonnement — masquée pour MECANO
+    '<div id="paramsSectionAbonnement" class="card" style="margin-bottom:16px;max-width:700px">' +
+      '<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">Abonnement</div>' +
+      '<p style="font-size:13px;color:var(--text2)">Plan actuel : <strong>MotoKey Pro</strong></p>' +
+    '</div>' +
+
+    // Section politique session — C1 — masquée pour MECANO
+    '<div id="paramsSectionPolicy" class="card" style="max-width:700px">' +
+      '<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">Sécurité session MÉCANO</div>' +
+      '<p style="font-size:13px;color:var(--text2);margin-bottom:14px">Durée d\'inactivité avant déconnexion automatique des comptes MÉCANO.</p>' +
+      '<div style="display:flex;gap:20px;flex-wrap:wrap">' +
+        [15,60,480].map(function(v) {
+          const lbl = v===15 ? '15 min (strict)' : v===60 ? '1 heure (modéré)' : '8 heures (souple)';
+          return '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">' +
+            '<input type="radio" name="sessionTimeout" value="' + v + '"' + (curTimeout===v?' checked':'') + ' onchange="saveSessionPolicy(' + v + ')">' +
+            lbl + '</label>';
+        }).join('') +
+      '</div>' +
+    '</div>';
+}
+
+async function saveSessionPolicy(minutes) {
+  try {
+    await api('/garage/session-policy', 'PATCH', { mecano_session_timeout_minutes: minutes });
+    toast('Politique de session mise à jour');
+  } catch(e) {
+    toast('Erreur : ' + e.message);
+  }
+}
 
 // ── NAVIGATION ──
 function nav(section, btn) {
@@ -312,6 +428,7 @@ function nav(section, btn) {
   else if (section === 'pneus') renderPneus();
   else if (section === 'or')   loadOR();
   else if (section === 'devis') loadDevis();
+  else if (section === 'params') renderParams();
 }
 
 // ── DASHBOARD ──
