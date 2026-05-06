@@ -142,6 +142,7 @@ async function inferLegacyRole(garageId, SBLayer) {
  *                  total, total_ht, total_ttc, remise, remise_pct,
  *                  remise_note, remise_type
  */
+// DÉPRÉCIÉ L4 v2 — MÉCANO accède maintenant aux champs financiers. Plus appelé dans motokey-api.js.
 function stripFinancialFields(obj, ctx) {
   if (!ctx || ctx.role !== 'MECANO') return obj;
   const FIELDS = [

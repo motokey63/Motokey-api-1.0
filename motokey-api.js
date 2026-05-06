@@ -535,9 +535,10 @@ const server = http.createServer(async function(req, res){
         if (role === 'garage') {
           const result = await SBLayer.Auth.loginGarage({ email, password });
           const g = result.garage;
+          const rbac_role = result.session?.user?.app_metadata?.role || 'CONCESSION';
           return ok(res, {
             token: jwtSign({ id: g.id, role: 'garage', email, nom: g.nom }),
-            role: 'garage', garage: g
+            role: 'garage', rbac_role, garage: g
           }, 'Connexion réussie');
         } else {
           const result = await SBLayer.Auth.loginClient({ email, password });
@@ -558,7 +559,7 @@ const server = http.createServer(async function(req, res){
       const g = DB.garages.find(function(x){return x.email===email&&x.password===h;});
       if(!g) return fail(res,'Identifiants incorrects',401,'INVALID_CREDENTIALS');
       const {password:_,...gd} = g;
-      return ok(res,{token:jwtSign({id:g.id,role:'garage',email,nom:g.nom}),role:'garage',garage:gd},'Connexion réussie');
+      return ok(res,{token:jwtSign({id:g.id,role:'garage',email,nom:g.nom}),role:'garage',rbac_role:'CONCESSION',garage:gd},'Connexion réussie');
     } else {
       const c = DB.clients.find(function(x){return x.email===email&&x.password===h;});
       if(!c) return fail(res,'Identifiants incorrects',401,'INVALID_CREDENTIALS');
@@ -657,11 +658,11 @@ const server = http.createServer(async function(req, res){
   }
 
   if((p=M('POST','/motos'))!==null){
-    // RBAC: PRO minimum — CLIENT et MECANO rejetés
+    // RBAC: MECANO minimum — CLIENT rejeté
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
 
     const {marque,modele,annee,plaque,vin,km,client_email,client_nom,client_tel} = b;
     if(!marque||!modele||!plaque||!vin) return fail(res,'marque, modele, plaque et vin requis');
@@ -736,11 +737,11 @@ const server = http.createServer(async function(req, res){
   }
 
   if((p=M('PUT','/motos/:id'))!==null){
-    // RBAC: PRO minimum — CLIENT et MECANO rejetés
+    // RBAC: MECANO minimum — CLIENT rejeté
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
 
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -782,11 +783,11 @@ const server = http.createServer(async function(req, res){
   }
 
   if((p=M('GET','/motos/:id/score'))!==null){
-    // RBAC: PRO minimum — outil garage uniquement
+    // RBAC: MECANO minimum — outil garage
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
 
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -837,7 +838,7 @@ const server = http.createServer(async function(req, res){
       return ok(res, { interventions: is, total: is.length });
     }
 
-    // MECANO minimum pour les rôles garage — stripFinancialFields pour MECANO
+    // MECANO minimum pour les rôles garage
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -845,14 +846,14 @@ const server = http.createServer(async function(req, res){
     if (USE_SUPABASE && SBLayer) {
       try {
         const is = await SBLayer.Interventions.list(p.id, garageId, { type: query.type });
-        return ok(res, { interventions: rbac.stripFinancialFields(is, ctx), total: is.length });
+        return ok(res, { interventions: is, total: is.length });
       } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
     }
 
     // ── RAM fallback ──
     let is = DB.interventions.filter(function(i){return i.moto_id===p.id;}).sort(function(a,b){return (b.created_at||'').localeCompare(a.created_at||'');});
     if(query.type) is = is.filter(function(i){return i.type===query.type;});
-    return ok(res, { interventions: rbac.stripFinancialFields(is, ctx), total: is.length });
+    return ok(res, { interventions: is, total: is.length });
   }
 
   if((p=M('POST','/motos/:id/interventions'))!==null){
@@ -897,11 +898,11 @@ const server = http.createServer(async function(req, res){
   }
 
   if((p=M('PUT','/motos/:id/interventions/:iid'))!==null){
-    // RBAC: PRO minimum (RAM uniquement)
+    // RBAC: MECANO minimum (RAM uniquement)
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
 
     const i = DB.interventions.findIndex(function(x){return x.id===p.iid&&x.moto_id===p.id;});
     if(i<0) return fail(res,'Intervention non trouvée',404,'NOT_FOUND');
@@ -910,11 +911,11 @@ const server = http.createServer(async function(req, res){
   }
 
   if((p=M('DELETE','/motos/:id/interventions/:iid'))!==null){
-    // RBAC: PRO minimum (RAM uniquement)
+    // RBAC: MECANO minimum (RAM uniquement)
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
 
     const i = DB.interventions.findIndex(function(x){return x.id===p.iid&&x.moto_id===p.id;});
     if(i<0) return fail(res,'Intervention non trouvée',404,'NOT_FOUND');
@@ -955,11 +956,10 @@ const server = http.createServer(async function(req, res){
 
   /* DEVIS */
   if((p=M('GET','/devis'))!==null){
-    // RBAC: MECANO rejeté (403), CLIENT voit ses propres devis, PRO+ voit le garage
+    // RBAC: MECANO minimum — CLIENT voit ses propres devis, MECANO+ voit le garage
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (rbac.requireAnyRole(ctx, ['MECANO'])) return fail(res, 'Permission refusée — accès devis interdit aux MECANO', 403, 'FORBIDDEN_ROLE');
 
     // CLIENT : ses propres devis (via ses motos)
     if (rbac.requireAnyRole(ctx, ['CLIENT'])) {
@@ -981,8 +981,8 @@ const server = http.createServer(async function(req, res){
       return ok(res, { devis: list, total: list.length });
     }
 
-    // PRO+ : tous les devis du garage
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
+    // MECANO+ : tous les devis du garage
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
 
@@ -1001,11 +1001,11 @@ const server = http.createServer(async function(req, res){
   }
 
   if((p=M('POST','/devis'))!==null){
-    // RBAC: PRO minimum — CLIENT et MECANO rejetés
+    // RBAC: MECANO minimum — CLIENT rejeté
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
 
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -1027,11 +1027,11 @@ const server = http.createServer(async function(req, res){
   }
 
   if((p=M('GET','/devis/:id'))!==null){
-    // RBAC: PRO minimum — opération garage uniquement
+    // RBAC: MECANO minimum — opération garage uniquement
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
 
@@ -1051,11 +1051,11 @@ const server = http.createServer(async function(req, res){
   }
 
   if((p=M('PUT','/devis/:id'))!==null){
-    // RBAC: PRO minimum
+    // RBAC: MECANO minimum
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
 
@@ -1073,11 +1073,11 @@ const server = http.createServer(async function(req, res){
   }
 
   if((p=M('POST','/devis/:id/valider'))!==null){
-    // RBAC: PRO minimum
+    // RBAC: MECANO minimum
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
 
@@ -1107,7 +1107,7 @@ const server = http.createServer(async function(req, res){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
     const dv = DB.devis.find(function(d){return d.id===p.id&&d.garage_id===garageId;});
@@ -1117,7 +1117,11 @@ const server = http.createServer(async function(req, res){
 
   /* FRAUDE */
   if((p=M('POST','/fraude/analyser'))!==null){
-    const a = auth(req,res); if(!a) return;
+    // RBAC: MECANO minimum — outil métier atelier (vérification pendant OR)
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const {moto_id,garage_nom,garage_type,montant,km,description,qr_code,signature} = b;
     if(!montant||!km) return fail(res,'montant et km requis');
     const r = analyserFraude({garage_type:garage_type||'ok',qr_code:qr_code||'',signature:signature||'none',montant:parseFloat(montant),km:parseInt(km),description:description||''});
@@ -1127,10 +1131,16 @@ const server = http.createServer(async function(req, res){
   }
 
   if((p=M('GET','/fraude/historique'))!==null){
-    const a = auth(req,res); if(!a) return;
+    // RBAC: MECANO minimum — historique des vérifications du garage
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
     if (USE_SUPABASE && SBLayer) {
       try {
-        const list = await SBLayer.Fraude.historique(a.id);
+        const list = await SBLayer.Fraude.historique(garageId);
         return ok(res, { verifications: list, total: list.length });
       } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
     }
@@ -1139,20 +1149,26 @@ const server = http.createServer(async function(req, res){
 
   /* TRANSFERT */
   if((p=M('POST','/transfert/initier'))!==null){
-    const a = auth(req,res); if(!a) return;
+    // RBAC: PRO+ uniquement (zone admin entité) — acte juridique transfert de propriété
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
     const {moto_id,acheteur_nom,acheteur_email,prix,km_cession,notes} = b;
     if(!moto_id||!acheteur_nom||!prix) return fail(res,'moto_id, acheteur_nom et prix requis');
     if (USE_SUPABASE && SBLayer) {
       try {
-        const result = await SBLayer.Transferts.initier(a.id, { moto_id, acheteur_nom, acheteur_email, prix, km_cession, notes });
+        const result = await SBLayer.Transferts.initier(garageId, { moto_id, acheteur_nom, acheteur_email, prix, km_cession, notes });
         return ok(res, result, 'Code généré · SMS envoyé', 201);
       } catch(e) { return fail(res, e.message, 400, 'ERROR'); }
     }
     // ── RAM fallback ──
-    const m = DB.motos.find(function(x){return x.id===moto_id&&x.garage_id===a.id;});
+    const m = DB.motos.find(function(x){return x.id===moto_id&&x.garage_id===garageId;});
     if(!m) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
     const code = 'MK-TR-'+Math.random().toString(36).substring(2,6).toUpperCase();
-    const tr   = {id:'tr-'+uid(),code,moto_id,garage_id:a.id,vendeur_id:m.client_id,acheteur_nom,acheteur_email:acheteur_email||'',prix,km_cession:km_cession||m.km,notes:notes||'',statut:'initie',expire_at:new Date(Date.now()+172800000).toISOString(),created_at:nowISO(),steps:[{etape:'initie',at:nowISO(),par:'garage'}]};
+    const tr   = {id:'tr-'+uid(),code,moto_id,garage_id:garageId,vendeur_id:m.client_id,acheteur_nom,acheteur_email:acheteur_email||'',prix,km_cession:km_cession||m.km,notes:notes||'',statut:'initie',expire_at:new Date(Date.now()+172800000).toISOString(),created_at:nowISO(),steps:[{etape:'initie',at:nowISO(),par:'garage'}]};
     DB.transferts.push(tr);
     return ok(res,{transfert:tr,code,expire_dans:'48 heures'},'Code généré · SMS envoyé',201);
   }
@@ -1268,30 +1284,42 @@ const server = http.createServer(async function(req, res){
 
   /* PARAMS & STATS */
   if((p=M('GET','/params'))!==null){
-    const a = auth(req,res); if(!a) return;
+    // RBAC: MECANO minimum — lecture paramètres garage
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
     if (USE_SUPABASE && SBLayer) {
       try {
-        const g = await SBLayer.Garages.getById(a.id);
+        const g = await SBLayer.Garages.getById(garageId);
         return ok(res, { params: g });
       } catch(e) { return fail(res, 'Garage non trouvé', 404, 'NOT_FOUND'); }
     }
     // ── RAM fallback ──
-    const g = DB.garages.find(function(x){return x.id===a.id;});
+    const g = DB.garages.find(function(x){return x.id===garageId;});
     if(!g) return fail(res,'Garage non trouvé',404,'NOT_FOUND');
     const {password:_,...gd} = g;
     return ok(res,{params:gd});
   }
 
   if((p=M('PUT','/params'))!==null){
-    const a = auth(req,res); if(!a) return;
+    // RBAC: MECANO minimum — mise à jour paramètres garage
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
     if (USE_SUPABASE && SBLayer) {
       try {
-        const g = await SBLayer.Garages.update(a.id, b);
+        const g = await SBLayer.Garages.update(garageId, b);
         return ok(res, { params: g }, 'Paramètres mis à jour');
       } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
     }
     // ── RAM fallback ──
-    const i = DB.garages.findIndex(function(x){return x.id===a.id;});
+    const i = DB.garages.findIndex(function(x){return x.id===garageId;});
     if(i<0) return fail(res,'Garage non trouvé',404,'NOT_FOUND');
     ['nom','tel','adresse','siret','taux_std','taux_spec','tva','techniciens'].forEach(function(k){if(b[k]!==undefined)DB.garages[i][k]=b[k];});
     const {password:_,...gd} = DB.garages[i];
@@ -1299,25 +1327,31 @@ const server = http.createServer(async function(req, res){
   }
 
   if((p=M('GET','/stats'))!==null){
-    const a = auth(req,res); if(!a) return;
+    // RBAC: MECANO minimum — tableau de bord garage
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
     if (USE_SUPABASE && SBLayer) {
       try {
-        const stats = await SBLayer.Garages.getStats(a.id);
+        const stats = await SBLayer.Garages.getStats(garageId);
         return ok(res, stats);
       } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
     }
     // ── RAM fallback ──
-    const ms = DB.motos.filter(function(m){return m.garage_id===a.id;});
+    const ms = DB.motos.filter(function(m){return m.garage_id===garageId;});
     const co = {vert:0,bleu:0,jaune:0,rouge:0};
     ms.forEach(function(m){co[m.couleur_dossier]=(co[m.couleur_dossier]||0)+1;});
-    const is  = DB.interventions.filter(function(i){return i.garage_id===a.id;});
-    const dvs = DB.devis.filter(function(d){return d.garage_id===a.id;});
+    const is  = DB.interventions.filter(function(i){return i.garage_id===garageId;});
+    const dvs = DB.devis.filter(function(d){return d.garage_id===garageId;});
     const ca  = dvs.filter(function(d){return d.statut==='valide';}).reduce(function(s,d){return s+calcDevis(d).total_ttc;},0);
     return ok(res,{
       motos:{total:ms.length,par_couleur:co},
       interventions:{total:is.length,par_type:{vert:is.filter(function(i){return i.type==='vert';}).length,bleu:is.filter(function(i){return i.type==='bleu';}).length,jaune:is.filter(function(i){return i.type==='jaune';}).length,rouge:is.filter(function(i){return i.type==='rouge';}).length}},
       devis:{total:dvs.length,valides:dvs.filter(function(d){return d.statut==='valide';}).length,ca_ttc:+ca.toFixed(2),ca_ht:+(ca/1.2).toFixed(2)},
-      transferts:{total:DB.transferts.filter(function(t){return t.garage_id===a.id;}).length,finalises:DB.transferts.filter(function(t){return t.garage_id===a.id&&t.statut==='finalise';}).length},
+      transferts:{total:DB.transferts.filter(function(t){return t.garage_id===garageId;}).length,finalises:DB.transferts.filter(function(t){return t.garage_id===garageId&&t.statut==='finalise';}).length},
       fraude:{total:DB.fraude_verifications.length,authentifiees:DB.fraude_verifications.filter(function(f){return f.verdict==='authentifie';}).length,suspectes:DB.fraude_verifications.filter(function(f){return f.verdict==='fraude_suspectee';}).length}
     });
   }
@@ -1326,17 +1360,67 @@ const server = http.createServer(async function(req, res){
 
   // GET /entites-facturation — liste les entités de facturation du garage connecté
   if((p=M('GET','/entites-facturation'))!==null){
-    const a = auth(req,res); if(!a) return;
+    // RBAC: PRO+ uniquement (zone admin entité) — raison sociale, SIRET, RIB
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
     if(USE_SUPABASE && SBLayer){
       const { data, error } = await SBLayer.supabase
         .from('entites_facturation')
         .select('*')
-        .eq('garage_id', a.id)
+        .eq('garage_id', garageId)
         .order('created_at', { ascending: false });
       if(error) return fail(res, error.message, 500, 'DB_ERROR');
       return ok(res, data || []);
     }
     return ok(res, []);
+  }
+
+  /* ── SESSION POLICY ── */
+
+  if((p=M('GET','/garage/session-policy'))!==null){
+    // RBAC: tous rôles authentifiés du garage (lecture seule)
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const g = await SBLayer.Garages.getById(garageId);
+        return ok(res, { mecano_session_timeout_minutes: g.mecano_session_timeout_minutes || 60 });
+      } catch(e) { return fail(res, 'Garage non trouvé', 404, 'NOT_FOUND'); }
+    }
+    const g = DB.garages.find(function(x){return x.id===garageId;});
+    return ok(res, { mecano_session_timeout_minutes: (g && g.mecano_session_timeout_minutes) || 60 });
+  }
+
+  if((p=M('PATCH','/garage/session-policy'))!==null){
+    // RBAC: PRO+ uniquement — MECANO ne peut pas modifier sa propre politique de session
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+    const { mecano_session_timeout_minutes } = b;
+    if (![15, 60, 480].includes(mecano_session_timeout_minutes)) {
+      return fail(res, 'mecano_session_timeout_minutes doit être 15, 60 ou 480', 400, 'INVALID_INPUT');
+    }
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const g = await SBLayer.Garages.update(garageId, { mecano_session_timeout_minutes });
+        return ok(res, { mecano_session_timeout_minutes: g.mecano_session_timeout_minutes }, 'Politique de session mise à jour');
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+    const i = DB.garages.findIndex(function(x){return x.id===garageId;});
+    if (i<0) return fail(res, 'Garage non trouvé', 404, 'NOT_FOUND');
+    DB.garages[i].mecano_session_timeout_minutes = mecano_session_timeout_minutes;
+    return ok(res, { mecano_session_timeout_minutes }, 'Politique de session mise à jour');
   }
 
   /* ── LIVRAISON 7a : AUTH CLIENT ── */
@@ -1616,11 +1700,11 @@ const server = http.createServer(async function(req, res){
   }
 
   if((p=M('POST','/ordres-reparation'))!==null){
-    // RBAC: PRO minimum — création OR réservée PRO et au-dessus
+    // RBAC: MECANO minimum — création OR réservée PRO et au-dessus
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
 
@@ -1694,11 +1778,11 @@ const server = http.createServer(async function(req, res){
   }
 
   if((p=M('PUT','/ordres-reparation/:id'))!==null){
-    // RBAC: PRO minimum — édition OR
+    // RBAC: MECANO minimum — édition OR
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
 
@@ -1772,11 +1856,11 @@ const server = http.createServer(async function(req, res){
   }
 
   if((p=M('POST','/ordres-reparation/:id/cloturer'))!==null){
-    // RBAC: PRO minimum — clôture engage la facturation
+    // RBAC: MECANO minimum — clôture engage la facturation
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
 
@@ -1873,7 +1957,7 @@ const server = http.createServer(async function(req, res){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
     const { nouveau_statut, attente_motif, signature_base64 } = b;
@@ -1912,7 +1996,7 @@ const server = http.createServer(async function(req, res){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
     const { signature_base64 } = b;
@@ -2280,7 +2364,7 @@ const server = http.createServer(async function(req, res){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
 
@@ -2323,7 +2407,7 @@ const server = http.createServer(async function(req, res){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
 
@@ -2386,7 +2470,7 @@ const server = http.createServer(async function(req, res){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
 
@@ -2408,7 +2492,7 @@ const server = http.createServer(async function(req, res){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
 
@@ -2430,7 +2514,7 @@ const server = http.createServer(async function(req, res){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
 
