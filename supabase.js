@@ -128,8 +128,27 @@ const Auth = {
   async loginGarage({ email, password }) {
     const { data, error } = await supabasePublic.auth.signInWithPassword({ email, password });
     if (error) throw new Error('Identifiants incorrects');
-    const garage = await query('garages', { auth_user_id: data.user.id }, { single: true });
-    return { session: data.session, garage };
+
+    // 1. Owner check — CONCESSION/PRO propriétaires d'un garage
+    const { data: g1 } = await supabase
+      .from('garages').select('*')
+      .eq('auth_user_id', data.user.id)
+      .maybeSingle();
+    if (g1) return { session: data.session, garage: g1 };
+
+    // 2. Fallback — MECANO/PRO employés via garage_users
+    const { data: gu } = await supabase
+      .from('garage_users').select('garage_id')
+      .eq('auth_user_id', data.user.id).eq('actif', true)
+      .maybeSingle();
+    if (!gu) throw new Error('Identifiants incorrects');
+
+    const { data: g2 } = await supabase
+      .from('garages').select('*')
+      .eq('id', gu.garage_id)
+      .maybeSingle();
+    if (!g2) throw new Error('Garage introuvable');
+    return { session: data.session, garage: g2 };
   },
 
   async loginClient({ email, password }) {
