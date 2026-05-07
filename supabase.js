@@ -155,7 +155,7 @@ const Garages = {
   },
 
   async update(id, payload) {
-    const allowed = ['nom','tel','adresse','siret','taux_std','taux_spec','tva','sms_active'];
+    const allowed = ['nom','tel','adresse','siret','taux_std','taux_spec','tva','sms_active','mecano_session_timeout_minutes'];
     const clean   = Object.fromEntries(Object.entries(payload).filter(([k]) => allowed.includes(k)));
     return update('garages', id, clean);
   },
