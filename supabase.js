@@ -103,6 +103,13 @@ const Auth = {
     });
     if (authError) throw new Error(`Auth: ${authError.message}`);
 
+    // 1b. Poser le rôle CONCESSION dans app_metadata (non falsifiable côté client)
+    const { error: roleErr } = await supabase.auth.admin.updateUserById(
+      authData.user.id,
+      { app_metadata: { role: 'CONCESSION' } }
+    );
+    if (roleErr) console.warn('[register] role assignment failed for', authData.user.id, '—', roleErr.message);
+
     // 2. Créer le profil garage
     const garage = await insert('garages', {
       auth_user_id: authData.user.id,
