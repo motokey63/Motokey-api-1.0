@@ -383,7 +383,7 @@ async function renderParams() {
     '<div id="paramsSectionUsers" class="card" style="margin-bottom:16px;max-width:700px">' +
       '<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">Utilisateurs</div>' +
       '<p style="font-size:13px;color:var(--text2);margin-bottom:12px">Comptes MÉCANO et accès PRO du garage.</p>' +
-      '<button class="btn btn-secondary btn-sm" onclick="toast(\'Gestion utilisateurs — à venir\')">Gérer les utilisateurs</button>' +
+      '<button class="btn btn-secondary btn-sm" onclick="openUsersManager()">Gérer les utilisateurs</button>' +
     '</div>' +
 
     // Section abonnement — masquée pour MECANO
@@ -1958,6 +1958,211 @@ async function submitNewOR() {
     err.textContent = e.message; err.style.display = 'block';
     btn.disabled = false; btn.textContent = 'Créer l\'OR';
   }
+}
+
+// ── GESTION UTILISATEURS (L4 v2 hardening) ──
+let _usersData = {};
+
+function openUsersManager() {
+  let ov = document.getElementById('umOverlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'umOverlay';
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;display:flex;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto';
+    ov.innerHTML =
+      '<div style="background:var(--bg2);border-radius:var(--r);width:100%;max-width:700px;box-shadow:0 8px 40px rgba(0,0,0,.15)">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--border)">' +
+          '<div style="font-size:17px;font-weight:700">Gérer les utilisateurs</div>' +
+          '<div style="display:flex;gap:8px">' +
+            '<button class="btn btn-primary btn-sm" onclick="openAddUser()">+ Ajouter</button>' +
+            '<button class="btn btn-secondary btn-sm" onclick="closeUsersManager()">✕</button>' +
+          '</div>' +
+        '</div>' +
+        '<div id="umBody" style="padding:24px"><div class="loading">Chargement…</div></div>' +
+      '</div>';
+    ov.addEventListener('click', function(e){ if(e.target===ov) closeUsersManager(); });
+    document.body.appendChild(ov);
+  } else {
+    ov.style.display = 'flex';
+    document.getElementById('umBody').innerHTML = '<div class="loading">Chargement…</div>';
+  }
+  _umLoad();
+}
+
+async function _umLoad() {
+  try {
+    const d = await api('/garage/users');
+    _usersData = {};
+    (d.users || []).forEach(function(u){ _usersData[u.id] = u; });
+    _umRender(d.users || []);
+  } catch(e) {
+    const b = document.getElementById('umBody');
+    if (b) b.innerHTML = '<div class="alert alert-warn">Erreur : ' + e.message + '</div>';
+  }
+}
+
+function _umRender(users) {
+  const b = document.getElementById('umBody');
+  if (!b) return;
+  if (!users.length) {
+    b.innerHTML = '<p style="font-size:13px;color:var(--text2);text-align:center;padding:24px 0">Aucun utilisateur. Cliquez sur <strong>+ Ajouter</strong> pour créer un compte MÉCANO ou PRO.</p>';
+    return;
+  }
+  b.innerHTML = '<table class="table"><thead><tr>' +
+    '<th>Email</th><th>Rôle</th><th>Créé le</th><th style="text-align:center">Actif</th><th>Actions</th>' +
+    '</tr></thead><tbody>' +
+    users.map(function(u) {
+      const dt = u.created_at ? new Date(u.created_at).toLocaleDateString('fr-FR') : '—';
+      const badge = u.role === 'MECANO' ? '<span class="badge badge-jaune">MÉCANO</span>' : '<span class="badge badge-bleu">PRO</span>';
+      const actif = u.actif ? '<span style="color:var(--success);font-weight:700">✓</span>' : '<span style="color:var(--danger);font-weight:700">✗</span>';
+      return '<tr>' +
+        '<td style="font-size:13px">' + u.email + '</td>' +
+        '<td>' + badge + '</td>' +
+        '<td style="font-size:12px;color:var(--text2)">' + dt + '</td>' +
+        '<td style="text-align:center">' + actif + '</td>' +
+        '<td>' +
+          '<button class="btn btn-secondary btn-sm" onclick="openEditUser(\'' + u.id + '\')">✏️</button> ' +
+          '<button class="btn btn-danger btn-sm" onclick="confirmDeactivateUser(\'' + u.id + '\')" style="margin-left:4px">🗑️</button>' +
+        '</td></tr>';
+    }).join('') +
+    '</tbody></table>';
+}
+
+function closeUsersManager() {
+  const el = document.getElementById('umOverlay');
+  if (el) el.style.display = 'none';
+  closeAddUser(); closeEditUser();
+}
+
+function openAddUser() {
+  let el = document.getElementById('umAddOverlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'umAddOverlay';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1010;display:flex;align-items:center;justify-content:center;padding:16px';
+    el.innerHTML =
+      '<div class="card" style="width:100%;max-width:420px">' +
+        '<div style="font-size:16px;font-weight:700;margin-bottom:18px">Ajouter un utilisateur</div>' +
+        '<div class="field"><label>Email</label><input id="umAddEmail" type="email" placeholder="prenom.nom@garage.fr"></div>' +
+        '<div class="field"><label>Mot de passe <span style="font-weight:400;color:var(--text2)">(min. 8 caractères)</span></label><input id="umAddPwd" type="password" placeholder="••••••••"></div>' +
+        '<div class="field"><label>Rôle</label><div style="display:flex;gap:20px;margin-top:6px">' +
+          '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px"><input type="radio" name="umAddRole" value="MECANO"> MÉCANO</label>' +
+          '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px"><input type="radio" name="umAddRole" value="PRO"> PRO</label>' +
+        '</div></div>' +
+        '<div id="umAddErr" style="display:none;color:var(--danger);font-size:12px;margin-bottom:10px"></div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+          '<button class="btn btn-secondary" onclick="closeAddUser()">Annuler</button>' +
+          '<button class="btn btn-primary" id="umAddBtn" onclick="submitAddUser()">Créer</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(el);
+  } else {
+    el.style.display = 'flex';
+    document.getElementById('umAddEmail').value = '';
+    document.getElementById('umAddPwd').value = '';
+    document.querySelectorAll('[name=umAddRole]').forEach(function(r){ r.checked = false; });
+    document.getElementById('umAddErr').style.display = 'none';
+  }
+}
+
+function closeAddUser() {
+  const el = document.getElementById('umAddOverlay');
+  if (el) el.style.display = 'none';
+}
+
+async function submitAddUser() {
+  const email = document.getElementById('umAddEmail').value.trim();
+  const pwd   = document.getElementById('umAddPwd').value;
+  const role  = (document.querySelector('[name=umAddRole]:checked') || {}).value;
+  const err   = document.getElementById('umAddErr');
+  const btn   = document.getElementById('umAddBtn');
+  err.style.display = 'none';
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { err.textContent = 'Email invalide.'; err.style.display = 'block'; return; }
+  if (pwd.length < 8) { err.textContent = 'Mot de passe : 8 caractères minimum.'; err.style.display = 'block'; return; }
+  if (!role) { err.textContent = 'Sélectionnez un rôle.'; err.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Création…';
+  try {
+    await api('/garage/users', 'POST', { email, password: pwd, role });
+    toast('Utilisateur ' + email + ' créé');
+    closeAddUser();
+    await _umLoad();
+  } catch(e) {
+    err.textContent = e.message.includes('already') ? 'Cet email est déjà utilisé.' : e.message;
+    err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Créer';
+  }
+}
+
+function openEditUser(id) {
+  const u = _usersData[id];
+  if (!u) return;
+  let el = document.getElementById('umEditOverlay');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'umEditOverlay';
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1010;display:flex;align-items:center;justify-content:center;padding:16px';
+    el.innerHTML =
+      '<div class="card" style="width:100%;max-width:420px">' +
+        '<div style="font-size:16px;font-weight:700;margin-bottom:18px">Modifier un utilisateur</div>' +
+        '<div class="field"><label>Email</label><input id="umEditEmail" disabled style="background:var(--bg);color:var(--text2);width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px"></div>' +
+        '<div class="field"><label>Rôle</label><div style="display:flex;gap:20px;margin-top:6px">' +
+          '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px"><input type="radio" name="umEditRole" value="MECANO"> MÉCANO</label>' +
+          '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px"><input type="radio" name="umEditRole" value="PRO"> PRO</label>' +
+        '</div></div>' +
+        '<div class="field"><label>Statut</label>' +
+          '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;margin-top:6px"><input type="checkbox" id="umEditActif"> Compte actif</label>' +
+        '</div>' +
+        '<input type="hidden" id="umEditId">' +
+        '<div id="umEditErr" style="display:none;color:var(--danger);font-size:12px;margin-bottom:10px"></div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+          '<button class="btn btn-secondary" onclick="closeEditUser()">Annuler</button>' +
+          '<button class="btn btn-primary" id="umEditBtn" onclick="submitEditUser()">Enregistrer</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(el);
+  } else {
+    el.style.display = 'flex';
+    document.getElementById('umEditErr').style.display = 'none';
+  }
+  document.getElementById('umEditId').value = u.id;
+  document.getElementById('umEditEmail').value = u.email || '';
+  document.querySelectorAll('[name=umEditRole]').forEach(function(r){ r.checked = r.value === u.role; });
+  document.getElementById('umEditActif').checked = !!u.actif;
+}
+
+function closeEditUser() {
+  const el = document.getElementById('umEditOverlay');
+  if (el) el.style.display = 'none';
+}
+
+async function submitEditUser() {
+  const id    = document.getElementById('umEditId').value;
+  const role  = (document.querySelector('[name=umEditRole]:checked') || {}).value;
+  const actif = document.getElementById('umEditActif').checked;
+  const err   = document.getElementById('umEditErr');
+  const btn   = document.getElementById('umEditBtn');
+  if (!role) { err.textContent = 'Sélectionnez un rôle.'; err.style.display = 'block'; return; }
+  btn.disabled = true; btn.textContent = 'Enregistrement…';
+  try {
+    await api('/garage/users/' + id, 'PATCH', { role, actif });
+    toast('Utilisateur mis à jour');
+    closeEditUser();
+    await _umLoad();
+  } catch(e) {
+    err.textContent = e.message; err.style.display = 'block';
+    btn.disabled = false; btn.textContent = 'Enregistrer';
+  }
+}
+
+async function confirmDeactivateUser(id) {
+  const u = _usersData[id];
+  if (!u) return;
+  if (!confirm('Désactiver l\'utilisateur ' + u.email + ' ?\nIl ne pourra plus se connecter.')) return;
+  try {
+    await api('/garage/users/' + id, 'DELETE');
+    toast(u.email + ' désactivé');
+    await _umLoad();
+  } catch(e) { toast('Erreur : ' + e.message); }
 }
 
 // ── HELPERS ──
