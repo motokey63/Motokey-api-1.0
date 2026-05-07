@@ -116,10 +116,19 @@ ADMIN
 **Migration SQL requise en prod :**
 - `sql/migrations/10_mecano_session_timeout.sql` — `ALTER TABLE garages ADD COLUMN mecano_session_timeout_minutes` — à appliquer via Supabase Dashboard SQL Editor
 
-**⚠️ Dette L4 v2 (avant 1er garage testeur réel) :**
-- Backfill `app_metadata.role` sur tous les comptes garage existants
-- Processus création compte MECANO : forcer `app_metadata.role = 'MECANO'` à la création
-- Test négatif : compte MECANO sans `app_metadata.role` ne bypass pas les restrictions UI
+**✅ Dette L4 v2 — RÉSOLUE (hardening 07/05/2026) :**
+- ~~Backfill `app_metadata.role` sur tous les comptes garage existants~~ → migration 11 appliquée prod
+- ~~Processus création compte MECANO~~ → table `garage_users` + endpoint `POST /garage/users` + UI
+- ~~Test négatif bypass~~ → qualifié prod (test 5 v2 passé 07/05/2026)
+
+**Hardening L4 v2 (07/05/2026) — commits : `f6c2440` `ecc30e5` `fe7abd4` `bd64d38` `075d558` :**
+- `supabase.js registerGarage` pose `app_metadata.role='CONCESSION'` à la création
+- Migration `11_backfill_garage_app_metadata.sql` appliquée prod
+- Table `garage_users` (migration 12) : liaison `auth_user_id ↔ garage_id` avec rôle PRO|MECANO
+- 4 endpoints `/garage/users` (GET/POST/PATCH/DELETE) — RBAC PRO+
+- `getGarageIdForUser` et `loginGarage` : fallback `garage_users` pour MECANO/PRO employés
+- UI "Gérer les utilisateurs" dans Paramètres : CRUD complet en modales, masquée pour MECANO
+- Bugs corrigés : `Garages.update` allowed list, `loginGarage` PGRST116 sur login MECANO
 
 **Pour tout nouveau code :**
 - Inclure les champs `role` et `garage_id` dans les payloads / tables / responses pertinents
@@ -141,7 +150,8 @@ ADMIN
 | **L7b endpoints** | `register`, `login`, `logout`, `password-reset`, `password-reset/confirm` (lien + OTP) | 7/7 validés en prod (commit `4cf896e`). Envoi email réel pending `RESEND_API_KEY` côté Railway env. |
 | **L3c-a** | Catalogue pièces (table `catalogue_pieces`) + autocomplete dans formulaire OR édition | Commit `1dfe935`, fix UUID `6998ca8`. Backend + frontend livrés. |
 | **L3c-b** | Scanner code-barres EAN-13/8/UPC-A via `zxing@0.21.3` dans picker pièces OR | Commit `310add6` (04/05/2026). Multi-scan avec dédup par `piece_id` (qte += 1 sur rescan). Debounce 1.5s. Fallback saisie manuelle si caméra inaccessible. Libération caméra sur tous chemins de sortie (X, Annuler, Terminer, Échap, backdrop). Validé prod : OR-2026-0003 reçu 2 pièces dont 1 catalogue (07BB37SA Plaquettes Brembo). Test C11 cleanup caméra : à valider en conditions réelles atelier (tablette). |
-| **L4 v2 RBAC** | 21 endpoints PRO→MECANO, stripFinancialFields supprimé, rbac_role exposé au login, timer inactivité MECANO, section Paramètres avec politique session | Commits `e2baba5` / `ef04588` / `ce87bb4` (06/05/2026). Migration SQL `10_mecano_session_timeout.sql` **à appliquer manuellement en prod** (Supabase Dashboard). Dette hardening avant 1er garage testeur. |
+| **L4 v2 RBAC** | 21 endpoints PRO→MECANO, stripFinancialFields supprimé, rbac_role exposé au login, timer inactivité MECANO, section Paramètres avec politique session | Commits `e2baba5` / `ef04588` / `ce87bb4` (06/05/2026). Migration `10_mecano_session_timeout.sql` appliquée prod. |
+| **L4 v2 hardening** | table `garage_users`, création MECANO, UI Gérer utilisateurs, fix loginGarage, backfill app_metadata | Commits `f6c2440` `ecc30e5` `fe7abd4` `bd64d38` `075d558` (07/05/2026). Migrations 11+12 appliquées prod. Dette L4 v2 résolue. Test 5 qualifiant passé. |
 
 ### 🔍 Statut à vérifier
 
