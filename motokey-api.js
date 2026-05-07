@@ -1423,6 +1423,81 @@ const server = http.createServer(async function(req, res){
     return ok(res, { mecano_session_timeout_minutes }, 'Politique de session mise à jour');
   }
 
+  /* ── GESTION USERS GARAGE (L4 v2 hardening) ── */
+
+  // GET /garage/users (PRO+) — liste des users du garage
+  if((p=M('GET','/garage/users'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const users = await SBLayer.GarageUsers.list(garageId);
+        return ok(res, { users, total: users.length });
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+    return ok(res, { users: [], total: 0 });
+  }
+
+  // POST /garage/users (PRO+) — créer un compte MECANO ou PRO
+  if((p=M('POST','/garage/users'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+    const { email, password, role } = b;
+    if (!email || !password || !role) return fail(res, 'email, password et role requis', 400, 'MISSING_FIELDS');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail(res, 'Format email invalide', 400, 'INVALID_EMAIL');
+    if (password.length < 8) return fail(res, 'Mot de passe minimum 8 caractères', 400, 'WEAK_PASSWORD');
+    if (!['PRO', 'MECANO'].includes(role)) return fail(res, 'role doit être PRO ou MECANO', 400, 'INVALID_ROLE');
+    if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis pour cette opération', 503, 'SERVICE_UNAVAILABLE');
+    try {
+      const user = await SBLayer.GarageUsers.create({ garageId, email, password, role, createdBy: ctx.user_id });
+      return ok(res, user, 'Utilisateur créé', 201);
+    } catch(e) {
+      const status = e.message.includes('already registered') || e.message.includes('already been registered') ? 409 : 400;
+      return fail(res, e.message, status, status === 409 ? 'DUPLICATE' : 'ERROR');
+    }
+  }
+
+  // PATCH /garage/users/:id (PRO+) — modifier rôle ou actif
+  if((p=M('PATCH','/garage/users/:id'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+    const { role, actif } = b;
+    if (role === undefined && actif === undefined) return fail(res, 'role ou actif requis', 400, 'MISSING_FIELDS');
+    if (role !== undefined && !['PRO', 'MECANO'].includes(role)) return fail(res, 'role doit être PRO ou MECANO', 400, 'INVALID_ROLE');
+    if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis pour cette opération', 503, 'SERVICE_UNAVAILABLE');
+    try {
+      const updated = await SBLayer.GarageUsers.update(p.id, garageId, { role, actif });
+      return ok(res, updated, 'Utilisateur mis à jour');
+    } catch(e) { return fail(res, e.message, e.message.includes('introuvable') ? 404 : 500, e.message.includes('introuvable') ? 'NOT_FOUND' : 'DB_ERROR'); }
+  }
+
+  // DELETE /garage/users/:id (PRO+) — soft delete (actif = false)
+  if((p=M('DELETE','/garage/users/:id'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+    if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis pour cette opération', 503, 'SERVICE_UNAVAILABLE');
+    try {
+      await SBLayer.GarageUsers.softDelete(p.id, garageId);
+      return ok(res, { id: p.id, actif: false }, 'Utilisateur désactivé');
+    } catch(e) { return fail(res, e.message, e.message.includes('introuvable') ? 404 : 500, e.message.includes('introuvable') ? 'NOT_FOUND' : 'DB_ERROR'); }
+  }
+
   /* ── LIVRAISON 7a : AUTH CLIENT ── */
 
   // GET /auth/client/healthz — sanity check, prêt pour 7b si jwt_configured: true

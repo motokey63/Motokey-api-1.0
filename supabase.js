@@ -1107,6 +1107,83 @@ const CataloguePieces = {
 };
 
 // ══════════════════════════════════════════════════════════
+// GARAGE USERS (L4 v2 hardening)
+// ══════════════════════════════════════════════════════════
+const GarageUsers = {
+
+  async list(garageId) {
+    const { data: rows, error } = await supabase
+      .from('garage_users')
+      .select('id, auth_user_id, role, actif, created_at')
+      .eq('garage_id', garageId)
+      .eq('actif', true)
+      .order('created_at', { ascending: true });
+    if (error) throw new Error(`[garage_users] ${error.message}`);
+    // Enrich avec email depuis Auth (N+1 acceptable — comptes par garage < 20)
+    const enriched = await Promise.all((rows || []).map(async row => {
+      const { data: u } = await supabase.auth.admin.getUserById(row.auth_user_id);
+      return { ...row, email: u?.user?.email || null };
+    }));
+    return enriched;
+  },
+
+  async create({ garageId, email, password, role, createdBy }) {
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email, password, email_confirm: true
+    });
+    if (authError) throw new Error(`Auth: ${authError.message}`);
+
+    const { error: roleErr } = await supabase.auth.admin.updateUserById(
+      authData.user.id,
+      { app_metadata: { role } }
+    );
+    if (roleErr) console.warn('[GarageUsers.create] role assignment failed —', roleErr.message);
+
+    const row = await insert('garage_users', {
+      auth_user_id: authData.user.id,
+      garage_id:    garageId,
+      role,
+      created_by:   createdBy || null
+    });
+    return { id: row.id, auth_user_id: authData.user.id, email, role, garage_id: garageId, actif: true };
+  },
+
+  async update(id, garageId, patches) {
+    // Vérifier ownership avant modification (pas de RLS v1)
+    const { data: current, error: fetchErr } = await supabase
+      .from('garage_users')
+      .select('auth_user_id')
+      .eq('id', id)
+      .eq('garage_id', garageId)
+      .single();
+    if (fetchErr || !current) throw new Error('garage_user introuvable dans ce garage');
+
+    if (patches.role !== undefined) {
+      await supabase.auth.admin.updateUserById(
+        current.auth_user_id,
+        { app_metadata: { role: patches.role } }
+      );
+    }
+    const ALLOWED = ['role', 'actif'];
+    const clean = Object.fromEntries(
+      Object.entries(patches).filter(([k, v]) => ALLOWED.includes(k) && v !== undefined)
+    );
+    return update('garage_users', id, clean);
+  },
+
+  async softDelete(id, garageId) {
+    const { data: current, error: fetchErr } = await supabase
+      .from('garage_users')
+      .select('id')
+      .eq('id', id)
+      .eq('garage_id', garageId)
+      .single();
+    if (fetchErr || !current) throw new Error('garage_user introuvable dans ce garage');
+    return update('garage_users', id, { actif: false });
+  }
+};
+
+// ══════════════════════════════════════════════════════════
 // EXPORT
 // ══════════════════════════════════════════════════════════
 module.exports = {
@@ -1125,5 +1202,6 @@ module.exports = {
   OrdresReparation,
   OrTaches,
   OrPieces,
-  CataloguePieces
+  CataloguePieces,
+  GarageUsers
 };

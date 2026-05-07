@@ -91,12 +91,22 @@ function requireAnyRole(ctx, allowedRoles) {
 async function getGarageIdForUser(ctx, SBLayer) {
   if (!ctx || !ctx.user_id || !SBLayer) return null;
   try {
-    const { data, error } = await SBLayer.supabase
+    // 1. Owner check — CONCESSION/PRO propriétaires d'un garage
+    const { data: g } = await SBLayer.supabase
       .from('garages')
       .select('id')
       .eq('auth_user_id', ctx.user_id)
-      .single();
-    return (error || !data) ? null : data.id;
+      .maybeSingle();
+    if (g) return g.id;
+
+    // 2. Fallback — MECANO/PRO employés via garage_users
+    const { data: gu } = await SBLayer.supabase
+      .from('garage_users')
+      .select('garage_id')
+      .eq('auth_user_id', ctx.user_id)
+      .eq('actif', true)
+      .maybeSingle();
+    return gu ? gu.garage_id : null;
   } catch (e) {
     return null;
   }
