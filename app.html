@@ -204,9 +204,6 @@ input,select,textarea{font-family:inherit}
   <div id="nav">
     <span class="nav-logo">🔑 MotoKey</span>
     <button class="nav-btn active" onclick="nav('dashboard',this)">Tableau de bord</button>
-    <button class="nav-btn" onclick="nav('fiche',this)">Fiche moto</button>
-    <button class="nav-btn" onclick="nav('entretien',this)">Entretien</button>
-    <button class="nav-btn" onclick="nav('pneus',this)">Pneus</button>
     <button class="nav-btn" onclick="nav('or',this)">OR</button>
     <button class="nav-btn" onclick="nav('devis',this)">Devis</button>
     <button class="nav-btn" id="navParams" onclick="nav('params',this)">Paramètres</button>
@@ -229,6 +226,7 @@ const API = window.location.origin;
 let TOKEN = '';
 let motos = [];
 let selectedMoto = null;
+let ficheTab = 'infos';
 let devisLines = [];
 let ordresList = [];
 let orMode     = 'comptoir';
@@ -470,7 +468,7 @@ function renderDashboard() {
   document.getElementById('main').innerHTML = `
     <div class="section-header">
       <div><div class="section-title">Tableau de bord</div><div class="section-sub">${motos.length} moto${motos.length>1?'s':''} · ${filtered.length} affichée${filtered.length>1?'s':''}</div></div>
-      <button class="btn btn-primary btn-sm" onclick="nav('fiche',null);highlightNav('fiche')">+ Nouvelle moto</button>
+      <button class="btn btn-primary btn-sm" onclick="selectedMoto=null;ficheTab='infos';renderFiche()">+ Nouvelle moto</button>
     </div>
     <input class="search-bar" placeholder="🔍 Rechercher par marque, modèle, plaque, client…" value="${searchQ}" oninput="searchQ=this.value.toLowerCase();renderDashboard()">
     <div class="moto-grid">${cards}</div>`;
@@ -497,7 +495,8 @@ function fmtEur(n){
 
 function selectMoto(id) {
   selectedMoto = motos.find(m => m.id === id) || null;
-  highlightNav('fiche');
+  ficheTab = 'infos';
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   renderFiche();
 }
 
@@ -511,27 +510,12 @@ function highlightNav(section) {
 // ── FICHE MOTO ──
 function renderFiche() {
   const m = document.getElementById('main');
-  if (selectedMoto) {
-    const mo = selectedMoto;
+  if (!selectedMoto) {
     m.innerHTML = `
       <div class="section-header">
-        <div><div class="section-title">${mo.marque} ${mo.modele}</div><div class="section-sub">Dossier numérique · ${mo.plaque}</div></div>
-        <button class="btn btn-secondary btn-sm" onclick="selectedMoto=null;renderFiche()">+ Nouvelle moto</button>
+        <div><div class="section-title">Nouvelle moto</div><div class="section-sub">Créer un dossier numérique</div></div>
+        <button class="btn btn-secondary btn-sm" onclick="loadDashboard()">← Tableau de bord</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-        <div class="card">
-          <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">Informations moto</div>
-          ${infoRow('Marque',mo.marque)}${infoRow('Modèle',mo.modele)}${infoRow('Année',mo.annee)}${infoRow('Plaque',mo.plaque)}${infoRow('VIN',mo.vin||'—')}${infoRow('Kilométrage',(mo.km||0).toLocaleString('fr-FR')+' km')}
-          <div style="margin-top:16px"><span class="score-badge score-${mo.couleur_dossier||'bleu'}">${scoreDot(mo.couleur_dossier)} ${scoreLabel(mo.couleur_dossier)} · ${mo.score||0}/100</span></div>
-        </div>
-        <div class="card">
-          <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">Client</div>
-          ${infoRow('Nom',mo.client_nom||'—')}${infoRow('Email',mo.client_email||'—')}${infoRow('Téléphone',mo.client_tel||'—')}
-        </div>
-      </div>`;
-  } else {
-    m.innerHTML = `
-      <div class="section-header"><div><div class="section-title">Nouvelle moto</div><div class="section-sub">Créer un dossier numérique</div></div></div>
       <div class="card" style="max-width:600px">
         <div id="ficheErr" class="alert alert-warn" style="display:none"></div>
         <div class="row-2">
@@ -554,14 +538,126 @@ function renderFiche() {
         <div class="field"><label>Téléphone</label><input id="fClientTel" placeholder="06 12 34 56 78"></div>
         <div style="margin-top:6px;display:flex;gap:10px">
           <button class="btn btn-primary" onclick="saveMoto()">Enregistrer</button>
-          <button class="btn btn-secondary" onclick="selectedMoto=null;renderFiche()">Annuler</button>
+          <button class="btn btn-secondary" onclick="loadDashboard()">Annuler</button>
         </div>
       </div>`;
+    return;
   }
+  const mo = selectedMoto;
+  const clientNom = mo.clients?.nom || mo.client_nom || '';
+  const tabDefs = [
+    {id:'infos',    label:'Infos'},
+    {id:'pneus',    label:'Pneus'},
+    {id:'entretien',label:'Carnet d\'entretien'},
+    {id:'or',       label:'OR liés'}
+  ];
+  const tabBar = tabDefs.map(t => {
+    const active = ficheTab === t.id;
+    return `<button onclick="switchFicheTab('${t.id}')" style="background:none;border:none;padding:10px 16px;font-size:13px;font-weight:600;cursor:pointer;color:${active?'var(--primary)':'var(--text2)'};border-bottom:2px solid ${active?'var(--primary)':'transparent'}">${t.label}</button>`;
+  }).join('');
+  m.innerHTML = `
+    <div class="section-header">
+      <div>
+        <div class="section-title">${mo.marque} ${mo.modele}</div>
+        <div class="section-sub">${mo.plaque}${clientNom ? ' · '+clientNom : ''}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary btn-sm" onclick="loadDashboard()">← Retour</button>
+        <button class="btn btn-primary btn-sm" onclick="selectedMoto=null;ficheTab='infos';renderFiche()">+ Nouvelle moto</button>
+      </div>
+    </div>
+    <div style="display:flex;border-bottom:1px solid var(--border);margin-bottom:16px">${tabBar}</div>
+    <div id="ficheTabContent"></div>`;
+  renderFicheTabContent();
 }
 
 function infoRow(label, val) {
   return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="color:var(--text2)">${label}</span><span style="font-weight:500">${val}</span></div>`;
+}
+
+function switchFicheTab(tab) {
+  ficheTab = tab;
+  renderFiche();
+}
+
+function renderFicheTabContent() {
+  const mo = selectedMoto;
+  const c = document.getElementById('ficheTabContent');
+  if (!c || !mo) return;
+  if (ficheTab === 'infos') {
+    c.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="card">
+          <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">Informations moto</div>
+          ${infoRow('Marque',mo.marque)}${infoRow('Modèle',mo.modele)}${infoRow('Année',mo.annee)}${infoRow('Plaque',mo.plaque)}${infoRow('VIN',mo.vin||'—')}${infoRow('Kilométrage',(mo.km||0).toLocaleString('fr-FR')+' km')}
+          <div style="margin-top:16px"><span class="score-badge score-${mo.couleur_dossier||'bleu'}">${scoreDot(mo.couleur_dossier)} ${scoreLabel(mo.couleur_dossier)} · ${mo.score||0}/100</span></div>
+        </div>
+        <div class="card">
+          <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">Client</div>
+          ${infoRow('Nom',mo.clients?.nom||mo.client_nom||'—')}${infoRow('Email',mo.clients?.email||mo.client_email||'—')}${infoRow('Téléphone',mo.clients?.tel||mo.client_tel||'—')}
+        </div>
+      </div>`;
+  } else if (ficheTab === 'pneus') {
+    c.innerHTML = '<div id="pneusContent"><div class="loading">Chargement…</div></div>';
+    loadPneus(mo.id);
+  } else if (ficheTab === 'entretien') {
+    c.innerHTML = `
+      <div id="entretienContent"><div class="loading">Chargement plan entretien…</div></div>
+      <div class="card" style="margin-top:20px;max-width:600px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:14px">Ajouter une intervention</div>
+        <div id="interErr" class="alert alert-warn" style="display:none"></div>
+        <div class="row-2">
+          <div class="field"><label>Type</label>
+            <select id="iType">
+              <option value="vert">🟢 Concession</option>
+              <option value="bleu" selected>🔵 Pro validé</option>
+              <option value="jaune">🟡 Propriétaire</option>
+              <option value="rouge">🔴 Non effectué</option>
+            </select>
+          </div>
+          <div class="field"><label>Titre *</label><input id="iTitre" placeholder="Vidange, courroie…"></div>
+        </div>
+        <div class="field"><label>Description</label><textarea id="iDesc" rows="2" placeholder="Détails…"></textarea></div>
+        <div class="row-2">
+          <div class="field"><label>Kilométrage</label><input id="iKm" type="number" placeholder="18500"></div>
+          <div class="field"><label>Montant HT (€)</label><input id="iMontant" type="number" placeholder="0"></div>
+        </div>
+        <div class="field"><label>Technicien</label><input id="iTech" placeholder="J.-M. Duval"></div>
+        <button class="btn btn-primary" onclick="saveInter()">Ajouter l'intervention</button>
+      </div>`;
+    loadEntretien(mo.id);
+  } else if (ficheTab === 'or') {
+    c.innerHTML = '<div id="ficheORList"><div class="loading">Chargement…</div></div>';
+    loadFicheORList(mo.id);
+  }
+}
+
+async function loadFicheORList(motoId) {
+  const c = document.getElementById('ficheORList');
+  if (!c) return;
+  try {
+    const data = await api('/ordres-reparation');
+    const list = (data.ordres || data || []).filter(or => or.moto_id === motoId || or.motos?.id === motoId);
+    if (!list.length) {
+      c.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">Aucun OR pour cette moto.</div></div>';
+      return;
+    }
+    const rows = list.map(or => {
+      const ttc = (or.total_ttc||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
+      return `<tr>
+        <td><strong>${or.numero_or}</strong></td>
+        <td style="white-space:nowrap">${fmtDate(or.date_ouverture)}</td>
+        <td>${badgeStatut(or.statut)}</td>
+        <td style="text-align:right;font-weight:600">${ttc}</td>
+        <td><button class="btn btn-secondary btn-sm" onclick="selectOR('${or.id}')">Voir</button></td>
+      </tr>`;
+    }).join('');
+    c.innerHTML = `<table class="table"><thead><tr>
+      <th>N° OR</th><th>Date ouverture</th><th>Statut</th><th style="text-align:right">Total TTC</th><th></th>
+    </tr></thead><tbody>${rows}</tbody></table>`;
+  } catch(e) {
+    c.innerHTML = '<div class="alert alert-warn">Erreur : '+e.message+'</div>';
+  }
 }
 
 async function saveMoto() {
@@ -587,6 +683,7 @@ async function saveMoto() {
     toast('✅ Moto créée avec succès');
     await loadDashboard();
     selectedMoto = data.moto || data;
+    ficheTab = 'infos';
     renderFiche();
   } catch(e) {
     err.textContent = e.message; err.style.display = 'block';
@@ -1879,7 +1976,7 @@ async function renderNewOR() {
       <div class="card"><div class="empty">
         <div class="empty-icon">🏍️</div>
         <div class="empty-text">Aucune moto en base.</div>
-        <div class="empty-sub">Créez d'abord une moto via l'onglet "Fiche moto".</div>
+        <div class="empty-sub">Créez d'abord une moto depuis le tableau de bord avec le bouton "+ Nouvelle moto".</div>
       </div></div>`;
     return;
   }
