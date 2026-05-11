@@ -32,6 +32,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
 .logo-badge{font-size:11px;font-weight:600;background:var(--accbg);color:var(--acc);border:1px solid var(--acc2);border-radius:20px;padding:2px 8px;margin-left:8px;white-space:nowrap;}
 .topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
 #nav-user-name{font-size:13px;font-weight:600;color:var(--tx2);display:none;}
+#btn-devis{display:none;}
 #btn-account{display:none;}
 #btn-logout-nav{display:none;}
 
@@ -157,6 +158,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
   <div class="logo">Moto<em>Key</em> <span class="logo-badge">Espace Client</span></div>
   <div class="topbar-right">
     <span id="nav-user-name"></span>
+    <button class="btn btn-secondary btn-sm" id="btn-devis" style="font-size:13px;padding:7px 14px;">Mes devis</button>
     <button class="btn btn-secondary btn-sm" id="btn-account" style="font-size:13px;padding:7px 14px;">Mon compte</button>
     <button class="btn btn-ghost" id="btn-logout-nav" style="color:var(--rd);">Déconnexion</button>
   </div>
@@ -367,6 +369,21 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════
+     ÉCRAN 8 — MES DEVIS
+════════════════════════════════════════════ -->
+<div id="screen-devis" style="display:none;">
+  <div class="app-wrap">
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="font-size:20px;font-weight:600;margin:0">Mes devis</h2>
+      <button class="btn btn-secondary btn-sm" id="btn-back-from-devis">← Mes motos</button>
+    </div>
+    <div id="devis-list-content">
+      <div class="empty-state"><div class="empty-icon">⏳</div><p>Chargement…</p></div>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 
@@ -388,10 +405,10 @@ let pendingEmail = '';
    UI
 ═══════════════════════════════════════════════════════ */
 function showScreen(id) {
-  ['login','register','verify','reset-request','reset-confirm','app','account'].forEach(s => {
+  ['login','register','verify','reset-request','reset-confirm','app','account','devis'].forEach(s => {
     const el = document.getElementById('screen-' + s);
     if (el) el.style.display = (s === id)
-      ? (s === 'app' || s === 'account' ? 'block' : 'flex')
+      ? (s === 'app' || s === 'account' || s === 'devis' ? 'block' : 'flex')
       : 'none';
   });
 }
@@ -497,12 +514,14 @@ function startRefreshTimer() {
 function setNavLoggedIn(email) {
   const n = document.getElementById('nav-user-name');
   n.textContent = email || ''; n.style.display = email ? 'inline' : 'none';
+  document.getElementById('btn-devis').style.display      = 'inline-flex';
   document.getElementById('btn-account').style.display    = 'inline-flex';
   document.getElementById('btn-logout-nav').style.display = 'inline';
 }
 
 function setNavLoggedOut() {
   document.getElementById('nav-user-name').style.display  = 'none';
+  document.getElementById('btn-devis').style.display      = 'none';
   document.getElementById('btn-account').style.display    = 'none';
   document.getElementById('btn-logout-nav').style.display = 'none';
 }
@@ -862,6 +881,89 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
 document.getElementById('link-login-from-reset-confirm').addEventListener('click', () => showScreen('login'));
 
 /* ═══════════════════════════════════════════════════════
+   ÉCRAN 8 — MES DEVIS
+═══════════════════════════════════════════════════════ */
+const STATUT_LABEL = { envoye: 'À valider', valide: 'Validé', refuse: 'Refusé', brouillon: 'Brouillon' };
+const STATUT_COLOR = { envoye: 'var(--or)', valide: 'var(--gn)', refuse: 'var(--rd)', brouillon: 'var(--tx3)' };
+
+async function loadClientDevis() {
+  const at = localStorage.getItem(LS_AT);
+  const box = document.getElementById('devis-list-content');
+  box.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><p>Chargement…</p></div>';
+
+  const { ok, data } = await apiGet('/devis', at);
+  if (!ok) {
+    box.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠</div><p>' + esc(errMsg(data)) + '</p></div>';
+    return;
+  }
+
+  const list = Array.isArray(data) ? data : (data.devis || data.data || []);
+  if (!list.length) {
+    box.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Aucun devis pour le moment.</p></div>';
+    return;
+  }
+
+  box.innerHTML = list.map(function(dv) {
+    const lignes = dv.devis_lignes || dv.lignes || [];
+    const label  = STATUT_LABEL[dv.statut] || dv.statut;
+    const color  = STATUT_COLOR[dv.statut] || 'var(--tx2)';
+    const total  = typeof dv.total_ttc === 'number' ? dv.total_ttc.toFixed(2) + ' €' : '—';
+    const motoInfo = dv.motos ? esc(dv.motos.marque + ' ' + dv.motos.modele + (dv.motos.plaque ? ' — ' + dv.motos.plaque : '')) : '—';
+    const dateStr  = fmtDate(dv.created_at);
+
+    const lignesHtml = lignes.length
+      ? '<table style="width:100%;font-size:13px;border-collapse:collapse;margin:8px 0">' +
+          lignes.map(function(l) {
+            const desc = esc(l.description || l.desc || '');
+            const qty  = l.quantite || 1;
+            const pu   = typeof l.prix_unitaire === 'number' ? l.prix_unitaire.toFixed(2) : '—';
+            return '<tr><td style="padding:4px 0;color:var(--tx2)">' + desc + '</td>' +
+                   '<td style="padding:4px 0;text-align:right;white-space:nowrap;color:var(--tx)">' + qty + ' × ' + pu + ' €</td></tr>';
+          }).join('') +
+        '</table>'
+      : '<p style="font-size:13px;color:var(--tx3);margin:8px 0">Aucune ligne.</p>';
+
+    const actionsHtml = dv.statut === 'envoye'
+      ? '<div style="display:flex;gap:10px;margin-top:12px">' +
+          '<button class="btn btn-primary btn-sm" onclick="acceptDevis(\'' + esc(dv.id) + '\')">Accepter</button>' +
+          '<button class="btn btn-secondary btn-sm" onclick="refuseDevis(\'' + esc(dv.id) + '\')">Refuser</button>' +
+        '</div>'
+      : (dv.valide_at || dv.refuse_at
+          ? '<p style="font-size:12px;color:var(--tx3);margin-top:10px">Décision le ' + esc(fmtDate(dv.valide_at || dv.refuse_at)) + '</p>'
+          : '');
+
+    return '<div class="card" style="margin-bottom:16px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:8px">' +
+        '<div>' +
+          '<div style="font-weight:700;font-size:15px">' + esc(dv.numero || dv.id) + '</div>' +
+          '<div style="font-size:12px;color:var(--tx3)">' + dateStr + ' · ' + motoInfo + '</div>' +
+        '</div>' +
+        '<span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:color-mix(in srgb,' + color + ' 15%,transparent);color:' + color + '">' + esc(label) + '</span>' +
+      '</div>' +
+      lignesHtml +
+      '<div style="text-align:right;font-weight:700;font-size:15px;border-top:1px solid var(--border);padding-top:8px;margin-top:4px">Total TTC : ' + total + '</div>' +
+      actionsHtml +
+    '</div>';
+  }).join('');
+}
+
+async function acceptDevis(id) {
+  if (!confirm('Confirmer l\'acceptation de ce devis ?')) return;
+  const at = localStorage.getItem(LS_AT);
+  const { ok, data } = await apiPost('/devis/' + id + '/valider', null, at);
+  if (ok) { toast('Devis accepté.', 'success'); loadClientDevis(); }
+  else     toast(errMsg(data), 'error');
+}
+
+async function refuseDevis(id) {
+  if (!confirm('Confirmer le refus de ce devis ?')) return;
+  const at = localStorage.getItem(LS_AT);
+  const { ok, data } = await apiPost('/devis/' + id + '/refuser', null, at);
+  if (ok) { toast('Devis refusé.', 'info'); loadClientDevis(); }
+  else     toast(errMsg(data), 'error');
+}
+
+/* ═══════════════════════════════════════════════════════
    NAV — ACCOUNT + LOGOUT
 ═══════════════════════════════════════════════════════ */
 document.getElementById('btn-logout-nav').addEventListener('click', function () { doLogout(this); });
@@ -883,6 +985,15 @@ document.getElementById('btn-account').addEventListener('click', async () => {
   }
   showScreen('account');
 });
+
+/* ═══════════════════════════════════════════════════════
+   ÉCRAN 8 — MES DEVIS
+═══════════════════════════════════════════════════════ */
+document.getElementById('btn-devis').addEventListener('click', () => {
+  showScreen('devis');
+  loadClientDevis();
+});
+document.getElementById('btn-back-from-devis').addEventListener('click', () => showScreen('app'));
 
 /* ═══════════════════════════════════════════════════════
    ÉCRAN 7 — MON COMPTE
