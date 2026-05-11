@@ -1127,7 +1127,7 @@ const server = http.createServer(async function(req, res){
       const motoC = DB.motos.find(function(x){ return x.id === dvR.moto_id && x.client_id === cli.id; });
       if (!motoC) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
       if (dvR.statut !== 'envoye') return fail(res, 'Ce devis ne peut pas être validé (statut: ' + dvR.statut + ')', 400, 'INVALID_STATUS');
-      DB.devis[ic].statut = 'valide'; DB.devis[ic].valide_at = nowISO(); DB.devis[ic].updated_at = nowISO();
+      DB.devis[ic].statut = 'valide'; DB.devis[ic].date_acceptation = nowISO(); DB.devis[ic].updated_at = nowISO();
       const totC = calcDevis(DB.devis[ic]);
       const interC = {id:'int-'+uid(),moto_id:dvR.moto_id,garage_id:dvR.garage_id,type:'bleu',titre:'Facture '+dvR.numero,description:(dvR.lignes||[]).map(function(l){return l.desc||l.description||'';}).join(', '),km:motoC?motoC.km:0,date:todayFR(),score_confiance:96,montant_ht:totC.base_ht,devis_id:p.id,created_at:nowISO()};
       DB.interventions.push(interC);
@@ -1152,7 +1152,7 @@ const server = http.createServer(async function(req, res){
     const i = DB.devis.findIndex(function(d){return d.id===p.id&&d.garage_id===garageId;});
     if(i<0) return fail(res,'Devis non trouvé',404,'NOT_FOUND');
     if(DB.devis[i].statut==='valide') return fail(res,'Devis déjà validé');
-    DB.devis[i].statut='valide'; DB.devis[i].valide_at=nowISO(); DB.devis[i].updated_at=nowISO();
+    DB.devis[i].statut='valide'; DB.devis[i].date_acceptation=nowISO(); DB.devis[i].updated_at=nowISO();
     const tot = calcDevis(DB.devis[i]);
     const m   = DB.motos.find(function(x){return x.id===DB.devis[i].moto_id;});
     const inter = {id:'int-'+uid(),moto_id:DB.devis[i].moto_id,garage_id:garageId,type:'bleu',titre:'Facture '+DB.devis[i].numero,description:(DB.devis[i].lignes||[]).map(function(l){return l.desc||l.description||'';}).join(', '),km:m?m.km:0,date:todayFR(),score_confiance:96,montant_ht:tot.base_ht,devis_id:p.id,created_at:nowISO()};
@@ -1180,7 +1180,7 @@ const server = http.createServer(async function(req, res){
           const { data: motoCheck } = await SBLayer.supabase.from('motos').select('id').eq('id', dvC.moto_id).eq('client_id', clientRow.id).limit(1).single();
           if (!motoCheck) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
           if (dvC.statut !== 'envoye') return fail(res, 'Ce devis ne peut pas être refusé (statut: ' + dvC.statut + ')', 400, 'INVALID_STATUS');
-          const { data: updated } = await SBLayer.supabase.from('devis').update({ statut: 'refuse', refuse_at: nowISO() }).eq('id', p.id).select().single();
+          const { data: updated } = await SBLayer.supabase.from('devis').update({ statut: 'refuse', date_refus: nowISO() }).eq('id', p.id).select().single();
           return ok(res, { devis: updated }, 'Devis refusé');
         } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
       }
@@ -1192,7 +1192,7 @@ const server = http.createServer(async function(req, res){
       const motoR = DB.motos.find(function(x){ return x.id === DB.devis[ir].moto_id && x.client_id === cli.id; });
       if (!motoR) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
       if (DB.devis[ir].statut !== 'envoye') return fail(res, 'Ce devis ne peut pas être refusé (statut: ' + DB.devis[ir].statut + ')', 400, 'INVALID_STATUS');
-      DB.devis[ir].statut = 'refuse'; DB.devis[ir].refuse_at = nowISO(); DB.devis[ir].updated_at = nowISO();
+      DB.devis[ir].statut = 'refuse'; DB.devis[ir].date_refus = nowISO(); DB.devis[ir].updated_at = nowISO();
       return ok(res, { devis: DB.devis[ir] }, 'Devis refusé');
     }
 
@@ -1205,14 +1205,14 @@ const server = http.createServer(async function(req, res){
       try {
         const { data: dvG } = await SBLayer.supabase.from('devis').select('id, statut').eq('id', p.id).eq('garage_id', garageId).single();
         if (!dvG) return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND');
-        const { data: updated } = await SBLayer.supabase.from('devis').update({ statut: 'refuse', refuse_at: nowISO() }).eq('id', p.id).select().single();
+        const { data: updated } = await SBLayer.supabase.from('devis').update({ statut: 'refuse', date_refus: nowISO() }).eq('id', p.id).select().single();
         return ok(res, { devis: updated }, 'Devis refusé');
       } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
     }
     // ── RAM fallback ──
     const ig = DB.devis.findIndex(function(d){ return d.id === p.id && d.garage_id === garageId; });
     if (ig < 0) return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND');
-    DB.devis[ig].statut = 'refuse'; DB.devis[ig].refuse_at = nowISO(); DB.devis[ig].updated_at = nowISO();
+    DB.devis[ig].statut = 'refuse'; DB.devis[ig].date_refus = nowISO(); DB.devis[ig].updated_at = nowISO();
     return ok(res, { devis: DB.devis[ig] }, 'Devis refusé');
   }
 

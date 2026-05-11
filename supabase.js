@@ -453,7 +453,7 @@ const Devis = {
     // Calculer les totaux
     const totaux = Devis._calcTotaux(dv);
     // Valider
-    await update('devis', id, { statut: 'valide', valide_at: new Date().toISOString(), ...totaux });
+    await update('devis', id, { statut: 'valide', date_acceptation: new Date().toISOString(), ...totaux });
     // Créer l'intervention correspondante
     const result = await Interventions.create(garage_id, dv.moto_id, {
       type:        'bleu',
