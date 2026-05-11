@@ -453,7 +453,7 @@ function renderDashboard() {
     : motos;
 
   const cards = filtered.length ? filtered.map(mo => `
-    <div class="moto-card" onclick="selectMoto(${mo.id})">
+    <div class="moto-card" onclick="selectMoto('${mo.id}')">
       <div class="moto-card-top">
         <div>
           <div class="moto-name">${mo.marque} ${mo.modele} <span style="font-weight:400;color:var(--text2);font-size:13px">${mo.annee||''}</span></div>
