@@ -727,7 +727,7 @@ async function renderEntretien() {
 }
 
 async function changerMotoEntretien() {
-  const id = parseInt(document.getElementById('eSelMoto').value);
+  const id = document.getElementById('eSelMoto').value;
   if (!id) return;
   selectedMoto = motos.find(m => m.id === id) || selectedMoto;
   await loadEntretien(id);
@@ -760,7 +760,7 @@ async function loadEntretien(id) {
 async function saveInter() {
   const err = document.getElementById('interErr');
   err.style.display = 'none';
-  const motoId = selectedMoto?.id || parseInt(document.getElementById('eSelMoto')?.value);
+  const motoId = selectedMoto?.id || document.getElementById('eSelMoto')?.value;
   if (!motoId) { err.textContent = 'Sélectionnez une moto.'; err.style.display='block'; return; }
   const titre = document.getElementById('iTitre').value.trim();
   if (!titre) { err.textContent = 'Le titre est requis.'; err.style.display='block'; return; }
@@ -794,7 +794,7 @@ async function renderPneus() {
 }
 
 async function changerMotoPneus() {
-  const id = parseInt(document.getElementById('pSelMoto').value);
+  const id = document.getElementById('pSelMoto').value;
   if (id) { selectedMoto = motos.find(m=>m.id===id)||selectedMoto; await loadPneus(id); }
 }
 
@@ -872,7 +872,7 @@ function addDevisLine() {
 async function saveDevis() {
   const err = document.getElementById('devisErr');
   err.style.display = 'none';
-  const motoId = parseInt(document.getElementById('dSelMoto').value);
+  const motoId = document.getElementById('dSelMoto').value;
   if (!motoId) { err.textContent = 'Sélectionnez une moto.'; err.style.display='block'; return; }
   const lignes = devisLines.filter(l=>l.designation.trim());
   if (!lignes.length) { err.textContent = 'Ajoutez au moins une ligne.'; err.style.display='block'; return; }
