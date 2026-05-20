@@ -242,9 +242,11 @@ const Motos = {
   },
 
   async create(garage_id, payload) {
-    // Chercher ou créer le client
+    const proprietaire_type = payload.proprietaire_type || 'client';
+
+    // Chercher ou créer le client (uniquement pour type 'client')
     let client_id = null;
-    if (payload.client_email || payload.client_nom) {
+    if (proprietaire_type === 'client' && (payload.client_email || payload.client_nom)) {
       let client = null;
       if (payload.client_email) {
         const { data } = await supabase.from('clients').select('id, garage_id').eq('email', payload.client_email).maybeSingle();
@@ -263,15 +265,48 @@ const Motos = {
       }
       client_id = client.id;
     }
-    return insert('motos', {
-      garage_id, client_id,
+
+    // Construire le payload moto selon le type de propriétaire
+    const motoPayload = {
+      garage_id,
       marque:  payload.marque,
       modele:  payload.modele,
       annee:   payload.annee,
       plaque:  payload.plaque,
       vin:     payload.vin,
-      km:      payload.km || 0
-    });
+      km:      payload.km || 0,
+      proprietaire_type
+    };
+
+    if (proprietaire_type === 'client') {
+      motoPayload.client_id = client_id;
+      motoPayload.proprietaire_garage_id = null;
+      motoPayload.proprio_libre = null;
+    } else if (proprietaire_type === 'garage') {
+      motoPayload.client_id = null;
+      motoPayload.proprietaire_garage_id = garage_id;
+      motoPayload.proprio_libre = null;
+    } else if (proprietaire_type === 'inconnu') {
+      motoPayload.client_id = null;
+      motoPayload.proprietaire_garage_id = null;
+      motoPayload.proprio_libre = payload.proprio_libre || null;
+    }
+
+    const moto = await insert('motos', motoPayload);
+
+    // Insérer l'entrée initiale dans l'historique des propriétaires
+    const histoPayload = {
+      moto_id:                 moto.id,
+      proprietaire_type:       proprietaire_type,
+      proprietaire_client_id:  proprietaire_type === 'client'  ? client_id  : null,
+      proprietaire_garage_id:  proprietaire_type === 'garage'  ? garage_id  : null,
+      date_debut:              new Date().toISOString().slice(0, 10),
+      mode_acquisition:        payload.mode_acquisition || 'inconnu'
+    };
+    const { error: histoErr } = await supabase.from('motos_proprietaires_historique').insert(histoPayload);
+    if (histoErr) throw new Error(`[Motos.create] insert historique: ${histoErr.message}`);
+
+    return moto;
   },
 
   async update(id, garage_id, payload) {
