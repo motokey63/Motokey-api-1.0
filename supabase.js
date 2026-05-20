@@ -1203,6 +1203,143 @@ const GarageUsers = {
 };
 
 // ══════════════════════════════════════════════════════════
+// L8 — PROPRIÉTAIRE POLYMORPHE
+// ══════════════════════════════════════════════════════════
+
+/**
+ * resolveProprietaire(moto)
+ * Prend un objet moto déjà chargé et retourne { type, nom, email }.
+ */
+async function resolveProprietaire(moto) {
+  try {
+    if (moto.proprietaire_type === 'client' && moto.client_id) {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('nom, email')
+        .eq('id', moto.client_id)
+        .single();
+      if (error) throw error;
+      return { type: 'client', nom: data.nom || null, email: data.email || null };
+    }
+    if (moto.proprietaire_type === 'garage' && moto.proprietaire_garage_id) {
+      const { data, error } = await supabase
+        .from('garages')
+        .select('nom')
+        .eq('id', moto.proprietaire_garage_id)
+        .single();
+      if (error) throw error;
+      return { type: 'garage', nom: data.nom || null, email: null };
+    }
+    // inconnu ou champs manquants
+    return {
+      type:  'inconnu',
+      nom:   moto.proprio_libre || 'Propriétaire inconnu',
+      email: null
+    };
+  } catch (e) {
+    console.error('[resolveProprietaire] DB error —', e.message);
+    return { type: 'inconnu', nom: 'Propriétaire inconnu', email: null };
+  }
+}
+
+/**
+ * checkLimiteMotosClient(client_id)
+ * Retourne { count, limite, is_pro, can_add }.
+ */
+async function checkLimiteMotosClient(client_id) {
+  const [{ count: countResult, error: countErr }, { data: client, error: clientErr }] =
+    await Promise.all([
+      supabase
+        .from('motos')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', client_id)
+        .eq('proprietaire_type', 'client'),
+      supabase
+        .from('clients')
+        .select('is_pro, limite_motos_gratuites')
+        .eq('id', client_id)
+        .single()
+    ]);
+
+  if (countErr) throw new Error(`[checkLimiteMotosClient] count: ${countErr.message}`);
+  if (clientErr) throw new Error(`[checkLimiteMotosClient] client: ${clientErr.message}`);
+
+  const count  = countResult || 0;
+  const is_pro = client.is_pro || false;
+  const limite = client.limite_motos_gratuites || 3;
+  return {
+    count,
+    limite,
+    is_pro,
+    can_add: is_pro || count < limite
+  };
+}
+
+/**
+ * cessionMoto(moto_id, nouveau_proprietaire, mode, created_by)
+ * nouveau_proprietaire : { type: 'client', id } | { type: 'garage', id } | { type: 'inconnu', libre }
+ * mode : valeur de mode_acquisition_enum
+ */
+async function cessionMoto(moto_id, nouveau_proprietaire, mode, created_by = null) {
+  // 1. Fermer la ligne courante dans l'historique
+  const { error: closeErr } = await supabase
+    .from('motos_proprietaires_historique')
+    .update({ date_fin: new Date().toISOString().split('T')[0] })
+    .eq('moto_id', moto_id)
+    .is('date_fin', null);
+  if (closeErr) throw new Error(`[cessionMoto] close historique: ${closeErr.message}`);
+
+  // 2. Construire le patch motos et la ligne historique selon le type
+  let motoPatch = { proprietaire_type: nouveau_proprietaire.type };
+  let histoPayload = {
+    moto_id,
+    proprietaire_type:   nouveau_proprietaire.type,
+    date_debut:          new Date().toISOString().split('T')[0],
+    mode_acquisition:    mode,
+    created_by:          created_by || null
+  };
+
+  if (nouveau_proprietaire.type === 'client') {
+    motoPatch.client_id                = nouveau_proprietaire.id;
+    motoPatch.proprietaire_garage_id   = null;
+    motoPatch.proprio_libre            = null;
+    histoPayload.proprietaire_client_id = nouveau_proprietaire.id;
+    histoPayload.proprietaire_garage_id = null;
+  } else if (nouveau_proprietaire.type === 'garage') {
+    motoPatch.client_id                = null;
+    motoPatch.proprietaire_garage_id   = nouveau_proprietaire.id;
+    motoPatch.proprio_libre            = null;
+    histoPayload.proprietaire_client_id = null;
+    histoPayload.proprietaire_garage_id = nouveau_proprietaire.id;
+  } else {
+    // inconnu
+    motoPatch.client_id                = null;
+    motoPatch.proprietaire_garage_id   = null;
+    motoPatch.proprio_libre            = nouveau_proprietaire.libre || null;
+    histoPayload.proprietaire_client_id = null;
+    histoPayload.proprietaire_garage_id = null;
+    histoPayload.proprio_libre          = nouveau_proprietaire.libre || null;
+  }
+
+  // 3. Mettre à jour la moto
+  const { data: motoMaj, error: motoErr } = await supabase
+    .from('motos')
+    .update(motoPatch)
+    .eq('id', moto_id)
+    .select()
+    .single();
+  if (motoErr) throw new Error(`[cessionMoto] update moto: ${motoErr.message}`);
+
+  // 4. Insérer la nouvelle ligne dans l'historique
+  const { error: histoErr } = await supabase
+    .from('motos_proprietaires_historique')
+    .insert(histoPayload);
+  if (histoErr) throw new Error(`[cessionMoto] insert historique: ${histoErr.message}`);
+
+  return motoMaj;
+}
+
+// ══════════════════════════════════════════════════════════
 // EXPORT
 // ══════════════════════════════════════════════════════════
 module.exports = {
@@ -1222,5 +1359,8 @@ module.exports = {
   OrTaches,
   OrPieces,
   CataloguePieces,
-  GarageUsers
+  GarageUsers,
+  resolveProprietaire,
+  checkLimiteMotosClient,
+  cessionMoto
 };
