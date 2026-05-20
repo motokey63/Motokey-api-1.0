@@ -1476,6 +1476,182 @@ const server = http.createServer(async function(req, res){
     return ok(res,{documents:docs,total:docs.length});
   }
 
+  // GET /client/limite-motos (CLIENT) — compteur motos + statut Pro + CTA — TODO RBAC L8
+  if((p=M('GET','/client/limite-motos'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
+    if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
+    try {
+      const { data: clientRow, error: cliErr } = await SBLayer.supabase
+        .from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
+      if (cliErr || !clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
+      const clientId = clientRow.id;
+
+      const { count, limite, is_pro, can_add } = await SBLayer.checkLimiteMotosClient(clientId);
+      return ok(res, { count, limite, is_pro, can_add, cta_pro: !is_pro && !can_add });
+    } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+  }
+
+  // POST /client/motos (CLIENT) — ajout autonome d'une moto — TODO RBAC L8
+  if((p=M('POST','/client/motos'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
+    if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
+    try {
+      const { data: clientRow, error: cliErr } = await SBLayer.supabase
+        .from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
+      if (cliErr || !clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
+      const clientId = clientRow.id;
+
+      const { marque, modele, annee, plaque, vin, km, mode_acquisition } = b;
+      if (!marque || !modele || !plaque || !vin) return fail(res, 'marque, modele, plaque et vin requis', 400, 'VALIDATION_ERROR');
+
+      const limite = await SBLayer.checkLimiteMotosClient(clientId);
+      if (!limite.can_add) return sendJSON(res, 402, { success: false, error: { code: 'LIMIT_REACHED', message: 'Limite de motos atteinte' }, cta_pro: true, timestamp: nowISO() });
+
+      const { data: clientFull, error: cfErr } = await SBLayer.supabase
+        .from('clients').select('garage_id').eq('id', clientId).single();
+      if (cfErr) throw new Error(cfErr.message);
+      const clientGarageId = clientFull ? clientFull.garage_id : null;
+
+      const { data: moto, error: motoErr } = await SBLayer.supabase
+        .from('motos')
+        .insert({ garage_id: clientGarageId || null, client_id: clientId, marque, modele, annee, plaque, vin, km: km || 0, proprietaire_type: 'client' })
+        .select()
+        .single();
+      if (motoErr) throw new Error(motoErr.message);
+
+      const today = new Date().toISOString().slice(0, 10);
+      const { error: histoErr } = await SBLayer.supabase
+        .from('motos_proprietaires_historique')
+        .insert({ moto_id: moto.id, proprietaire_type: 'client', proprietaire_client_id: clientId, date_debut: today, mode_acquisition: mode_acquisition || 'inconnu', created_by: ctx.user_id });
+      if (histoErr) throw new Error(histoErr.message);
+
+      return ok(res, { moto }, null, 201);
+    } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+  }
+
+  // POST /client/reclamations (CLIENT) — réclamer une moto orpheline — TODO RBAC L8
+  if((p=M('POST','/client/reclamations'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
+    if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
+    try {
+      const { data: clientRow, error: cliErr } = await SBLayer.supabase
+        .from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
+      if (cliErr || !clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
+      const clientId = clientRow.id;
+
+      const { vin_fourni, plaque_fournie, carte_grise_photo_url } = b;
+      if (!vin_fourni || !plaque_fournie || !carte_grise_photo_url) return fail(res, 'vin_fourni, plaque_fournie et carte_grise_photo_url requis', 400, 'VALIDATION_ERROR');
+
+      const { data: motoRows, error: motoErr } = await SBLayer.supabase
+        .from('motos').select('id, proprietaire_type, client_id').eq('vin', vin_fourni).eq('plaque', plaque_fournie).limit(1);
+      if (motoErr) throw new Error(motoErr.message);
+      if (!motoRows || motoRows.length === 0) return fail(res, 'Moto non trouvée avec ce VIN et cette plaque', 404, 'MOTO_NOT_FOUND');
+      const moto = motoRows[0];
+
+      if (moto.client_id === clientId) return fail(res, 'Vous êtes déjà propriétaire de cette moto', 409, 'ALREADY_OWNER');
+
+      const { data: existingClaims, error: claimErr } = await SBLayer.supabase
+        .from('reclamations_moto').select('id').eq('moto_id', moto.id).eq('client_id', clientId).eq('statut', 'en_attente');
+      if (claimErr) throw new Error(claimErr.message);
+      if (existingClaims && existingClaims.length > 0) return fail(res, 'Une réclamation est déjà en attente pour cette moto', 409, 'CLAIM_ALREADY_PENDING');
+
+      const statut = (moto.proprietaire_type === 'client' && moto.client_id && moto.client_id !== clientId) ? 'litige' : 'en_attente';
+
+      const { data: reclamation, error: insertErr } = await SBLayer.supabase
+        .from('reclamations_moto')
+        .insert({ moto_id: moto.id, client_id: clientId, statut, vin_fourni, plaque_fournie, carte_grise_photo_url })
+        .select()
+        .single();
+      if (insertErr) throw new Error(insertErr.message);
+
+      return ok(res, { reclamation }, null, 201);
+    } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+  }
+
+  // GET /client/reclamations (CLIENT) — liste des réclamations du client — TODO RBAC L8
+  if((p=M('GET','/client/reclamations'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
+    if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
+    try {
+      const { data: clientRow, error: cliErr } = await SBLayer.supabase
+        .from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
+      if (cliErr || !clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
+      const clientId = clientRow.id;
+
+      const { data: reclamations, error } = await SBLayer.supabase
+        .from('reclamations_moto')
+        .select('*, motos(id, plaque, marque, modele)')
+        .eq('client_id', clientId)
+        .order('date_creation', { ascending: false });
+      if (error) return fail(res, error.message, 500, 'DB_ERROR');
+      return ok(res, { reclamations: reclamations || [], total: (reclamations || []).length });
+    } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+  }
+
+  // GET /client/garages (CLIENT) — liste des garages liés au compte client — TODO RBAC L8
+  if((p=M('GET','/client/garages'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
+    if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
+    try {
+      const { data: clientRow, error: cliErr } = await SBLayer.supabase
+        .from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
+      if (cliErr || !clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
+      const clientId = clientRow.id;
+
+      const { data: garages, error } = await SBLayer.supabase
+        .from('liaisons_client_garage')
+        .select('*, garages(id, nom, email, tel, adresse, logo_url)')
+        .eq('client_id', clientId)
+        .order('date_creation', { ascending: false });
+      if (error) return fail(res, error.message, 500, 'DB_ERROR');
+      return ok(res, { garages: garages || [], total: (garages || []).length });
+    } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+  }
+
+  // DELETE /client/garages/:id (CLIENT) — quitter un garage (révocation) — TODO RBAC L8
+  if((p=M('DELETE','/client/garages/:id'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
+    if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
+    try {
+      const { data: clientRow, error: cliErr } = await SBLayer.supabase
+        .from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
+      if (cliErr || !clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
+      const clientId = clientRow.id;
+
+      const { data: liaison, error: liaisonErr } = await SBLayer.supabase
+        .from('liaisons_client_garage').select('*').eq('id', p.id).single();
+      if (liaisonErr || !liaison || liaison.client_id !== clientId) return fail(res, 'Liaison non trouvée', 404, 'NOT_FOUND');
+      if (liaison.statut === 'revoque_par_client') return fail(res, 'Liaison déjà révoquée', 409, 'ALREADY_REVOKED');
+
+      const { data: updated, error: updErr } = await SBLayer.supabase
+        .from('liaisons_client_garage')
+        .update({ statut: 'revoque_par_client', date_revocation: new Date().toISOString(), motif_revocation: b.motif || null })
+        .eq('id', p.id)
+        .select()
+        .single();
+      if (updErr) throw new Error(updErr.message);
+      return ok(res, { liaison: updated }, 'Garage quitté — votre historique reste conservé (obligations légales)');
+    } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+  }
+
   /* PARAMS & STATS */
   if((p=M('GET','/params'))!==null){
     // RBAC: MECANO minimum — lecture paramètres garage
