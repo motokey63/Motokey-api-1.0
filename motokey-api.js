@@ -1529,7 +1529,11 @@ const server = http.createServer(async function(req, res){
       const { error: histoErr } = await SBLayer.supabase
         .from('motos_proprietaires_historique')
         .insert({ moto_id: moto.id, proprietaire_type: 'client', proprietaire_client_id: clientId, date_debut: today, mode_acquisition: mode_acquisition || 'inconnu', created_by: ctx.user_id });
-      if (histoErr) throw new Error(histoErr.message);
+      if (histoErr) {
+        console.error('[POST /client/motos] historique insert failed — orphan moto risk, id:', moto.id, histoErr.message);
+        await SBLayer.supabase.from('motos').delete().eq('id', moto.id);
+        throw new Error(histoErr.message);
+      }
 
       return ok(res, { moto }, null, 201);
     } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
@@ -1560,9 +1564,9 @@ const server = http.createServer(async function(req, res){
       if (moto.client_id === clientId) return fail(res, 'Vous êtes déjà propriétaire de cette moto', 409, 'ALREADY_OWNER');
 
       const { data: existingClaims, error: claimErr } = await SBLayer.supabase
-        .from('reclamations_moto').select('id').eq('moto_id', moto.id).eq('client_id', clientId).eq('statut', 'en_attente');
+        .from('reclamations_moto').select('id').eq('moto_id', moto.id).eq('client_id', clientId).in('statut', ['en_attente', 'litige']);
       if (claimErr) throw new Error(claimErr.message);
-      if (existingClaims && existingClaims.length > 0) return fail(res, 'Une réclamation est déjà en attente pour cette moto', 409, 'CLAIM_ALREADY_PENDING');
+      if (existingClaims && existingClaims.length > 0) return fail(res, 'Une réclamation est déjà en cours pour cette moto', 409, 'CLAIM_ALREADY_PENDING');
 
       const statut = (moto.proprietaire_type === 'client' && moto.client_id && moto.client_id !== clientId) ? 'litige' : 'en_attente';
 
@@ -1631,6 +1635,9 @@ const server = http.createServer(async function(req, res){
     if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
     if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
     try {
+      const deleteBody = await body(req).catch(() => ({}));
+      const motifRevocation = (deleteBody && deleteBody.motif) || null;
+
       const { data: clientRow, error: cliErr } = await SBLayer.supabase
         .from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
       if (cliErr || !clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
@@ -1643,7 +1650,7 @@ const server = http.createServer(async function(req, res){
 
       const { data: updated, error: updErr } = await SBLayer.supabase
         .from('liaisons_client_garage')
-        .update({ statut: 'revoque_par_client', date_revocation: new Date().toISOString(), motif_revocation: b.motif || null })
+        .update({ statut: 'revoque_par_client', date_revocation: new Date().toISOString(), motif_revocation: motifRevocation })
         .eq('id', p.id)
         .select()
         .single();
