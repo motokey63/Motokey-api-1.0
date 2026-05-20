@@ -1702,14 +1702,23 @@ const server = http.createServer(async function(req, res){
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
     if (USE_SUPABASE && SBLayer) {
       try {
-        const { data: reclamations, error } = await SBLayer.supabase
+        // TODO RBAC L8
+        // Passe 1 : récupérer les IDs de motos appartenant à ce garage
+        const { data: motoRows, error: motoErr } = await SBLayer.supabase
+          .from('motos').select('id').eq('garage_id', garageId);
+        if (motoErr) return fail(res, motoErr.message, 500, 'DB_ERROR');
+        const motoIds = (motoRows || []).map(function(m){ return m.id; });
+        if (!motoIds.length) return ok(res, { reclamations: [], total: 0 });
+
+        // Passe 2 : réclamations en attente pour ces motos
+        const { data: rows, error } = await SBLayer.supabase
           .from('reclamations_moto')
-          .select('*, motos!inner(id, plaque, marque, modele, garage_id), clients(nom, email, tel)')
-          .eq('motos.garage_id', garageId)
+          .select('*, motos(id, plaque, marque, modele), clients(nom, email, tel)')
+          .in('moto_id', motoIds)
           .eq('statut', 'en_attente')
           .order('date_creation', { ascending: false });
-        if (error) throw new Error(error.message);
-        return ok(res, { reclamations: reclamations || [], total: (reclamations || []).length });
+        if (error) return fail(res, error.message, 500, 'DB_ERROR');
+        return ok(res, { reclamations: rows || [], total: (rows || []).length });
       } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
     }
     return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
@@ -1735,6 +1744,9 @@ const server = http.createServer(async function(req, res){
           .single();
         if (recErr || !reclamation) return fail(res, 'Réclamation non trouvée', 404, 'NOT_FOUND');
         if (reclamation.motos.garage_id !== garageId) return fail(res, 'Réclamation hors périmètre garage', 403, 'FORBIDDEN');
+        if (reclamation.statut !== 'en_attente') {
+          return fail(res, 'Réclamation déjà traitée (statut: ' + reclamation.statut + ')', 409, 'CONFLICT');
+        }
         const now = new Date().toISOString();
         if (statut === 'refuse') {
           const { data: updated, error: updErr } = await SBLayer.supabase
