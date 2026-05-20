@@ -182,6 +182,15 @@ input,select,textarea{font-family:inherit}
 .piece-picker-empty{padding:16px;text-align:center;color:var(--text2);font-size:13px}
 .piece-picker-loading{padding:12px;text-align:center;color:var(--text2);font-size:13px}
 .piece-picker-fallback{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);text-align:center}
+
+/* ── L8 — nav badge, vendre modal, timeline, clients ── */
+.nav-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;background:var(--danger);color:#fff;border-radius:10px;font-size:10px;font-weight:800;margin-left:4px;vertical-align:middle}
+.mk-modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:200;padding:16px}
+.mk-modal-box{background:var(--bg2);border-radius:var(--r);padding:24px;width:100%;max-width:440px;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+.mk-modal-title{font-size:16px;font-weight:700;margin-bottom:16px}
+.badge-quit{background:#f1f5f9;color:#64748b;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;margin-left:6px}
+.reclamation-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:10px}
+.reclamation-actions{display:flex;gap:8px;margin-top:12px}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js"></script>
 </head>
@@ -206,6 +215,8 @@ input,select,textarea{font-family:inherit}
     <button class="nav-btn active" onclick="nav('dashboard',this)">Tableau de bord</button>
     <button class="nav-btn" onclick="nav('or',this)">OR</button>
     <button class="nav-btn" onclick="nav('devis',this)">Devis</button>
+    <button class="nav-btn" id="navReclamations" onclick="nav('reclamations',this)">Réclamations <span id="badgeReclam" class="nav-badge" style="display:none">0</span></button>
+    <button class="nav-btn" id="navClients" onclick="nav('clients',this)">Clients</button>
     <button class="nav-btn" id="navParams" onclick="nav('params',this)">Paramètres</button>
     <div class="nav-end">
       <span class="nav-user" id="navUser"></span>
@@ -221,10 +232,36 @@ input,select,textarea{font-family:inherit}
   <div class="or-modal" id="orModalBox"></div>
 </div>
 
+<!-- ── VENDRE MOTO MODAL (L8) ── -->
+<div id="vendreModalOverlay" class="mk-modal" style="display:none" onclick="if(event.target===this)closeVendreModal()">
+  <div class="mk-modal-box">
+    <div class="mk-modal-title">Vendre cette moto</div>
+    <div id="vendreErr" class="alert alert-warn" style="display:none"></div>
+    <div class="field"><label>Email client *</label><input id="vClientEmail" type="email" placeholder="client@exemple.fr"></div>
+    <div class="row-2">
+      <div class="field"><label>Nom complet</label><input id="vClientNom" placeholder="Sophie Laurent"></div>
+      <div class="field"><label>Téléphone</label><input id="vClientTel" placeholder="06 12 34 56 78"></div>
+    </div>
+    <div class="field"><label>Mode d'acquisition</label>
+      <select id="vModeAcq">
+        <option value="achat_occasion">Achat occasion</option>
+        <option value="achat_neuf">Achat neuf</option>
+        <option value="don">Don</option>
+        <option value="heritage">Héritage</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-secondary" onclick="closeVendreModal()">Annuler</button>
+      <button class="btn btn-primary" id="vendreSubmitBtn" onclick="submitVendre()">Confirmer la vente</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API = window.location.origin;
 let TOKEN = '';
 let motos = [];
+let reclamCount = 0;
 let selectedMoto = null;
 let ficheTab = 'infos';
 let devisLines = [];
@@ -296,6 +333,7 @@ async function doLogin() {
     applyRoleUI();
     startInactivityTimer();
     await loadDashboard();
+    if (isPro()) loadReclamBadge();
   } catch(e) {
     err.textContent = e.message;
     err.style.display = 'block';
@@ -317,6 +355,8 @@ document.addEventListener('keydown', e => {
 function applyRoleUI() {
   const hide = isMecano();
   document.getElementById('navParams').style.display = hide ? 'none' : '';
+  const reclBtn = document.getElementById('navReclamations');
+  if (reclBtn) reclBtn.style.display = hide ? 'none' : '';
 }
 
 // ── TIMER INACTIVITÉ (C2) ── MECANO uniquement
@@ -427,6 +467,8 @@ function nav(section, btn) {
   else if (section === 'or')   loadOR();
   else if (section === 'devis') loadDevis();
   else if (section === 'params') renderParams();
+  else if (section === 'reclamations') loadReclamations();
+  else if (section === 'clients') loadClients();
 }
 
 // ── DASHBOARD ──
@@ -530,12 +572,25 @@ function renderFiche() {
           <div class="field"><label>Plaque *</label><input id="fPlaque" placeholder="AB-123-CD"></div>
           <div class="field"><label>VIN *</label><input id="fVin" placeholder="17 caractères"></div>
         </div>
-        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin:16px 0 10px">Client</div>
-        <div class="row-2">
-          <div class="field"><label>Nom complet</label><input id="fClientNom" placeholder="Sophie Laurent"></div>
-          <div class="field"><label>Email</label><input id="fClientEmail" type="email" placeholder="sophie@email.com"></div>
+        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin:16px 0 10px">Propriétaire</div>
+        <div class="field">
+          <label>Type de propriétaire</label>
+          <select id="fProprioType" onchange="toggleFicheClientFields()">
+            <option value="client">Client</option>
+            <option value="garage">Stock garage</option>
+            <option value="inconnu">Inconnu / libre</option>
+          </select>
         </div>
-        <div class="field"><label>Téléphone</label><input id="fClientTel" placeholder="06 12 34 56 78"></div>
+        <div id="ficheClientFields">
+          <div class="row-2">
+            <div class="field"><label>Nom complet</label><input id="fClientNom" placeholder="Sophie Laurent"></div>
+            <div class="field"><label>Email</label><input id="fClientEmail" type="email" placeholder="sophie@email.com"></div>
+          </div>
+          <div class="field"><label>Téléphone</label><input id="fClientTel" placeholder="06 12 34 56 78"></div>
+        </div>
+        <div id="ficheLibreField" style="display:none">
+          <div class="field"><label>Propriétaire libre (nom / description)</label><input id="fPropLibre" placeholder="Ex : Jean-Pierre Martin, particulier"></div>
+        </div>
         <div style="margin-top:6px;display:flex;gap:10px">
           <button class="btn btn-primary" onclick="saveMoto()">Enregistrer</button>
           <button class="btn btn-secondary" onclick="loadDashboard()">Annuler</button>
@@ -585,17 +640,27 @@ function renderFicheTabContent() {
   const c = document.getElementById('ficheTabContent');
   if (!c || !mo) return;
   if (ficheTab === 'infos') {
+    const proprio = mo.proprietaire_type === 'garage' ? 'Stock garage' : mo.proprietaire_type === 'client' ? 'Client' : mo.proprietaire_type === 'inconnu' ? 'Inconnu' : (mo.proprietaire_type || '—');
+    const vendreBtn = mo.proprietaire_type === 'garage'
+      ? `<div style="margin-top:14px"><button class="btn btn-primary btn-sm" onclick="openVendreModal('${mo.id}')">Vendre cette moto</button></div>`
+      : '';
     c.innerHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
         <div class="card">
           <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">Informations moto</div>
-          ${infoRow('Marque',mo.marque)}${infoRow('Modèle',mo.modele)}${infoRow('Année',mo.annee)}${infoRow('Plaque',mo.plaque)}${infoRow('VIN',mo.vin||'—')}${infoRow('Kilométrage',(mo.km||0).toLocaleString('fr-FR')+' km')}
+          ${infoRow('Marque',mo.marque)}${infoRow('Modèle',mo.modele)}${infoRow('Année',mo.annee)}${infoRow('Plaque',mo.plaque)}${infoRow('VIN',mo.vin||'—')}${infoRow('Kilométrage',(mo.km||0).toLocaleString('fr-FR')+' km')}${infoRow('Propriétaire',proprio)}
           <div style="margin-top:16px"><span class="score-badge score-${mo.couleur_dossier||'bleu'}">${scoreDot(mo.couleur_dossier)} ${scoreLabel(mo.couleur_dossier)} · ${mo.score||0}/100</span></div>
+          ${vendreBtn}
         </div>
         <div class="card">
           <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">Client</div>
           ${infoRow('Nom',mo.clients?.nom||mo.client_nom||'—')}${infoRow('Email',mo.clients?.email||mo.client_email||'—')}${infoRow('Téléphone',mo.clients?.tel||mo.client_tel||'—')}
         </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Historique propriétaires</div>
+        <div style="font-size:13px;color:var(--text2)">Propriétaire actuel : <strong>${proprio}</strong></div>
+        <div style="font-size:12px;color:var(--text2);margin-top:6px;font-style:italic">Historique complet des cessions disponible prochainement.</div>
       </div>`;
   } else if (ficheTab === 'pneus') {
     c.innerHTML = '<div id="pneusContent"><div class="loading">Chargement…</div></div>';
@@ -663,6 +728,7 @@ async function loadFicheORList(motoId) {
 async function saveMoto() {
   const err = document.getElementById('ficheErr');
   err.style.display = 'none';
+  const proprietaire_type = document.getElementById('fProprioType')?.value || 'client';
   const body = {
     marque: document.getElementById('fMarque').value.trim(),
     modele: document.getElementById('fModele').value.trim(),
@@ -670,10 +736,15 @@ async function saveMoto() {
     vin: document.getElementById('fVin').value.trim(),
     annee: parseInt(document.getElementById('fAnnee').value)||null,
     km: parseInt(document.getElementById('fKm').value)||0,
-    client_nom: document.getElementById('fClientNom').value.trim(),
-    client_email: document.getElementById('fClientEmail').value.trim(),
-    client_tel: document.getElementById('fClientTel').value.trim()
+    proprietaire_type
   };
+  if (proprietaire_type === 'client') {
+    body.client_nom   = document.getElementById('fClientNom').value.trim();
+    body.client_email = document.getElementById('fClientEmail').value.trim();
+    body.client_tel   = document.getElementById('fClientTel').value.trim();
+  } else if (proprietaire_type === 'inconnu') {
+    body.proprio_libre = document.getElementById('fPropLibre')?.value.trim() || null;
+  }
   if (!body.marque||!body.modele||!body.plaque||!body.vin) {
     err.textContent = 'Marque, modèle, plaque et VIN sont requis.';
     err.style.display = 'block'; return;
@@ -2260,6 +2331,123 @@ async function confirmDeactivateUser(id) {
     toast(u.email + ' désactivé');
     await _umLoad();
   } catch(e) { toast('Erreur : ' + e.message); }
+}
+
+// ── L8 — PROPRIÉTAIRE / FICHE ──
+function toggleFicheClientFields() {
+  const type = document.getElementById('fProprioType').value;
+  const cf = document.getElementById('ficheClientFields');
+  const lf = document.getElementById('ficheLibreField');
+  if (cf) cf.style.display = type === 'client' ? '' : 'none';
+  if (lf) lf.style.display = type === 'inconnu' ? '' : 'none';
+}
+
+let _vendreCurrentMotoId = null;
+function openVendreModal(motoId) {
+  _vendreCurrentMotoId = motoId;
+  ['vClientEmail','vClientNom','vClientTel'].forEach(function(id){ const el=document.getElementById(id); if(el) el.value=''; });
+  document.getElementById('vendreErr').style.display = 'none';
+  document.getElementById('vendreModalOverlay').style.display = 'flex';
+}
+function closeVendreModal() { document.getElementById('vendreModalOverlay').style.display = 'none'; }
+
+async function submitVendre() {
+  const btn = document.getElementById('vendreSubmitBtn');
+  const err = document.getElementById('vendreErr');
+  err.style.display = 'none';
+  const client_email = document.getElementById('vClientEmail').value.trim();
+  const client_nom   = document.getElementById('vClientNom').value.trim();
+  const client_tel   = document.getElementById('vClientTel').value.trim();
+  const mode_acquisition = document.getElementById('vModeAcq').value;
+  if (!client_email && !client_nom) { err.textContent='Email ou nom du client requis.'; err.style.display='block'; return; }
+  btn.disabled=true; btn.textContent='Traitement…';
+  try {
+    const data = await api('/motos/'+_vendreCurrentMotoId+'/vendre','POST',{client_email,client_nom,client_tel,mode_acquisition});
+    closeVendreModal();
+    toast('Moto vendue — dossier transféré au client');
+    await loadDashboard();
+    selectedMoto = data.moto; ficheTab='infos'; renderFiche();
+  } catch(e) { err.textContent=e.message; err.style.display='block'; btn.disabled=false; btn.textContent='Confirmer la vente'; }
+}
+
+// ── L8 — BADGE RÉCLAMATIONS ──
+async function loadReclamBadge() {
+  try {
+    const data = await api('/garage/reclamations');
+    reclamCount = (data.reclamations||[]).length;
+    const badge = document.getElementById('badgeReclam');
+    if (!badge) return;
+    if (reclamCount>0) { badge.textContent=reclamCount; badge.style.display='inline-flex'; }
+    else badge.style.display='none';
+  } catch(e) {}
+}
+
+// ── L8 — RÉCLAMATIONS GARAGE ──
+async function loadReclamations() {
+  const m = document.getElementById('main');
+  m.innerHTML='<div class="loading">Chargement des réclamations…</div>';
+  try {
+    const data = await api('/garage/reclamations');
+    const list = data.reclamations||[];
+    m.innerHTML = `<div class="section-header"><div><div class="section-title">Réclamations</div><div class="section-sub">${list.length} en attente</div></div></div>` +
+      (list.length===0
+        ? '<div class="empty"><div class="empty-icon">✅</div><div class="empty-text">Aucune réclamation en attente</div><div class="empty-sub">Toutes les demandes ont été traitées</div></div>'
+        : list.map(function(r){
+            const moto=r.motos||{}; const client=r.clients||{};
+            const dateStr=r.date_creation?new Date(r.date_creation).toLocaleDateString('fr-FR'):'—';
+            return `<div class="reclamation-card">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:8px">
+                <div>
+                  <div style="font-size:14px;font-weight:700">${(moto.marque||'')+' '+(moto.modele||'')} — ${moto.plaque||'—'}</div>
+                  <div style="font-size:13px;color:var(--text2);margin-top:4px">Client : ${client.nom||'—'} · ${client.email||'—'}</div>
+                  <div style="font-size:12px;color:var(--text2);margin-top:2px">Réclamé le ${dateStr}</div>
+                  <div style="font-size:12px;margin-top:4px">VIN fourni : <code style="background:var(--bg);padding:2px 6px;border-radius:4px">${r.vin_fourni||'—'}</code></div>
+                </div>
+                <span class="badge badge-jaune">En attente</span>
+              </div>
+              <div class="reclamation-actions">
+                <button class="btn btn-primary btn-sm" onclick="repondreReclamation('${r.id}','accepte')">Accepter</button>
+                <button class="btn btn-secondary btn-sm" onclick="openRefuseReclam('${r.id}')">Refuser</button>
+              </div>
+            </div>`;
+          }).join(''));
+  } catch(e) { m.innerHTML='<div class="card"><div class="alert alert-warn">Erreur : '+e.message+'</div></div>'; }
+}
+
+async function repondreReclamation(id, statut, motif_refus) {
+  try {
+    await api('/garage/reclamations/'+id,'PATCH',{statut,motif_refus:motif_refus||null});
+    toast(statut==='accepte'?'Réclamation acceptée — moto transférée':'Réclamation refusée');
+    loadReclamBadge(); loadReclamations();
+  } catch(e) { toast('Erreur : '+e.message); }
+}
+
+function openRefuseReclam(id) {
+  const motif = prompt('Motif du refus (optionnel) :');
+  if (motif===null) return;
+  repondreReclamation(id,'refuse',motif||null);
+}
+
+// ── L8 — CLIENTS GARAGE ──
+async function loadClients() {
+  const m = document.getElementById('main');
+  m.innerHTML='<div class="loading">Chargement des clients…</div>';
+  try {
+    const data = await api('/garage/clients');
+    const list = data.clients||[];
+    const actifs = list.filter(function(c){return !c.a_quitte;}).length;
+    const partis = list.filter(function(c){return c.a_quitte;}).length;
+    m.innerHTML = `<div class="section-header"><div><div class="section-title">Mes clients</div><div class="section-sub">${actifs} actif${actifs>1?'s':''} · ${partis} ayant quitté</div></div></div>` +
+      (list.length===0
+        ? '<div class="empty"><div class="empty-icon">👤</div><div class="empty-text">Aucun client</div><div class="empty-sub">Les clients apparaissent ici après une vente ou une liaison</div></div>'
+        : `<table class="table"><thead><tr><th>Nom</th><th>Email</th><th>Téléphone</th><th>Statut</th></tr></thead><tbody>`+
+          list.map(function(c){
+            const cl=c.clients||{};
+            const statut=c.a_quitte?'<span class="badge-quit">A quitté</span>':'<span class="badge badge-vert">Actif</span>';
+            return `<tr><td>${cl.nom||'—'}</td><td>${cl.email||'—'}</td><td>${cl.tel||'—'}</td><td>${statut}</td></tr>`;
+          }).join('')+
+          `</tbody></table>`);
+  } catch(e) { m.innerHTML='<div class="card"><div class="alert alert-warn">Erreur : '+e.message+'</div></div>'; }
 }
 
 // ── HELPERS ──

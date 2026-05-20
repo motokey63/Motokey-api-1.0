@@ -140,6 +140,21 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
 .toast.info{background:var(--blbg);color:var(--bl);border:1px solid var(--blbd);}
 @keyframes toast-in{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
 
+/* ── L8 — Onglets client ── */
+#client-tabs{background:#fff;border-bottom:1px solid var(--border);padding:0 16px;display:flex;gap:2px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+#client-tabs::-webkit-scrollbar{display:none}
+.client-tab{padding:12px 14px;border:none;background:none;color:var(--tx2);font-size:13px;font-weight:500;cursor:pointer;border-bottom:3px solid transparent;transition:.15s;white-space:nowrap;font-family:inherit}
+.client-tab:hover{color:var(--tx)}
+.client-tab.active{color:var(--acc);border-bottom-color:var(--acc)}
+.nav-badge{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;background:var(--rd);color:#fff;border-radius:10px;font-size:10px;font-weight:800;margin-left:4px;vertical-align:middle}
+/* ── CTA Pro ── */
+.cta-pro-block{background:var(--pubg);border:2px dashed var(--pu);border-radius:12px;padding:24px;text-align:center;margin-bottom:20px}
+.cta-pro-crown{font-size:40px;margin-bottom:8px}
+.cta-pro-title{font-size:16px;font-weight:800;color:var(--pu);margin-bottom:6px}
+.cta-pro-sub{font-size:13px;color:var(--tx2);margin-bottom:16px;line-height:1.5}
+/* ── Alert inline ── */
+.alert-inline{padding:12px 16px;border-radius:10px;font-size:13px;margin-bottom:16px}
+.alert-err{background:var(--rdbg);border:1px solid var(--rdbd);color:var(--rd)}
 /* ── Responsive ── */
 @media(max-width:600px){
   .topbar{padding:0 16px;}
@@ -315,13 +330,41 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
      ÉCRAN 6 — APP (vue principale client)
 ════════════════════════════════════════════ -->
 <div id="screen-app" style="display:none;">
+  <!-- Onglets L8 -->
+  <div id="client-tabs">
+    <button id="tab-motos" class="client-tab active" onclick="switchClientTab('motos')">Mes motos</button>
+    <button id="tab-add" class="client-tab" onclick="switchClientTab('add')">+ Ajouter</button>
+    <button id="tab-claim" class="client-tab" onclick="switchClientTab('claim')">Réclamer</button>
+    <button id="tab-reclamations" class="client-tab" onclick="switchClientTab('reclamations')">Réclamations <span id="badgeClaimClient" class="nav-badge" style="display:none">0</span></button>
+    <button id="tab-garages" class="client-tab" onclick="switchClientTab('garages')">Mes garages</button>
+  </div>
   <div class="app-wrap">
-    <!-- Sera rempli en Phase 4 — loadMotos() -->
     <div id="app-content">
       <div class="empty-state">
         <div class="empty-icon">🏍</div>
         <p>Chargement de vos motos…</p>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MODALE RÉVOCATION LIAISON (L8)
+════════════════════════════════════════════ -->
+<div id="revokeModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeRevokeModal()">
+  <div style="background:#fff;border-radius:12px;padding:24px;width:100%;max-width:460px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-size:16px;font-weight:800;margin-bottom:4px">Quitter ce garage</div>
+    <div id="revokeGarageName" style="font-size:13px;color:var(--tx2);margin-bottom:16px"></div>
+    <div style="background:var(--ywbg);border:1px solid var(--ywbd);border-radius:8px;padding:14px;font-size:13px;color:var(--yw);margin-bottom:16px;line-height:1.6">
+      <strong>Information légale (art. L110-4 Code de commerce) :</strong> votre historique d'entretien sera conservé par le garage pendant <strong>10 ans</strong> après révocation. Vous perdrez uniquement l'accès en lecture à ces données.
+    </div>
+    <div class="form-group">
+      <label for="revokeMotif">Motif (optionnel)</label>
+      <input id="revokeMotif" placeholder="Ex : changement de garage, vente du véhicule…">
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+      <button class="btn btn-secondary" onclick="closeRevokeModal()">Annuler</button>
+      <button class="btn btn-danger" id="revokeSubmitBtn" onclick="submitRevoke()">Confirmer — Quitter le garage</button>
     </div>
   </div>
 </div>
@@ -684,7 +727,11 @@ async function loadMotos() {
 function goToApp() {
   showScreen('app');
   startRefreshTimer();
+  _clientTab = 'motos';
+  document.querySelectorAll('.client-tab').forEach(function(b){ b.classList.remove('active'); });
+  const t = document.getElementById('tab-motos'); if (t) t.classList.add('active');
   loadMotos();
+  loadClaimCountBadge();
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1035,6 +1082,207 @@ document.getElementById('btn-change-password').addEventListener('click', async (
   showScreen('reset-confirm');
   toast('Code envoyé à ' + email + '.', 'info');
 });
+
+/* ═══════════════════════════════════════════════════════
+   L8 — ONGLETS CLIENT
+═══════════════════════════════════════════════════════ */
+const CLOUDINARY_CLOUD  = '';
+const CLOUDINARY_PRESET = 'motokey_unsigned';
+
+let _clientTab = 'motos';
+
+function switchClientTab(tab) {
+  _clientTab = tab;
+  document.querySelectorAll('.client-tab').forEach(function(b){ b.classList.remove('active'); });
+  const btn = document.getElementById('tab-' + tab);
+  if (btn) btn.classList.add('active');
+  if (tab === 'motos')         loadMotos();
+  else if (tab === 'add')      renderAddMotoTab();
+  else if (tab === 'claim')    renderClaimTab();
+  else if (tab === 'reclamations') loadClientReclamationsTab();
+  else if (tab === 'garages')  loadClientGaragesTab();
+}
+
+async function loadClaimCountBadge() {
+  const at = localStorage.getItem(LS_AT);
+  const { ok, data } = await apiGet('/client/reclamations', at);
+  if (!ok) return;
+  const count = (data.reclamations||[]).filter(function(r){ return r.statut==='en_attente'; }).length;
+  const badge = document.getElementById('badgeClaimClient');
+  if (!badge) return;
+  if (count>0) { badge.textContent=count; badge.style.display='inline-flex'; } else badge.style.display='none';
+}
+
+async function renderAddMotoTab() {
+  const content = document.getElementById('app-content');
+  content.innerHTML = `<div class="empty-state"><div class="empty-icon" style="font-size:32px">⏳</div><p>Vérification de la limite…</p></div>`;
+  const at = localStorage.getItem(LS_AT);
+  const { ok, data } = await apiGet('/client/limite-motos', at);
+  const lim = ok ? data : { count:0, limite:3, can_add:true, cta_pro:false };
+  const ctaHtml = !lim.can_add ? `<div class="cta-pro-block"><div class="cta-pro-crown">👑</div><div class="cta-pro-title">Passez Pro pour plus de motos</div><div class="cta-pro-sub">Limite de ${lim.limite} moto${lim.limite>1?'s':''} atteinte (plan Standard). Le plan Pro vous permet d'en gérer jusqu'à 10.</div><button class="btn btn-secondary" style="opacity:.6;color:var(--pu);border-color:var(--pu)" disabled>Passer au plan Pro (bientôt)</button></div>` : '';
+  content.innerHTML = `
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">Ajouter une moto</div>
+    <div style="font-size:13px;color:var(--tx2);margin-bottom:16px">${lim.count} / ${lim.limite} utilisée${lim.count>1?'s':''}</div>
+    ${ctaHtml}
+    ${lim.can_add ? `<div class="card card-sm">
+      <div id="addMotoErr" class="alert-inline alert-err" style="display:none"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group"><label>Marque *</label><input id="amMarque" placeholder="Yamaha"></div>
+        <div class="form-group"><label>Modèle *</label><input id="amModele" placeholder="MT-07"></div>
+        <div class="form-group"><label>Année</label><input id="amAnnee" type="number" placeholder="2021"></div>
+        <div class="form-group"><label>Kilométrage</label><input id="amKm" type="number" placeholder="0"></div>
+        <div class="form-group"><label>Plaque *</label><input id="amPlaque" placeholder="AB-123-CD"></div>
+        <div class="form-group"><label>VIN *</label><input id="amVin" placeholder="17 caractères"></div>
+      </div>
+      <div class="form-group"><label>Mode d'acquisition</label>
+        <select id="amMode"><option value="achat_occasion">Achat occasion</option><option value="achat_neuf">Achat neuf</option><option value="don">Don</option><option value="heritage">Héritage</option><option value="inconnu">Non précisé</option></select>
+      </div>
+      <button class="btn btn-primary" id="btnSubmitAddMoto" onclick="submitAddMoto()" style="margin-top:4px">Enregistrer ma moto</button>
+    </div>` : ''}`;
+}
+
+async function submitAddMoto() {
+  const btn = document.getElementById('btnSubmitAddMoto');
+  const err = document.getElementById('addMotoErr');
+  err.style.display = 'none';
+  const marque=document.getElementById('amMarque').value.trim(), modele=document.getElementById('amModele').value.trim();
+  const plaque=document.getElementById('amPlaque').value.trim(), vin=document.getElementById('amVin').value.trim();
+  if (!marque||!modele||!plaque||!vin) { err.textContent='Marque, modèle, plaque et VIN requis.'; err.style.display='block'; return; }
+  setLoading(btn, true, 'Enregistrement…');
+  const at = localStorage.getItem(LS_AT);
+  const { ok, data, status } = await apiPost('/client/motos', { marque, modele, plaque, vin,
+    annee: parseInt(document.getElementById('amAnnee').value)||null,
+    km: parseInt(document.getElementById('amKm').value)||0,
+    mode_acquisition: document.getElementById('amMode').value }, at);
+  setLoading(btn, false);
+  if (!ok) { err.textContent = status===402 ? 'Limite atteinte — passez Pro.' : errMsg(data); err.style.display='block'; return; }
+  toast('Moto ajoutée !', 'success');
+  switchClientTab('motos');
+}
+
+function renderClaimTab() {
+  const content = document.getElementById('app-content');
+  const uploadHtml = CLOUDINARY_CLOUD
+    ? `<div class="form-group"><label>Photo carte grise *</label><input type="file" id="claimPhoto" accept="image/*" capture="environment" style="padding:6px;border:1px solid var(--border);border-radius:8px;width:100%;background:var(--card)"><div class="form-hint">JPG/PNG · max 5 Mo</div></div>`
+    : `<div class="form-group"><label>Photo carte grise</label><div style="padding:12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;font-size:13px;color:var(--tx2)">Upload désactivé temporairement — contactez votre garage pour finaliser la réclamation.</div></div>`;
+  content.innerHTML = `
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px">Réclamer une moto</div>
+    <p style="font-size:13px;color:var(--tx2);margin-bottom:16px">Moto déjà référencée dans MotoKey ? Soumettez votre réclamation — le garage vérifiera vos documents.</p>
+    <div class="card card-sm">
+      <div id="claimErr" class="alert-inline alert-err" style="display:none"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group"><label>VIN *</label><input id="claimVin" placeholder="17 caractères"></div>
+        <div class="form-group"><label>Plaque *</label><input id="claimPlaque" placeholder="AB-123-CD"></div>
+      </div>
+      ${uploadHtml}
+      <button class="btn btn-primary" id="btnSubmitClaim" onclick="submitClaim()" style="margin-top:4px">Soumettre la réclamation</button>
+    </div>`;
+}
+
+async function uploadToCloudinary(file) {
+  const fd = new FormData(); fd.append('file', file); fd.append('upload_preset', CLOUDINARY_PRESET);
+  const r = await fetch('https://api.cloudinary.com/v1_1/'+CLOUDINARY_CLOUD+'/image/upload', { method:'POST', body:fd });
+  const j = await r.json();
+  if (!j.secure_url) throw new Error('Upload échoué — '+(j.error?.message||'erreur Cloudinary'));
+  return j.secure_url;
+}
+
+async function submitClaim() {
+  const btn = document.getElementById('btnSubmitClaim');
+  const err = document.getElementById('claimErr');
+  err.style.display='none';
+  const vin_fourni=document.getElementById('claimVin').value.trim();
+  const plaque_fournie=document.getElementById('claimPlaque').value.trim();
+  if (!vin_fourni||!plaque_fournie) { err.textContent='VIN et plaque requis.'; err.style.display='block'; return; }
+  setLoading(btn, true, 'Traitement…');
+  let carte_grise_photo_url = 'pending_manual_verification';
+  if (CLOUDINARY_CLOUD) {
+    const fi = document.getElementById('claimPhoto');
+    const file = fi && fi.files[0];
+    if (!file) { setLoading(btn,false); err.textContent='Photo carte grise requise.'; err.style.display='block'; return; }
+    try { carte_grise_photo_url = await uploadToCloudinary(file); }
+    catch(ue) { setLoading(btn,false); err.textContent='Upload : '+ue.message; err.style.display='block'; return; }
+  }
+  const at = localStorage.getItem(LS_AT);
+  const { ok, data } = await apiPost('/client/reclamations', { vin_fourni, plaque_fournie, carte_grise_photo_url }, at);
+  setLoading(btn, false);
+  if (!ok) { err.textContent=errMsg(data); err.style.display='block'; return; }
+  toast('Réclamation soumise — en attente de validation du garage', 'success');
+  switchClientTab('reclamations');
+}
+
+async function loadClientReclamationsTab() {
+  const content = document.getElementById('app-content');
+  content.innerHTML = `<div class="empty-state"><div class="empty-icon" style="font-size:32px">⏳</div><p>Chargement…</p></div>`;
+  const at = localStorage.getItem(LS_AT);
+  const { ok, data } = await apiGet('/client/reclamations', at);
+  if (!ok) { content.innerHTML=`<div class="empty-state"><div class="empty-icon">⚠️</div><p>${esc(errMsg(data))}</p></div>`; return; }
+  const list = data.reclamations||[];
+  if (!list.length) { content.innerHTML=`<div class="empty-state"><div class="empty-icon">📋</div><p>Aucune réclamation en cours.</p><button class="btn btn-primary" style="margin-top:12px" onclick="switchClientTab('claim')">Réclamer une moto</button></div>`; return; }
+  const sLabel={'en_attente':'En attente','accepte':'Acceptée','refuse':'Refusée','litige':'Litige'};
+  const sCls={'en_attente':'yw','accepte':'gn','refuse':'rd','litige':'rd'};
+  content.innerHTML = `<div style="font-size:16px;font-weight:700;margin-bottom:16px">Mes réclamations</div><div style="display:flex;flex-direction:column;gap:12px">`+
+    list.map(function(r){
+      const moto=r.motos||{}; const sc=sCls[r.statut]||'bl'; const lbl=sLabel[r.statut]||r.statut;
+      const dateStr=r.date_creation?new Date(r.date_creation).toLocaleDateString('fr-FR'):'—';
+      return `<div class="card card-sm"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+        <div><div style="font-size:14px;font-weight:700">${esc(moto.marque||'')} ${esc(moto.modele||'')} — ${esc(moto.plaque||'—')}</div>
+        <div style="font-size:12px;color:var(--tx2);margin-top:4px">VIN fourni : ${esc(r.vin_fourni||'—')}</div>
+        <div style="font-size:12px;color:var(--tx2)">Soumis le ${dateStr}</div>
+        ${r.motif_refus?`<div style="font-size:12px;color:var(--rd);margin-top:4px">Motif refus : ${esc(r.motif_refus)}</div>`:''}</div>
+        <span style="background:var(--${sc}bg);color:var(--${sc});border:1px solid var(--${sc}bd);padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700">${lbl}</span>
+      </div></div>`;
+    }).join('')+`</div>`;
+}
+
+async function loadClientGaragesTab() {
+  const content = document.getElementById('app-content');
+  content.innerHTML = `<div class="empty-state"><div class="empty-icon" style="font-size:32px">⏳</div><p>Chargement de vos garages…</p></div>`;
+  const at = localStorage.getItem(LS_AT);
+  const { ok, data } = await apiGet('/client/garages', at);
+  if (!ok) { content.innerHTML=`<div class="empty-state"><div class="empty-icon">⚠️</div><p>${esc(errMsg(data))}</p></div>`; return; }
+  const list = data.garages||[];
+  if (!list.length) { content.innerHTML=`<div class="empty-state"><div class="empty-icon">🔧</div><p>Aucun garage lié à votre compte.</p></div>`; return; }
+  content.innerHTML = `<div style="font-size:16px;font-weight:700;margin-bottom:16px">Mes garages</div><div style="display:flex;flex-direction:column;gap:12px">`+
+    list.map(function(g){
+      const garage=g.garages||{}; const isActive=g.statut==='actif';
+      const dateStr=g.date_creation?new Date(g.date_creation).toLocaleDateString('fr-FR'):'—';
+      return `<div class="card card-sm"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+        <div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:700">${esc(garage.nom||'Garage')}</div>
+        ${garage.adresse?`<div style="font-size:13px;color:var(--tx2);margin-top:2px">${esc(garage.adresse)}</div>`:''}
+        ${garage.tel?`<div style="font-size:13px;color:var(--tx2)">${esc(garage.tel)}</div>`:''}
+        <div style="font-size:12px;color:var(--tx3);margin-top:4px">Lié depuis le ${dateStr}</div></div>
+        <span style="background:${isActive?'var(--gnbg)':'var(--bg)'};color:${isActive?'var(--gn)':'var(--tx3)'};border:1px solid ${isActive?'var(--gnbd)':'var(--border)'};padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700">${isActive?'Actif':'Quitté'}</span>
+      </div>${isActive?`<div style="margin-top:12px"><button class="btn btn-danger" style="font-size:12px;padding:6px 14px" onclick="openRevokeModal('${g.id}','${esc(garage.nom||'ce garage').replace(/'/g,"\\'")}')">Quitter ce garage</button></div>`:''}</div>`;
+    }).join('')+`</div>`;
+}
+
+let _revokeId = null;
+function openRevokeModal(id, name) {
+  _revokeId = id;
+  document.getElementById('revokeGarageName').textContent = name;
+  document.getElementById('revokeMotif').value = '';
+  const el = document.getElementById('revokeModalOverlay');
+  el.style.display = 'flex';
+}
+function closeRevokeModal() { document.getElementById('revokeModalOverlay').style.display = 'none'; }
+
+async function submitRevoke() {
+  const btn = document.getElementById('revokeSubmitBtn');
+  const motif = document.getElementById('revokeMotif').value.trim() || null;
+  setLoading(btn, true, 'Traitement…');
+  const at = localStorage.getItem(LS_AT);
+  try {
+    const r = await fetch(API_BASE+'/client/garages/'+_revokeId, { method:'DELETE',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+at}, body:JSON.stringify({motif}) });
+    const j = await r.json();
+    if (!j.success) throw new Error(j.error?.message||j.message||'Erreur');
+    closeRevokeModal();
+    toast('Vous avez quitté le garage. Historique conservé 10 ans.','info');
+    loadClientGaragesTab();
+  } catch(e) { toast(e.message,'error'); }
+  setLoading(btn, false);
+}
 
 /* ═══════════════════════════════════════════════════════
    DÉMARRAGE
