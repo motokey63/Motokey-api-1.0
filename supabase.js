@@ -300,6 +300,7 @@ const Motos = {
       proprietaire_type:       proprietaire_type,
       proprietaire_client_id:  proprietaire_type === 'client'  ? client_id  : null,
       proprietaire_garage_id:  proprietaire_type === 'garage'  ? garage_id  : null,
+      proprio_libre:           proprietaire_type === 'inconnu' ? (payload.proprio_libre || null) : null,
       date_debut:              new Date().toISOString().slice(0, 10),
       mode_acquisition:        payload.mode_acquisition || 'inconnu'
     };
