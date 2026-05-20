@@ -17,13 +17,15 @@ ALTER TABLE motos
   ADD COLUMN statut_moto TEXT NULL DEFAULT 'actif',
   ADD COLUMN carte_grise_photo_url TEXT NULL;
 
+-- Corriger les motos sans client avant d'ajouter la contrainte
+UPDATE motos SET proprietaire_type = 'inconnu' WHERE client_id IS NULL;
+
 ALTER TABLE motos ADD CONSTRAINT moto_proprietaire_coherence CHECK (
   (proprietaire_type = 'client'  AND client_id IS NOT NULL AND proprietaire_garage_id IS NULL) OR
   (proprietaire_type = 'garage'  AND proprietaire_garage_id IS NOT NULL AND client_id IS NULL) OR
   (proprietaire_type = 'inconnu' AND client_id IS NULL AND proprietaire_garage_id IS NULL)
 );
 
-UPDATE motos SET proprietaire_type = 'client' WHERE client_id IS NOT NULL;
 ALTER TABLE motos ALTER COLUMN client_id DROP NOT NULL;
 
 -- Historique propriétaires

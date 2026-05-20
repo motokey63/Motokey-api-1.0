@@ -1281,62 +1281,69 @@ async function checkLimiteMotosClient(client_id) {
  * mode : valeur de mode_acquisition_enum
  */
 async function cessionMoto(moto_id, nouveau_proprietaire, mode, created_by = null) {
-  // 1. Fermer la ligne courante dans l'historique
+  // Étape 1 : fermer la ligne historique ouverte
   const { error: closeErr } = await supabase
     .from('motos_proprietaires_historique')
-    .update({ date_fin: new Date().toISOString().split('T')[0] })
+    .update({ date_fin: new Date().toISOString().slice(0, 10) })
     .eq('moto_id', moto_id)
     .is('date_fin', null);
-  if (closeErr) throw new Error(`[cessionMoto] close historique: ${closeErr.message}`);
+  if (closeErr) throw new Error(`[cessionMoto] fermeture historique: ${closeErr.message}`);
 
-  // 2. Construire le patch motos et la ligne historique selon le type
-  let motoPatch = { proprietaire_type: nouveau_proprietaire.type };
-  let histoPayload = {
-    moto_id,
-    proprietaire_type:   nouveau_proprietaire.type,
-    date_debut:          new Date().toISOString().split('T')[0],
-    mode_acquisition:    mode,
-    created_by:          created_by || null
-  };
+  try {
+    // Étape 2 : construire le patch moto selon le type
+    const motoPatch = { proprietaire_type: nouveau_proprietaire.type };
+    if (nouveau_proprietaire.type === 'client') {
+      motoPatch.client_id = nouveau_proprietaire.id;
+      motoPatch.proprietaire_garage_id = null;
+      motoPatch.proprio_libre = null;
+    } else if (nouveau_proprietaire.type === 'garage') {
+      motoPatch.proprietaire_garage_id = nouveau_proprietaire.id;
+      motoPatch.client_id = null;
+      motoPatch.proprio_libre = null;
+    } else {
+      motoPatch.client_id = null;
+      motoPatch.proprietaire_garage_id = null;
+      motoPatch.proprio_libre = nouveau_proprietaire.libre || null;
+    }
 
-  if (nouveau_proprietaire.type === 'client') {
-    motoPatch.client_id                = nouveau_proprietaire.id;
-    motoPatch.proprietaire_garage_id   = null;
-    motoPatch.proprio_libre            = null;
-    histoPayload.proprietaire_client_id = nouveau_proprietaire.id;
-    histoPayload.proprietaire_garage_id = null;
-  } else if (nouveau_proprietaire.type === 'garage') {
-    motoPatch.client_id                = null;
-    motoPatch.proprietaire_garage_id   = nouveau_proprietaire.id;
-    motoPatch.proprio_libre            = null;
-    histoPayload.proprietaire_client_id = null;
-    histoPayload.proprietaire_garage_id = nouveau_proprietaire.id;
-  } else {
-    // inconnu
-    motoPatch.client_id                = null;
-    motoPatch.proprietaire_garage_id   = null;
-    motoPatch.proprio_libre            = nouveau_proprietaire.libre || null;
-    histoPayload.proprietaire_client_id = null;
-    histoPayload.proprietaire_garage_id = null;
-    histoPayload.proprio_libre          = nouveau_proprietaire.libre || null;
+    // Étape 3 : mettre à jour la moto
+    const { data: moto, error: motoErr } = await supabase
+      .from('motos')
+      .update(motoPatch)
+      .eq('id', moto_id)
+      .select()
+      .single();
+    if (motoErr) throw new Error(`[cessionMoto] update moto: ${motoErr.message}`);
+
+    // Étape 4 : insérer la nouvelle entrée historique
+    const histoPayload = {
+      moto_id,
+      proprietaire_type: nouveau_proprietaire.type,
+      proprietaire_client_id: nouveau_proprietaire.type === 'client' ? nouveau_proprietaire.id : null,
+      proprietaire_garage_id: nouveau_proprietaire.type === 'garage' ? nouveau_proprietaire.id : null,
+      proprio_libre: nouveau_proprietaire.type === 'inconnu' ? (nouveau_proprietaire.libre || null) : null,
+      date_debut: new Date().toISOString().slice(0, 10),
+      mode_acquisition: mode,
+      created_by: created_by || null
+    };
+    const { error: histoErr } = await supabase
+      .from('motos_proprietaires_historique')
+      .insert(histoPayload);
+    if (histoErr) throw new Error(`[cessionMoto] insert historique: ${histoErr.message}`);
+
+    return moto;
+  } catch (err) {
+    // Compensation : tenter de ré-ouvrir la ligne fermée à l'étape 1
+    await supabase
+      .from('motos_proprietaires_historique')
+      .update({ date_fin: null })
+      .eq('moto_id', moto_id)
+      .not('date_fin', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    console.error('[cessionMoto] CRITICAL: échec cession, compensation partielle tentée —', err.message);
+    throw err;
   }
-
-  // 3. Mettre à jour la moto
-  const { data: motoMaj, error: motoErr } = await supabase
-    .from('motos')
-    .update(motoPatch)
-    .eq('id', moto_id)
-    .select()
-    .single();
-  if (motoErr) throw new Error(`[cessionMoto] update moto: ${motoErr.message}`);
-
-  // 4. Insérer la nouvelle ligne dans l'historique
-  const { error: histoErr } = await supabase
-    .from('motos_proprietaires_historique')
-    .insert(histoPayload);
-  if (histoErr) throw new Error(`[cessionMoto] insert historique: ${histoErr.message}`);
-
-  return motoMaj;
 }
 
 // ══════════════════════════════════════════════════════════
