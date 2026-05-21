@@ -1478,9 +1478,8 @@ const server = http.createServer(async function(req, res){
 
   // GET /client/limite-motos (CLIENT) — compteur motos + statut Pro + CTA — TODO RBAC L8
   if((p=M('GET','/client/limite-motos'))!==null){
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.extractRoleFromRequest(req, SBLayer) : null);
+    if (!ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
     if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
     try {
@@ -1496,9 +1495,8 @@ const server = http.createServer(async function(req, res){
 
   // POST /client/motos (CLIENT) — ajout autonome d'une moto — TODO RBAC L8
   if((p=M('POST','/client/motos'))!==null){
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.extractRoleFromRequest(req, SBLayer) : null);
+    if (!ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
     if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
     try {
@@ -1541,9 +1539,8 @@ const server = http.createServer(async function(req, res){
 
   // POST /client/reclamations (CLIENT) — réclamer une moto orpheline — TODO RBAC L8
   if((p=M('POST','/client/reclamations'))!==null){
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.extractRoleFromRequest(req, SBLayer) : null);
+    if (!ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
     if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
     try {
@@ -1583,9 +1580,8 @@ const server = http.createServer(async function(req, res){
 
   // GET /client/reclamations (CLIENT) — liste des réclamations du client — TODO RBAC L8
   if((p=M('GET','/client/reclamations'))!==null){
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.extractRoleFromRequest(req, SBLayer) : null);
+    if (!ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
     if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
     try {
@@ -1606,9 +1602,8 @@ const server = http.createServer(async function(req, res){
 
   // GET /client/garages (CLIENT) — liste des garages liés au compte client — TODO RBAC L8
   if((p=M('GET','/client/garages'))!==null){
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.extractRoleFromRequest(req, SBLayer) : null);
+    if (!ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
     if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
     try {
@@ -1629,9 +1624,8 @@ const server = http.createServer(async function(req, res){
 
   // DELETE /client/garages/:id (CLIENT) — quitter un garage (révocation) — TODO RBAC L8
   if((p=M('DELETE','/client/garages/:id'))!==null){
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.extractRoleFromRequest(req, SBLayer) : null);
+    if (!ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
     if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
     try {
