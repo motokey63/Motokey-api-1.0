@@ -700,7 +700,8 @@ async function loadMotos() {
     content.innerHTML = `
       <div class="empty-state">
         <div class="empty-icon">🏍</div>
-        <p>Aucune moto liée à votre compte.<br>Contactez votre garage pour associer votre moto.</p>
+        <p>Aucune moto pour l'instant.<br>Ajoutez votre moto vous-même ou demandez à votre garage de vous y aider.</p>
+        <button class="btn btn-primary" style="margin-top:14px" onclick="switchClientTab('add')">+ Ajouter ma moto</button>
       </div>`;
     return;
   }
