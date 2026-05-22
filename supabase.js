@@ -31,10 +31,14 @@ const { createClient } = require('@supabase/supabase-js');
 // ── Validation config ──────────────────────────────────────
 const SUPABASE_URL = process.env.SUPABASE_URL;
 
-// Nouveau système Supabase (Publishable/Secret) avec fallback legacy
+// NOTE migration Supabase (22/05/2026) : inversion de priorité vers JWT legacy
+// car auth.admin.createUser rejette sb_secret_* en local avec "Unregistered API key".
+// Comportement local/prod divergent non élucidé — Railway a aussi sb_secret_* défini
+// mais n'échoue pas (à investiguer post-L8). Tâche : régénérer les sb_*_* propres
+// depuis le dashboard et inverser la priorité une fois validés.
 const SUPABASE_SERVICE_KEY =
-  process.env.SUPABASE_SECRET_KEY ||      // nouveau
-  process.env.SUPABASE_SERVICE_KEY;       // legacy
+  process.env.SUPABASE_SERVICE_KEY ||     // JWT legacy (auth.admin compatible)
+  process.env.SUPABASE_SECRET_KEY;        // nouveau format (fallback)
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   // En mode RAM, on exporte null — motokey-api.js vérifie USE_SUPABASE && SBLayer avant d'appeler
@@ -50,8 +54,8 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
 
 // ── Client Supabase public (pour signInWithPassword, avec RLS) ────
 const SUPABASE_PUBLIC_KEY =
-  process.env.SUPABASE_PUBLISHABLE_KEY || // nouveau
-  process.env.SUPABASE_ANON_KEY ||        // legacy
+  process.env.SUPABASE_ANON_KEY ||        // JWT legacy (GoTrue compatible)
+  process.env.SUPABASE_PUBLISHABLE_KEY || // nouveau format (fallback)
   SUPABASE_SERVICE_KEY;                   // dernier recours
 const supabasePublic = createClient(
   SUPABASE_URL,
