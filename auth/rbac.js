@@ -50,6 +50,7 @@ async function extractRoleFromRequest(req, SBLayer) {
       client_type: (user.app_metadata && user.app_metadata.client_type) || null
     };
   } catch (e) {
+    console.error('[rbac] extractRole exception:', e.message);
     return null;
   }
 }

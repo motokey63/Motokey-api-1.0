@@ -70,6 +70,8 @@
 
 'use strict';
 
+require('dotenv').config();
+
 const http       = require('http');
 const crypto     = require('crypto');
 const url        = require('url');
@@ -86,13 +88,6 @@ try {
 } catch(e) {
   console.warn('⚠️  supabase.js introuvable — mode RAM uniquement:', e.message);
 }
-
-console.log('=== DEBUG ENV ===');
-console.log('JWT_CLIENT_SECRET present:', !!process.env.JWT_CLIENT_SECRET);
-console.log('JWT_CLIENT_SECRET length:', process.env.JWT_CLIENT_SECRET ? process.env.JWT_CLIENT_SECRET.length : 0);
-console.log('FRONTEND_CLIENT_URL present:', !!process.env.FRONTEND_CLIENT_URL);
-console.log('All JWT keys:', Object.keys(process.env).filter(function(k){ return k.includes('JWT'); }));
-console.log('================');
 
 const PORT       = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'motokey_secret_2026';
@@ -1502,6 +1497,7 @@ const server = http.createServer(async function(req, res){
     try {
       const { data: clientRow, error: cliErr } = await SBLayer.supabase
         .from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
+
       if (cliErr || !clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
       const clientId = clientRow.id;
 
@@ -2079,7 +2075,7 @@ const server = http.createServer(async function(req, res){
             tel:          tel || null,
             garage_id:    garageId
           });
-          console.debug('[7b] register: nouveau client créé pour', email);
+
         }
       }
     } catch (e) {
