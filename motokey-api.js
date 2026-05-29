@@ -976,12 +976,12 @@ const server = http.createServer(async function(req, res){
           const { data } = await SBLayer.supabase.from('clients').select('id, garage_id').eq('email', client_email).maybeSingle();
           client = data;
           if (client && !client.garage_id) {
-            await SBLayer.supabase.from('clients').update({ garage_id }).eq('id', client.id);
+            await SBLayer.supabase.from('clients').update({ garage_id: garageId }).eq('id', client.id);
           }
         }
         if (!client) {
           const { data: newClient, error: cliErr } = await SBLayer.supabase.from('clients').insert({
-            garage_id,
+            garage_id: garageId,
             nom:   client_nom   || client_email,
             email: client_email || null,
             tel:   client_tel   || null
