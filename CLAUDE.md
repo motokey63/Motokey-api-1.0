@@ -161,7 +161,7 @@ ADMIN
 
 ### ⏳ À faire
 
-- **`renderFicheOR()`** dans `app.html` — actuellement placeholder "à venir". Édition complète d'un OR : ajout/modif tâches et pièces avec recalcul auto, changement de statut, clôture avec `km_sortie`. **Backend déjà prêt — c'est purement frontend.**
+- ~~**`renderFicheOR()`**~~ — **✅ LIVRÉ (29/05/2026)** : stepper statut inline, transitions directes (valide_client/démarrer/reprendre), modales pour attente/annule/clôture/facturation, édition tâches+pièces+notes+km_entree, km_sortie pré-rempli. Backend était déjà prêt.
 - **Mot de passe oublié comptes garage** (distinct du reset client L7b) — pas commencé
 - **Resend** — configurer `RESEND_API_KEY` côté Railway env vars + activer `EMAIL_ENABLED=true` pour débloquer l'envoi réel des emails de reset password client
 
