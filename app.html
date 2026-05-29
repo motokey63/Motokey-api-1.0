@@ -271,7 +271,7 @@ let orFilters  = { statut: '', search: '', periode: '30j' };
 let curORId      = null;
 let currentOR    = null;
 let currentORHist = [];
-const orEditState = { editing: false, taches: [], pieces: [], dirty: false };
+const orEditState = { editing: false, taches: [], pieces: [], dirty: false, notes_client: '', notes_atelier: '', km_entree: 0 };
 const orPiecePicker = { searchDebounce: null };
 
 // ── RBAC frontend ──
@@ -1110,17 +1110,23 @@ function escAttr(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&q
 
 function startEdit() {
   if (!currentOR) return;
-  orEditState.editing = true;
-  orEditState.taches  = JSON.parse(JSON.stringify(currentOR.or_taches || []));
-  orEditState.pieces  = JSON.parse(JSON.stringify(currentOR.or_pieces || []));
-  orEditState.dirty   = false;
+  orEditState.editing       = true;
+  orEditState.taches        = JSON.parse(JSON.stringify(currentOR.or_taches || []));
+  orEditState.pieces        = JSON.parse(JSON.stringify(currentOR.or_pieces || []));
+  orEditState.notes_client  = currentOR.notes_client  || '';
+  orEditState.notes_atelier = currentOR.notes_atelier || '';
+  orEditState.km_entree     = currentOR.km_entree     || 0;
+  orEditState.dirty         = false;
   rerenderFicheEdit();
 }
 function cancelEdit() {
-  orEditState.editing = false;
-  orEditState.taches  = [];
-  orEditState.pieces  = [];
-  orEditState.dirty   = false;
+  orEditState.editing       = false;
+  orEditState.taches        = [];
+  orEditState.pieces        = [];
+  orEditState.notes_client  = '';
+  orEditState.notes_atelier = '';
+  orEditState.km_entree     = 0;
+  orEditState.dirty         = false;
   rerenderFicheEdit();
 }
 function markDirty() { orEditState.dirty = true; }
@@ -1138,6 +1144,10 @@ function rerenderFicheEdit() {
 function orUpdateTache(i, field, val) { if (orEditState.taches[i]) { orEditState.taches[i][field] = val; markDirty(); } }
 function orRemoveTache(i)  { orEditState.taches.splice(i, 1); markDirty(); rerenderFicheEdit(); }
 function orAddTache()      { orEditState.taches.push({ libelle:'', duree_h:0, taux_horaire:65, statut:'a_faire', description:'' }); markDirty(); rerenderFicheEdit(); }
+
+// OR-level field helpers
+function orUpdateKm(val)             { orEditState.km_entree = parseInt(val) || 0; markDirty(); }
+function orUpdateNotes(field, val)   { orEditState[field] = val; markDirty(); }
 
 // Pièce row helpers
 function orUpdatePiece(i, field, val) { if (orEditState.pieces[i]) { orEditState.pieces[i][field] = val; markDirty(); } }
@@ -1303,6 +1313,7 @@ function buildFicheOR(or, hist) {
   return buildORHeader(enriched)
        + buildORActionBar(or)
        + buildORMotoClient(or)
+       + buildORNotes(or)
        + buildORTaches(taches)
        + buildORPieces(pieces)
        + buildORTotaux(or, taches, pieces)
@@ -1365,7 +1376,11 @@ function buildORMotoClient(or) {
   h += '<div class="or-info-row"><span class="or-info-lbl">Plaque</span><span class="or-info-val" style="font-weight:700">' + (moto.plaque||'—') + '</span></div>';
   if (moto.annee) h += '<div class="or-info-row"><span class="or-info-lbl">Année</span><span class="or-info-val">' + moto.annee + '</span></div>';
   if (moto.vin)   h += '<div class="or-info-row"><span class="or-info-lbl">VIN</span><span class="or-info-val" style="font-family:monospace;font-size:11px">' + moto.vin + '</span></div>';
-  h += '<div class="or-info-row"><span class="or-info-lbl">Km</span><span class="or-info-val">' + kmE + ' km' + kmS + '</span></div>';
+  if (orEditState.editing) {
+    h += '<div class="or-info-row"><span class="or-info-lbl">Km entrée</span><span class="or-info-val"><input type="number" class="or-edit-input" style="width:110px" min="0" value="' + escAttr(String(orEditState.km_entree || 0)) + '" onchange="orUpdateKm(this.value)"></span></div>';
+  } else {
+    h += '<div class="or-info-row"><span class="or-info-lbl">Km</span><span class="or-info-val">' + kmE + ' km' + kmS + '</span></div>';
+  }
   h += '</div>';
 
   h += '<div class="card"><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">👤 Client</div>';
@@ -1529,6 +1544,30 @@ function buildORTotaux(or, taches, pieces) {
   return '<div class="or-totaux" id="orTotauxBox">' + buildORTotauxInner(enriched) + '</div>';
 }
 
+function buildORNotes(or) {
+  const editing = orEditState.editing;
+  const nc = editing ? orEditState.notes_client  : (or.notes_client  || '');
+  const na = editing ? orEditState.notes_atelier : (or.notes_atelier || '');
+  if (!editing && !nc && !na) return '';
+  let h = '<div class="card" style="margin-bottom:14px"><div style="font-size:13px;font-weight:700;margin-bottom:14px">📝 Notes</div>';
+  h += '<div class="or-grid-2" style="margin-bottom:0">';
+  h += '<div><div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Atelier</div>';
+  if (editing) {
+    h += '<textarea class="or-edit-input" style="width:100%;min-height:68px;resize:vertical" placeholder="Notes internes" oninput="orUpdateNotes(\'notes_atelier\',this.value)">' + escHtml(na) + '</textarea>';
+  } else {
+    h += '<div style="font-size:13px;white-space:pre-wrap;color:var(--text1)">' + escHtml(na) + '</div>';
+  }
+  h += '</div>';
+  h += '<div><div style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Client</div>';
+  if (editing) {
+    h += '<textarea class="or-edit-input" style="width:100%;min-height:68px;resize:vertical" placeholder="Visible par le client" oninput="orUpdateNotes(\'notes_client\',this.value)">' + escHtml(nc) + '</textarea>';
+  } else {
+    h += '<div style="font-size:13px;white-space:pre-wrap;color:var(--text1)">' + escHtml(nc) + '</div>';
+  }
+  h += '</div></div></div>';
+  return h;
+}
+
 function buildORHistorique(hist) {
   let h = '<div class="card"><div style="font-size:13px;font-weight:700;margin-bottom:14px">📋 Historique</div>';
   if (!hist.length) {
@@ -1671,6 +1710,16 @@ async function saveEdit() {
         }
       }
     }
+  }
+
+  // PUT OR-level fields if changed
+  const orLevelPatch = {};
+  if (orEditState.notes_client  !== (currentOR.notes_client  || '')) orLevelPatch.notes_client  = orEditState.notes_client;
+  if (orEditState.notes_atelier !== (currentOR.notes_atelier || '')) orLevelPatch.notes_atelier = orEditState.notes_atelier;
+  if (orEditState.km_entree     !== (currentOR.km_entree     || 0))  orLevelPatch.km_entree     = orEditState.km_entree;
+  if (Object.keys(orLevelPatch).length > 0) {
+    try { await api('/ordres-reparation/' + orId, 'PUT', orLevelPatch); }
+    catch(e) { errors.push('Modif. OR : ' + e.message); }
   }
 
   if (errors.length > 0) {
