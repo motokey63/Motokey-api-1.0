@@ -2075,8 +2075,13 @@ const server = http.createServer(async function(req, res){
             tel:          tel || null,
             garage_id:    garageId
           });
-
         }
+
+        // Email de bienvenue — fire-and-forget, n'impacte pas la réponse
+        const prenom = (nom.trim().split(' ')[0]) || nom.trim();
+        emailService.send('welcome', email, { prenom, email }).catch(function(e) {
+          console.error('[7b] welcome email failed:', e.message);
+        });
       }
     } catch (e) {
       console.error('[7b] register error:', e.message);
