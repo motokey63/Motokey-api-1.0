@@ -238,6 +238,10 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
         <input type="password" id="reg-password" placeholder="12 caractères minimum" autocomplete="new-password">
         <div class="form-hint">Min. 12 caractères — majuscule, chiffre et caractère spécial requis.</div>
       </div>
+      <div class="form-group">
+        <label for="reg-password-confirm">Confirmer le mot de passe</label>
+        <input type="password" id="reg-password-confirm" placeholder="Répétez le mot de passe" autocomplete="new-password">
+      </div>
 
       <button class="btn btn-primary btn-full" id="btn-register">Créer mon compte</button>
 
@@ -315,6 +319,10 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
         <label for="reset-new-password">Nouveau mot de passe</label>
         <input type="password" id="reset-new-password" placeholder="12 caractères minimum" autocomplete="new-password">
         <div class="form-hint">Min. 12 caractères — majuscule, chiffre et caractère spécial requis.</div>
+      </div>
+      <div class="form-group">
+        <label for="reset-new-password-confirm">Confirmer le nouveau mot de passe</label>
+        <input type="password" id="reset-new-password-confirm" placeholder="Répétez le mot de passe" autocomplete="new-password">
       </div>
 
       <button class="btn btn-primary btn-full" id="btn-reset-confirm">Réinitialiser le mot de passe</button>
@@ -802,16 +810,18 @@ document.getElementById('link-register').addEventListener('click', () => showScr
 ═══════════════════════════════════════════════════════ */
 document.getElementById('btn-register').addEventListener('click', async () => {
   const btn   = document.getElementById('btn-register');
-  const nom   = document.getElementById('reg-nom').value.trim();
-  const email = document.getElementById('reg-email').value.trim();
-  const tel   = document.getElementById('reg-tel').value.trim();
-  const pwd   = document.getElementById('reg-password').value;
+  const nom        = document.getElementById('reg-nom').value.trim();
+  const email      = document.getElementById('reg-email').value.trim();
+  const tel        = document.getElementById('reg-tel').value.trim();
+  const pwd        = document.getElementById('reg-password').value;
+  const pwdConfirm = document.getElementById('reg-password-confirm').value;
 
   if (!nom || !email || !pwd) { toast('Nom, email et mot de passe requis.', 'error'); return; }
   if (pwd.length < 12) {
     toast('Mot de passe trop court — minimum 12 caractères avec majuscule, chiffre et caractère spécial.', 'error');
     return;
   }
+  if (pwd !== pwdConfirm) { toast('Les mots de passe ne correspondent pas.', 'error'); return; }
 
   setLoading(btn, true, 'Création…');
   const body = { email, password: pwd, nom };
@@ -892,8 +902,9 @@ document.getElementById('btn-reset-request').addEventListener('click', async () 
   pendingEmail = email;
   document.getElementById('reset-confirm-subtitle').textContent =
     'Entrez le code envoyé à ' + email + ' et choisissez votre nouveau mot de passe.';
-  document.getElementById('reset-code').value         = '';
-  document.getElementById('reset-new-password').value = '';
+  document.getElementById('reset-code').value                 = '';
+  document.getElementById('reset-new-password').value         = '';
+  document.getElementById('reset-new-password-confirm').value = '';
   showScreen('reset-confirm');
   toast('Si votre email est enregistré, un code vous a été envoyé.', 'info');
 });
@@ -905,14 +916,16 @@ document.getElementById('link-login-from-reset').addEventListener('click', () =>
 ═══════════════════════════════════════════════════════ */
 document.getElementById('btn-reset-confirm').addEventListener('click', async () => {
   const btn   = document.getElementById('btn-reset-confirm');
-  const token = document.getElementById('reset-code').value.trim();
-  const pwd   = document.getElementById('reset-new-password').value;
+  const token      = document.getElementById('reset-code').value.trim();
+  const pwd        = document.getElementById('reset-new-password').value;
+  const pwdConfirm = document.getElementById('reset-new-password-confirm').value;
 
   if (!token || token.length < 6) { toast('Entrez le code reçu par email.', 'error'); return; }
   if (pwd.length < 12) {
     toast('Mot de passe : minimum 12 caractères avec majuscule, chiffre et caractère spécial.', 'error');
     return;
   }
+  if (pwd !== pwdConfirm) { toast('Les mots de passe ne correspondent pas.', 'error'); return; }
 
   setLoading(btn, true, 'Réinitialisation…');
   const { ok, data } = await apiPost('/auth/client/password-reset/confirm', {
@@ -1078,8 +1091,9 @@ document.getElementById('btn-change-password').addEventListener('click', async (
   pendingEmail = email;
   document.getElementById('reset-confirm-subtitle').textContent =
     'Entrez le code envoyé à ' + email + ' et choisissez votre nouveau mot de passe.';
-  document.getElementById('reset-code').value         = '';
-  document.getElementById('reset-new-password').value = '';
+  document.getElementById('reset-code').value                 = '';
+  document.getElementById('reset-new-password').value         = '';
+  document.getElementById('reset-new-password-confirm').value = '';
   showScreen('reset-confirm');
   toast('Code envoyé à ' + email + '.', 'info');
 });
