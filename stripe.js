@@ -1,3 +1,12 @@
+/* ⚠️ ══════════════════════════════════════════════════════════
+   OBSOLÈTE — NE PAS UTILISER — NE PAS SUPPRIMER
+   Prototype hand-rolled (anciens plans Starter/Pro/Expert 49/99/199€,
+   HTTP via https.request). AUCUN code actuel ne require() ce fichier.
+   Le service Stripe officiel L9 est dans services/stripeService.js
+   (package npm `stripe`, webhook signature sécurisée constructEvent).
+   Conservé pour archive uniquement.
+   ══════════════════════════════════════════════════════════ */
+
 /**
  * ╔══════════════════════════════════════════════════════════╗
  * ║     MOTOKEY — STRIPE ABONNEMENTS (stripe.js)            ║
