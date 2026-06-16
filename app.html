@@ -321,8 +321,33 @@ async function api(path, method='GET', body=null) {
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(API + path, opts);
   const j = await r.json();
-  if (!j.success) throw new Error(j.error?.message || j.message || 'Erreur');
+  if (!j.success) {
+    if (r.status === 402) _show402Banner(j.error?.code, j.error?.message);
+    throw new Error(j.error?.message || j.message || 'Erreur');
+  }
   return j.data;
+}
+
+function _show402Banner(code, message) {
+  let banner = document.getElementById('planLimitBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'planLimitBanner';
+    banner.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#1a1a2e;color:#fff;' +
+      'padding:16px 20px;border-radius:10px;max-width:340px;box-shadow:0 4px 20px rgba(0,0,0,.35);' +
+      'z-index:9999;font-size:13px;animation:fadeIn .2s';
+    document.body.appendChild(banner);
+  }
+  banner.innerHTML =
+    '<div style="font-weight:700;margin-bottom:6px;color:#ff6b00">Limite de plan atteinte</div>' +
+    '<div style="margin-bottom:12px;color:#ccc;line-height:1.4">' + (message || '') + '</div>' +
+    '<div style="display:flex;gap:8px">' +
+      '<button onclick="openBillingPortal()" style="background:#ff6b00;color:#fff;border:none;' +
+        'padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700">Mettre à niveau</button>' +
+      '<button onclick="document.getElementById(\'planLimitBanner\').remove()" style="background:transparent;' +
+        'color:#888;border:1px solid #444;padding:8px 14px;border-radius:6px;cursor:pointer;font-size:12px">Fermer</button>' +
+    '</div>';
+  setTimeout(function() { if (banner.parentNode) banner.remove(); }, 10000);
 }
 
 function toast(msg, dur=3000) {
@@ -508,8 +533,16 @@ function renderBillingBlock(d) {
       html += '<div class="alert alert-warn" style="margin-bottom:12px;font-size:13px">Paiement en échec — accès maintenu jusqu\'au ' + graceEnd + '. Mettez à jour votre moyen de paiement.</div>';
     }
 
+    // Quota avec usage réel si disponible
+    const motosStr = d.motos_limit
+      ? (d.motos_count !== null ? d.motos_count + '/' : '') + d.motos_limit + ' motos'
+      : 'motos illimitées';
+    const usersStr = d.users_limit
+      ? (d.users_count !== null ? d.users_count + '/' : '') + d.users_limit + ' utilisateurs'
+      : 'utilisateurs illimités';
+
     html += '<div style="font-size:13px;color:var(--text2);margin-bottom:16px">' +
-      (d.motos_limit ? 'Quota : ' + d.motos_limit + ' motos · ' + (d.users_limit || '∞') + ' utilisateurs' : 'Quota illimité') +
+      motosStr + ' &nbsp;·&nbsp; ' + usersStr +
       ' &nbsp;·&nbsp; Renouvellement : ' + endFmt +
     '</div>';
 
@@ -599,7 +632,12 @@ async function startCheckout() {
 }
 
 async function openBillingPortal() {
-  toast('Portail de facturation — disponible en Phase 7');
+  try {
+    const d = await api('/billing/portal', 'POST');
+    window.location.href = d.url;
+  } catch(e) {
+    toast('Portail indisponible : ' + e.message);
+  }
 }
 
 async function saveSessionPolicy(minutes) {

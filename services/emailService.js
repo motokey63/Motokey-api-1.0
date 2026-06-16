@@ -37,6 +37,8 @@ const TEMPLATES = {
   reset:            require('../templates/emails/reset'),
   'login-alert':    require('../templates/emails/login-alert'),
   'billing-confirm': require('../templates/emails/billing-confirm'),
+  'trial-ending':    require('../templates/emails/trial-ending'),
+  'payment-failed':  require('../templates/emails/payment-failed'),
 };
 
 /**

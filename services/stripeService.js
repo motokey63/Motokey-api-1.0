@@ -140,6 +140,19 @@ async function handleInvoicePaymentFailed(invoice, SBLayer) {
     grace_period_ends_at: graceEnd,
   });
   console.log(`[webhook] ⚠️  invoice.payment_failed → garage ${garage.id} grace jusqu'au ${graceEnd}`);
+
+  // Email notification — non bloquant
+  const toEmail = invoice.customer_email;
+  if (toEmail) {
+    const baseUrl = process.env.FRONTEND_URL || 'https://motokey11-production.up.railway.app';
+    const portalUrl = `${baseUrl}/app?section=params`;
+    const graceEndFmt = new Date(graceEnd).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' });
+    emailService.send('payment-failed', toEmail, {
+      nom:               garage.nom || 'Garage',
+      portal_url:        portalUrl,
+      grace_end_formatted: graceEndFmt,
+    }).catch(e => console.error('[webhook] Email payment-failed échoué :', e.message));
+  }
 }
 
 async function handleSubscriptionBlocked(sub, SBLayer) {
@@ -168,6 +181,33 @@ async function handleSubscriptionUpdated(sub, SBLayer) {
     users_limit:                     planData.users_limit ?? null,
   });
   console.log(`[webhook] 🔄 subscription.updated → garage ${garage.id} plan ${planKey}`);
+}
+
+async function handleTrialWillEnd(sub, SBLayer) {
+  const customerId = sub.customer;
+  const garage = await SBLayer.Garages.getByStripeCustomerId(customerId);
+  if (!garage) return;
+
+  const trialEndFmt = sub.trial_end
+    ? new Date(sub.trial_end * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+    : '—';
+
+  const customer = await stripe.customers.retrieve(customerId);
+  const toEmail  = customer.email;
+  if (!toEmail) return;
+
+  const baseUrl   = process.env.FRONTEND_URL || 'https://motokey11-production.up.railway.app';
+  const portalUrl = `${baseUrl}/app?section=params`;
+  const planData  = PLANS[garage.plan_code] || {};
+
+  emailService.send('trial-ending', toEmail, {
+    nom:                 garage.nom || 'Garage',
+    plan:                planData.label || garage.plan_code || 'MotoKey',
+    trial_end_formatted: trialEndFmt,
+    portal_url:          portalUrl,
+  }).catch(e => console.error('[webhook] Email trial-ending échoué :', e.message));
+
+  console.log(`[webhook] ⏰ trial_will_end → email envoyé à ${toEmail}`);
 }
 
 async function handleWebhookEvent(event, SBLayer) {
@@ -200,8 +240,7 @@ async function handleWebhookEvent(event, SBLayer) {
       await handleSubscriptionUpdated(event.data.object, SBLayer);
       break;
     case 'customer.subscription.trial_will_end':
-      // Notification email — implémentée en Phase 7
-      console.log(`[webhook] trial_will_end customer ${event.data.object.customer} — email Phase 7`);
+      await handleTrialWillEnd(event.data.object, SBLayer);
       break;
     default:
       console.log(`[webhook] Event ignoré : ${event.type}`);
@@ -273,4 +312,14 @@ async function createAutoTrial(garageId, garageEmail, garageName, SBLayer) {
   return { customer_id: customer.id, subscription_id: sub.id };
 }
 
-module.exports = { stripe, PRICE_IDS, PLANS, handleWebhookEvent, createCheckoutSession, createAutoTrial };
+// ── PHASE 7 : Customer Portal ─────────────────────────────────────────
+
+async function createPortalSession(stripeCustomerId, returnUrl) {
+  if (!stripe) throw new Error('Stripe non configuré');
+  return stripe.billingPortal.sessions.create({
+    customer:   stripeCustomerId,
+    return_url: returnUrl,
+  });
+}
+
+module.exports = { stripe, PRICE_IDS, PLANS, handleWebhookEvent, createCheckoutSession, createAutoTrial, createPortalSession };

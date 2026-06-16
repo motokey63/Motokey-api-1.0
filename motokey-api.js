@@ -79,7 +79,7 @@ const https2     = require('https');
 const clientAuth  = require('./auth/client_auth');
 const emailService = require('./services/emailService');
 const rbac        = require('./auth/rbac');
-const { stripe: stripeClient, handleWebhookEvent, createCheckoutSession, createAutoTrial } = require('./services/stripeService');
+const { stripe: stripeClient, handleWebhookEvent, createCheckoutSession, createAutoTrial, createPortalSession } = require('./services/stripeService');
 const planLimits = require('./auth/planLimits');
 
 // Couche Supabase (supabase.js) — chargée si SUPABASE_URL + SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_KEY) présents
@@ -1858,22 +1858,56 @@ const server = http.createServer(async function(req, res){
 
     if (USE_SUPABASE && SBLayer) {
       try {
-        const g = await SBLayer.Garages.getById(garageId);
+        let g = await SBLayer.Garages.getById(garageId);
 
-        // Auto-trial : si BILLING_ENFORCE=true et aucun plan, créer un trial Stripe silencieusement
+        // Auto-trial : si BILLING_ENFORCE=true et aucun plan, créer un trial silencieusement
         const BILLING_ENFORCE = process.env.BILLING_ENFORCE === 'true';
         if (BILLING_ENFORCE && !g.plan_code && stripeClient) {
           await createAutoTrial(garageId, req.ctx.email, g.nom, SBLayer).catch(e =>
             console.error('[billing] auto-trial échoué :', e.message)
           );
-          const updated = await SBLayer.Garages.getById(garageId);
-          return ok(res, buildBillingStatus(updated), 'Statut abonnement');
+          g = await SBLayer.Garages.getById(garageId);
         }
 
-        return ok(res, buildBillingStatus(g), 'Statut abonnement');
+        // Counts actuels pour l'affichage des quotas restants
+        const [motosRes, usersRes] = await Promise.all([
+          SBLayer.supabase.from('motos').select('id', { count: 'exact', head: true }).eq('garage_id', garageId),
+          SBLayer.supabase.from('garage_users').select('id', { count: 'exact', head: true }).eq('garage_id', garageId).eq('actif', true),
+        ]);
+
+        return ok(res, {
+          ...buildBillingStatus(g),
+          motos_count: motosRes.count ?? null,
+          users_count: usersRes.count ?? null,
+        }, 'Statut abonnement');
       } catch (e) { return fail(res, e.message, 500, 'DB_ERROR'); }
     }
     return ok(res, { plan_code: null, subscription_status: null }, 'Statut abonnement (mode RAM)');
+  }
+
+  // POST /billing/portal (PRO+) — génère un lien one-time vers le Customer Portal Stripe
+  if ((p = M('POST', '/billing/portal')) !== null) {
+    if (!req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    if (!rbac.requireRole(req.ctx, 'PRO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
+    if (!stripeClient) return fail(res, 'Stripe non configuré', 503, 'STRIPE_UNAVAILABLE');
+
+    const garageId = await rbac.getGarageIdForUser(req.ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable', 404, 'NOT_FOUND');
+
+    let stripeCustomerId = null;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const g = await SBLayer.Garages.getById(garageId);
+        stripeCustomerId = g.stripe_customer_id || null;
+      } catch (_) {}
+    }
+    if (!stripeCustomerId) return fail(res, 'Aucun abonnement Stripe trouvé pour ce garage', 404, 'NO_SUBSCRIPTION');
+
+    try {
+      const baseUrl  = process.env.FRONTEND_URL || 'https://motokey11-production.up.railway.app';
+      const session  = await createPortalSession(stripeCustomerId, `${baseUrl}/app?section=params`);
+      return ok(res, { url: session.url }, 'Session portail créée');
+    } catch (e) { return fail(res, e.message, 500, 'STRIPE_ERROR'); }
   }
 
   // POST /billing/checkout (PRO+) — crée une session Stripe Checkout et retourne l'URL
