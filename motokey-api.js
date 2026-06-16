@@ -80,6 +80,7 @@ const clientAuth  = require('./auth/client_auth');
 const emailService = require('./services/emailService');
 const rbac        = require('./auth/rbac');
 const { stripe: stripeClient, handleWebhookEvent, createCheckoutSession, createAutoTrial } = require('./services/stripeService');
+const planLimits = require('./auth/planLimits');
 
 // Couche Supabase (supabase.js) — chargée si SUPABASE_URL + SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_KEY) présents
 let SBLayer = null;
@@ -719,6 +720,9 @@ const server = http.createServer(async function(req, res){
 
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    try { await planLimits.assertMotosLimit(garageId, SBLayer); }
+    catch (e) { return fail(res, e.message, e.statusCode || 500, e.code || 'ERROR'); }
 
     if (USE_SUPABASE && SBLayer) {
       try {
@@ -1929,6 +1933,10 @@ const server = http.createServer(async function(req, res){
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    try { await planLimits.assertUsersLimit(garageId, SBLayer); }
+    catch (e) { return fail(res, e.message, e.statusCode || 500, e.code || 'ERROR'); }
+
     const { email, password, role } = b;
     if (!email || !password || !role) return fail(res, 'email, password et role requis', 400, 'MISSING_FIELDS');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail(res, 'Format email invalide', 400, 'INVALID_EMAIL');
