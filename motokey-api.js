@@ -79,6 +79,7 @@ const https2     = require('https');
 const clientAuth  = require('./auth/client_auth');
 const emailService = require('./services/emailService');
 const rbac        = require('./auth/rbac');
+const { stripe: stripeClient, handleWebhookEvent } = require('./services/stripeService');
 
 // Couche Supabase (supabase.js) — chargée si SUPABASE_URL + SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_KEY) présents
 let SBLayer = null;
@@ -484,6 +485,43 @@ const server = http.createServer(async function(req, res){
   if(pathname==='/client' && method==='GET'){
     res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS','Access-Control-Allow-Headers':'Content-Type,Authorization','Cache-Control':'no-cache, no-store, must-revalidate','Pragma':'no-cache','Expires':'0'});
     res.end(getClientHTML());
+    return;
+  }
+
+  // ── POST /stripe/webhook ── monté AVANT body() pour conserver les bytes bruts
+  if (pathname === '/stripe/webhook' && method === 'POST') {
+    const sig = req.headers['stripe-signature'];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!stripeClient || !webhookSecret) {
+      console.warn('[webhook] Stripe ou STRIPE_WEBHOOK_SECRET non configuré');
+      res.writeHead(200); res.end(JSON.stringify({ ignored: true }));
+      return;
+    }
+
+    const rawBody = await new Promise((resolve, reject) => {
+      const chunks = [];
+      req.on('data', c => chunks.push(c));
+      req.on('end',  () => resolve(Buffer.concat(chunks)));
+      req.on('error', reject);
+    });
+
+    let event;
+    try {
+      event = stripeClient.webhooks.constructEvent(rawBody, sig, webhookSecret);
+    } catch (err) {
+      console.error('[webhook] Signature invalide :', err.message);
+      res.writeHead(400); res.end(JSON.stringify({ error: 'Invalid signature' }));
+      return;
+    }
+
+    try {
+      const result = await handleWebhookEvent(event, SBLayer);
+      res.writeHead(200); res.end(JSON.stringify(result));
+    } catch (err) {
+      console.error('[webhook] Erreur handler :', err.message);
+      res.writeHead(500); res.end(JSON.stringify({ error: 'Handler error' }));
+    }
     return;
   }
 

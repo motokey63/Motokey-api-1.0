@@ -188,6 +188,19 @@ const Garages = {
     return update('garages', id, clean);
   },
 
+  async updateBilling(id, payload) {
+    const allowed = ['stripe_customer_id','stripe_subscription_id','plan_code','subscription_status',
+                     'subscription_current_period_end','grace_period_ends_at','motos_limit','users_limit'];
+    const clean = Object.fromEntries(Object.entries(payload).filter(([k]) => allowed.includes(k)));
+    return update('garages', id, clean);
+  },
+
+  async getByStripeCustomerId(stripe_customer_id) {
+    const { data, error } = await supabase.from('garages').select('*').eq('stripe_customer_id', stripe_customer_id).maybeSingle();
+    if (error) throw new Error(`[garages] ${error.message}`);
+    return data;
+  },
+
   async getStats(garage_id) {
     const [motos, interventions, devis] = await Promise.all([
       supabase.from('motos').select('couleur_dossier, score').eq('garage_id', garage_id),
@@ -1385,6 +1398,21 @@ async function cessionMoto(moto_id, nouveau_proprietaire, mode, created_by = nul
 }
 
 // ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// BILLING EVENTS — idempotency guard + audit log
+// ══════════════════════════════════════════════════════════
+const BillingEvents = {
+  async insert(stripe_event_id, event_type, payload) {
+    const { data, error } = await supabase
+      .from('billing_events')
+      .insert({ stripe_event_id, event_type, payload })
+      .select()
+      .single();
+    if (error) throw new Error(`[billing_events] ${error.message}`);
+    return data;
+  }
+};
+
 // EXPORT
 // ══════════════════════════════════════════════════════════
 module.exports = {
@@ -1407,5 +1435,6 @@ module.exports = {
   GarageUsers,
   resolveProprietaire,
   checkLimiteMotosClient,
-  cessionMoto
+  cessionMoto,
+  BillingEvents
 };
