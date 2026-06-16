@@ -16,6 +16,8 @@
 
 'use strict';
 
+const emailService = require('./emailService');
+
 const STRIPE_ENABLED = !!process.env.STRIPE_SECRET_KEY;
 
 let stripe = null;
@@ -96,6 +98,20 @@ async function handleCheckoutCompleted(session, SBLayer) {
     users_limit:                     planData.users_limit ?? null,
   });
   console.log(`[webhook] ✅ checkout.completed → garage ${garageId} plan ${planKey}`);
+
+  // Email de confirmation — non bloquant
+  const toEmail = session.customer_details?.email || session.customer_email;
+  if (toEmail) {
+    const trialEnd = sub.trial_end
+      ? new Date(sub.trial_end * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+      : null;
+    emailService.send('billing-confirm', toEmail, {
+      nom:                  session.customer_details?.name || 'Garage',
+      plan:                 planData.label || planKey,
+      trial_end_formatted:  trialEnd,
+      app_url:              process.env.FRONTEND_URL || 'https://motokey11-production.up.railway.app',
+    }).catch(e => console.error('[webhook] Email billing-confirm échoué :', e.message));
+  }
 }
 
 async function handleInvoicePaid(invoice, SBLayer) {
@@ -194,4 +210,67 @@ async function handleWebhookEvent(event, SBLayer) {
   return { processed: true };
 }
 
-module.exports = { stripe, PRICE_IDS, PLANS, handleWebhookEvent };
+// ── PHASE 5 : Checkout + Auto-trial ──────────────────────────────────
+
+async function createCheckoutSession(garageId, planKey, period, stripeCustomerId, baseUrl) {
+  if (!stripe) throw new Error('Stripe non configuré');
+
+  const priceId = PRICE_IDS[planKey]?.[period];
+  if (!priceId) throw new Error(`Prix inconnu : ${planKey}/${period}`);
+
+  const params = {
+    mode: 'subscription',
+    payment_method_collection: 'if_required',
+    line_items: [{ price: priceId, quantity: 1 }],
+    subscription_data: {
+      trial_period_days: 14,
+      trial_settings: { end_behavior: { missing_payment_method: 'pause' } },
+      metadata: { garage_id: garageId, plan_key: planKey },
+    },
+    metadata: { garage_id: garageId, plan_key: planKey },
+    success_url: `${baseUrl}/app?billing=success`,
+    cancel_url:  `${baseUrl}/app?billing=cancel`,
+  };
+
+  if (stripeCustomerId) params.customer = stripeCustomerId;
+
+  return stripe.checkout.sessions.create(params);
+}
+
+// Crée un trial Stripe directement (sans Checkout) pour les garages existants
+// quand BILLING_ENFORCE passe à true. Plan solo mensuel par défaut.
+async function createAutoTrial(garageId, garageEmail, garageName, SBLayer) {
+  if (!stripe) throw new Error('Stripe non configuré');
+
+  const customer = await stripe.customers.create({
+    email:    garageEmail,
+    name:     garageName || 'Garage MotoKey',
+    metadata: { garage_id: garageId },
+  });
+
+  const sub = await stripe.subscriptions.create({
+    customer:    customer.id,
+    items:       [{ price: PRICE_IDS.solo.monthly }],
+    trial_period_days: 14,
+    trial_settings: { end_behavior: { missing_payment_method: 'pause' } },
+    metadata: { garage_id: garageId, plan_key: 'solo', auto_trial: 'true' },
+  });
+
+  const trialEndIso = new Date((sub.trial_end || sub.current_period_end) * 1000).toISOString();
+
+  await SBLayer.Garages.updateBilling(garageId, {
+    stripe_customer_id:              customer.id,
+    stripe_subscription_id:          sub.id,
+    plan_code:                       'solo',
+    subscription_status:             'active',
+    subscription_current_period_end: trialEndIso,
+    grace_period_ends_at:            null,
+    motos_limit:                     PLANS.solo.motos_limit,
+    users_limit:                     PLANS.solo.users_limit,
+  });
+
+  console.log(`[billing] auto-trial créé → garage ${garageId} trial jusqu'au ${trialEndIso}`);
+  return { customer_id: customer.id, subscription_id: sub.id };
+}
+
+module.exports = { stripe, PRICE_IDS, PLANS, handleWebhookEvent, createCheckoutSession, createAutoTrial };

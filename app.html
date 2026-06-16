@@ -442,7 +442,7 @@ async function renderParams() {
     // Section abonnement — masquée pour MECANO
     '<div id="paramsSectionAbonnement" class="card" style="margin-bottom:16px;max-width:700px">' +
       '<div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">Abonnement</div>' +
-      '<p style="font-size:13px;color:var(--text2)">Plan actuel : <strong>MotoKey Pro</strong></p>' +
+      '<div id="billingStatusBlock"><div class="loading" style="font-size:13px">Chargement…</div></div>' +
     '</div>' +
 
     // Section politique session — C1 — masquée pour MECANO
@@ -458,6 +458,148 @@ async function renderParams() {
         }).join('') +
       '</div>' +
     '</div>';
+
+  // Charger le statut billing en arrière-plan
+  loadBillingStatus();
+}
+
+async function loadBillingStatus() {
+  const block = document.getElementById('billingStatusBlock');
+  if (!block) return;
+  try {
+    const d = await api('/billing/status');
+    block.innerHTML = renderBillingBlock(d);
+  } catch(e) {
+    block.innerHTML = '<p style="font-size:13px;color:var(--text2)">Impossible de charger le statut abonnement.</p>';
+  }
+}
+
+function renderBillingBlock(d) {
+  const STATUS_LABEL = { active:'Actif', grace:'Période de grâce', blocked:'Bloqué' };
+  const STATUS_COLOR = { active:'#22c55e', grace:'#f59e0b', blocked:'#ef4444' };
+  const PERIOD_OPTS = [
+    { value:'monthly', label:'Mensuel' },
+    { value:'annual',  label:'Annuel (-17%)' }
+  ];
+  const PLAN_OPTS = [
+    { key:'solo',       label:'MotoKey Solo',       monthly:'79 €/mois', annual:'790 €/an', desc:'50 motos · 2 utilisateurs' },
+    { key:'atelier',    label:'MotoKey Atelier',    monthly:'149 €/mois', annual:'1 490 €/an', desc:'200 motos · 5 utilisateurs' },
+    { key:'concession', label:'MotoKey Concession', monthly:'299 €/mois', annual:'2 990 €/an', desc:'Illimité' }
+  ];
+
+  let html = '';
+
+  if (d.subscription_status === 'active' || d.subscription_status === 'grace') {
+    const color  = STATUS_COLOR[d.subscription_status] || '#888';
+    const label  = STATUS_LABEL[d.subscription_status] || d.subscription_status;
+    const endFmt = d.subscription_current_period_end
+      ? new Date(d.subscription_current_period_end).toLocaleDateString('fr-FR', { day:'2-digit', month:'long', year:'numeric' })
+      : '—';
+
+    html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">' +
+      '<span style="display:inline-block;padding:3px 10px;border-radius:12px;background:' + color + '20;color:' + color + ';font-size:12px;font-weight:700">' + label + '</span>' +
+      '<span style="font-size:14px;font-weight:600;color:var(--text1)">' + (d.plan_label || d.plan_code || '—') + '</span>' +
+    '</div>';
+
+    if (d.subscription_status === 'grace') {
+      const graceEnd = d.grace_period_ends_at
+        ? new Date(d.grace_period_ends_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'long' })
+        : '';
+      html += '<div class="alert alert-warn" style="margin-bottom:12px;font-size:13px">Paiement en échec — accès maintenu jusqu\'au ' + graceEnd + '. Mettez à jour votre moyen de paiement.</div>';
+    }
+
+    html += '<div style="font-size:13px;color:var(--text2);margin-bottom:16px">' +
+      (d.motos_limit ? 'Quota : ' + d.motos_limit + ' motos · ' + (d.users_limit || '∞') + ' utilisateurs' : 'Quota illimité') +
+      ' &nbsp;·&nbsp; Renouvellement : ' + endFmt +
+    '</div>';
+
+    html += '<button class="btn btn-secondary btn-sm" onclick="openBillingPortal()">Gérer mon abonnement</button>';
+
+  } else if (d.subscription_status === 'blocked') {
+    html += '<div class="alert alert-warn" style="margin-bottom:16px;font-size:13px">⛔ Abonnement suspendu. Réactivez-le pour continuer à utiliser MotoKey.</div>';
+    html += renderPlanSelector(PLAN_OPTS, PERIOD_OPTS);
+
+  } else {
+    // Pas d'abonnement — afficher le sélecteur de plan
+    html += '<p style="font-size:13px;color:var(--text2);margin-bottom:16px">Essai gratuit 14 jours · Sans carte bancaire</p>';
+    html += renderPlanSelector(PLAN_OPTS, PERIOD_OPTS);
+  }
+
+  return html;
+}
+
+function renderPlanSelector(plans, periods) {
+  let html = '<div style="display:flex;gap:8px;margin-bottom:16px">' +
+    periods.map(function(p) {
+      return '<button class="btn btn-sm" id="periodBtn_' + p.value + '" ' +
+        'onclick="selectBillingPeriod(\'' + p.value + '\')" ' +
+        'style="' + (p.value === 'monthly' ? 'background:var(--accent);color:#fff;' : '') + '">' +
+        p.label + '</button>';
+    }).join('') +
+  '</div>';
+
+  html += '<div id="planCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">';
+  plans.forEach(function(plan) {
+    html += '<div class="card" id="planCard_' + plan.key + '" onclick="selectBillingPlan(\'' + plan.key + '\')" ' +
+      'style="cursor:pointer;border:2px solid transparent;padding:14px;transition:border-color .15s">' +
+      '<div style="font-weight:700;font-size:14px;margin-bottom:4px">' + plan.label + '</div>' +
+      '<div id="planPrice_' + plan.key + '" style="font-size:18px;font-weight:800;color:var(--accent);margin-bottom:4px">' + plan.monthly + '</div>' +
+      '<div style="font-size:12px;color:var(--text2)">' + plan.desc + '</div>' +
+    '</div>';
+  });
+  html += '</div>';
+
+  html += '<button class="btn btn-primary" id="btnSubscribe" onclick="startCheckout()" disabled ' +
+    'style="opacity:.5;cursor:not-allowed">Démarrer l\'essai gratuit</button>';
+
+  return html;
+}
+
+let _billingPlan = null;
+let _billingPeriod = 'monthly';
+
+function selectBillingPeriod(period) {
+  _billingPeriod = period;
+  ['monthly','annual'].forEach(function(p) {
+    const btn = document.getElementById('periodBtn_' + p);
+    if (btn) btn.style.cssText = p === period ? 'background:var(--accent);color:#fff;' : '';
+  });
+  const PRICES = {
+    solo:       { monthly:'79 €/mois',  annual:'790 €/an' },
+    atelier:    { monthly:'149 €/mois', annual:'1 490 €/an' },
+    concession: { monthly:'299 €/mois', annual:'2 990 €/an' }
+  };
+  ['solo','atelier','concession'].forEach(function(k) {
+    const el = document.getElementById('planPrice_' + k);
+    if (el) el.textContent = PRICES[k][period];
+  });
+}
+
+function selectBillingPlan(key) {
+  _billingPlan = key;
+  ['solo','atelier','concession'].forEach(function(k) {
+    const card = document.getElementById('planCard_' + k);
+    if (card) card.style.borderColor = k === key ? 'var(--accent)' : 'transparent';
+  });
+  const btn = document.getElementById('btnSubscribe');
+  if (btn) { btn.disabled = false; btn.style.cssText = ''; }
+}
+
+async function startCheckout() {
+  if (!_billingPlan) return toast('Sélectionnez un plan');
+  const btn = document.getElementById('btnSubscribe');
+  if (btn) { btn.disabled = true; btn.textContent = 'Redirection…'; }
+  try {
+    const d = await api('/billing/checkout', 'POST', { plan_key: _billingPlan, period: _billingPeriod });
+    window.location.href = d.url;
+  } catch(e) {
+    toast('Erreur : ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Démarrer l\'essai gratuit'; }
+  }
+}
+
+async function openBillingPortal() {
+  toast('Portail de facturation — disponible en Phase 7');
 }
 
 async function saveSessionPolicy(minutes) {

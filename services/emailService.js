@@ -32,10 +32,11 @@ if (EMAIL_ENABLED) {
 }
 
 const TEMPLATES = {
-  welcome:       require('../templates/emails/welcome'),
-  verify:        require('../templates/emails/verify'),
-  reset:         require('../templates/emails/reset'),
-  'login-alert': require('../templates/emails/login-alert')
+  welcome:          require('../templates/emails/welcome'),
+  verify:           require('../templates/emails/verify'),
+  reset:            require('../templates/emails/reset'),
+  'login-alert':    require('../templates/emails/login-alert'),
+  'billing-confirm': require('../templates/emails/billing-confirm'),
 };
 
 /**

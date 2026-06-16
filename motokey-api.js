@@ -79,7 +79,7 @@ const https2     = require('https');
 const clientAuth  = require('./auth/client_auth');
 const emailService = require('./services/emailService');
 const rbac        = require('./auth/rbac');
-const { stripe: stripeClient, handleWebhookEvent } = require('./services/stripeService');
+const { stripe: stripeClient, handleWebhookEvent, createCheckoutSession, createAutoTrial } = require('./services/stripeService');
 
 // Couche Supabase (supabase.js) — chargée si SUPABASE_URL + SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_KEY) présents
 let SBLayer = null;
@@ -370,6 +370,21 @@ function auth(req, res) {
 // Version silencieuse : retourne null sans envoyer de 401.
 // Utilisée dans les handlers qui acceptent aussi bien un vieux JWT (HS256)
 // qu'un JWT Supabase (ES256, validé via req.ctx par extractRoleFromRequest).
+// Formate les colonnes billing d'un garage en réponse /billing/status
+function buildBillingStatus(g) {
+  const { PLANS } = require('./services/stripeService');
+  const plan = PLANS[g.plan_code] || null;
+  return {
+    plan_code:                       g.plan_code || null,
+    plan_label:                      plan ? plan.label : null,
+    subscription_status:             g.subscription_status || null,
+    subscription_current_period_end: g.subscription_current_period_end || null,
+    grace_period_ends_at:            g.grace_period_ends_at || null,
+    motos_limit:                     g.motos_limit ?? null,
+    users_limit:                     g.users_limit ?? null,
+  };
+}
+
 function authSilent(req) {
   const h = (req.headers['authorization']||'');
   if(!h.startsWith('Bearer ')) return null;
@@ -1826,6 +1841,65 @@ const server = http.createServer(async function(req, res){
     if (i<0) return fail(res, 'Garage non trouvé', 404, 'NOT_FOUND');
     DB.garages[i].mecano_session_timeout_minutes = mecano_session_timeout_minutes;
     return ok(res, { mecano_session_timeout_minutes }, 'Politique de session mise à jour');
+  }
+
+  /* ── BILLING (Phase 5) ── */
+
+  // GET /billing/status (PRO+) — statut abonnement du garage
+  if ((p = M('GET', '/billing/status')) !== null) {
+    if (!req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    if (!rbac.requireRole(req.ctx, 'PRO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
+    const garageId = await rbac.getGarageIdForUser(req.ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable', 404, 'NOT_FOUND');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const g = await SBLayer.Garages.getById(garageId);
+
+        // Auto-trial : si BILLING_ENFORCE=true et aucun plan, créer un trial Stripe silencieusement
+        const BILLING_ENFORCE = process.env.BILLING_ENFORCE === 'true';
+        if (BILLING_ENFORCE && !g.plan_code && stripeClient) {
+          await createAutoTrial(garageId, req.ctx.email, g.nom, SBLayer).catch(e =>
+            console.error('[billing] auto-trial échoué :', e.message)
+          );
+          const updated = await SBLayer.Garages.getById(garageId);
+          return ok(res, buildBillingStatus(updated), 'Statut abonnement');
+        }
+
+        return ok(res, buildBillingStatus(g), 'Statut abonnement');
+      } catch (e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+    return ok(res, { plan_code: null, subscription_status: null }, 'Statut abonnement (mode RAM)');
+  }
+
+  // POST /billing/checkout (PRO+) — crée une session Stripe Checkout et retourne l'URL
+  if ((p = M('POST', '/billing/checkout')) !== null) {
+    if (!req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    if (!rbac.requireRole(req.ctx, 'PRO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
+    if (!stripeClient) return fail(res, 'Stripe non configuré', 503, 'STRIPE_UNAVAILABLE');
+
+    const garageId = await rbac.getGarageIdForUser(req.ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable', 404, 'NOT_FOUND');
+
+    const { plan_key, period } = b;
+    if (!plan_key || !['solo', 'atelier', 'concession'].includes(plan_key))
+      return fail(res, 'plan_key invalide (solo|atelier|concession)', 400, 'INVALID_PLAN');
+    if (!period || !['monthly', 'annual'].includes(period))
+      return fail(res, 'period invalide (monthly|annual)', 400, 'INVALID_PERIOD');
+
+    let stripeCustomerId = null;
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const g = await SBLayer.Garages.getById(garageId);
+        stripeCustomerId = g.stripe_customer_id || null;
+      } catch (_) {}
+    }
+
+    try {
+      const baseUrl = process.env.FRONTEND_URL || 'https://motokey11-production.up.railway.app';
+      const session = await createCheckoutSession(garageId, plan_key, period, stripeCustomerId, baseUrl);
+      return ok(res, { url: session.url, session_id: session.id }, 'Session Checkout créée');
+    } catch (e) { return fail(res, e.message, 500, 'STRIPE_ERROR'); }
   }
 
   /* ── GESTION USERS GARAGE (L4 v2 hardening) ── */
