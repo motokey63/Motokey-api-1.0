@@ -1851,9 +1851,11 @@ const server = http.createServer(async function(req, res){
 
   // GET /billing/status (PRO+) — statut abonnement du garage
   if ((p = M('GET', '/billing/status')) !== null) {
-    if (!req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    if (!rbac.requireRole(req.ctx, 'PRO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
-    const garageId = await rbac.getGarageIdForUser(req.ctx, SBLayer);
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
+    const garageId = await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable', 404, 'NOT_FOUND');
 
     if (USE_SUPABASE && SBLayer) {
@@ -1863,7 +1865,7 @@ const server = http.createServer(async function(req, res){
         // Auto-trial : si BILLING_ENFORCE=true et aucun plan, créer un trial silencieusement
         const BILLING_ENFORCE = process.env.BILLING_ENFORCE === 'true';
         if (BILLING_ENFORCE && !g.plan_code && stripeClient) {
-          await createAutoTrial(garageId, req.ctx.email, g.nom, SBLayer).catch(e =>
+          await createAutoTrial(garageId, ctx.email, g.nom, SBLayer).catch(e =>
             console.error('[billing] auto-trial échoué :', e.message)
           );
           g = await SBLayer.Garages.getById(garageId);
@@ -1887,11 +1889,13 @@ const server = http.createServer(async function(req, res){
 
   // POST /billing/portal (PRO+) — génère un lien one-time vers le Customer Portal Stripe
   if ((p = M('POST', '/billing/portal')) !== null) {
-    if (!req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    if (!rbac.requireRole(req.ctx, 'PRO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
     if (!stripeClient) return fail(res, 'Stripe non configuré', 503, 'STRIPE_UNAVAILABLE');
 
-    const garageId = await rbac.getGarageIdForUser(req.ctx, SBLayer);
+    const garageId = await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable', 404, 'NOT_FOUND');
 
     let stripeCustomerId = null;
@@ -1912,11 +1916,13 @@ const server = http.createServer(async function(req, res){
 
   // POST /billing/checkout (PRO+) — crée une session Stripe Checkout et retourne l'URL
   if ((p = M('POST', '/billing/checkout')) !== null) {
-    if (!req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    if (!rbac.requireRole(req.ctx, 'PRO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
     if (!stripeClient) return fail(res, 'Stripe non configuré', 503, 'STRIPE_UNAVAILABLE');
 
-    const garageId = await rbac.getGarageIdForUser(req.ctx, SBLayer);
+    const garageId = await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable', 404, 'NOT_FOUND');
 
     const { plan_key, period } = b;
