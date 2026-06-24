@@ -2391,6 +2391,50 @@ const server = http.createServer(async function(req, res){
     return ok(res, { message: 'Mot de passe mis à jour — reconnectez-vous' });
   }
 
+  // ── POST /auth/password-reset/garage ──────────────────────
+  // Endpoint public — demande de réinitialisation mot de passe compte garage.
+  // Anti-énumération : répond toujours succès, que l'email existe ou non.
+  if ((p = M('POST', '/auth/password-reset/garage')) !== null) {
+    // RBAC: endpoint public — l'utilisateur a oublié son mot de passe, aucune auth possible.
+    if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
+    const { email } = b;
+    if (!email) return fail(res, 'Champ requis : email', 400, 'MISSING_FIELDS');
+
+    const appUrl = process.env.APP_URL || 'https://motokey11-production.up.railway.app';
+    try {
+      await sbPub().auth.resetPasswordForEmail(email, {
+        redirectTo: appUrl + '/reset-password'
+      });
+    } catch (e) {
+      console.error('[pwd-reset garage]', e.message);
+    }
+
+    // Anti-énumération : même réponse que l'email existe ou non
+    return ok(res, { message: 'Si ce compte existe, un email de réinitialisation a été envoyé.' });
+  }
+
+  // ── POST /auth/password-reset/garage/confirm ──────────────
+  // Endpoint public — confirmation OTP + nouveau mot de passe pour compte garage.
+  if ((p = M('POST', '/auth/password-reset/garage/confirm')) !== null) {
+    // RBAC: endpoint public — le code OTP tient lieu d'auth.
+    if (!SBLayer) return fail(res, 'Supabase non configuré', 503, 'SERVICE_UNAVAILABLE');
+    const { email, code, new_password } = b;
+    if (!email || !code || !new_password) {
+      return fail(res, 'Champs requis : email, code, new_password', 400, 'MISSING_FIELDS');
+    }
+    if (String(new_password).length < 8) {
+      return fail(res, 'Mot de passe : 8 caractères minimum', 400, 'WEAK_PASSWORD');
+    }
+
+    const { data, error: otpErr } = await sbPub().auth.verifyOtp({ email, token: String(code), type: 'recovery' });
+    if (otpErr || !data?.user) return fail(res, 'Code invalide ou expiré', 400, 'INVALID_TOKEN');
+
+    const { error } = await sbSvc().auth.admin.updateUserById(data.user.id, { password: new_password });
+    if (error) return fail(res, 'Impossible de mettre à jour le mot de passe', 500, 'SERVER_ERROR');
+
+    return ok(res, { message: 'Mot de passe mis à jour — reconnectez-vous' });
+  }
+
   /* ─── LIVRAISON 3A : ORDRES DE RÉPARATION ─── */
 
   if((p=M('GET','/ordres-reparation'))!==null){

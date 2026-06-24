@@ -220,6 +220,34 @@ input,select,textarea{font-family:inherit}
     <div class="field"><label>Email</label><input id="loginEmail" type="email" value="garage@motokey.fr" placeholder="garage@motokey.fr"></div>
     <div class="field"><label>Mot de passe</label><input id="loginPass" type="password" value="motokey2026" placeholder="••••••••"></div>
     <button class="btn btn-primary" style="width:100%;margin-top:6px" onclick="doLogin()">Connexion</button>
+    <div style="text-align:center;margin-top:14px"><a href="#" onclick="showResetGarage();return false" style="font-size:13px;color:var(--text2);text-decoration:underline">Mot de passe oublié ?</a></div>
+  </div>
+</div>
+
+<!-- RESET MOT DE PASSE GARAGE — Écran 1 : demande email -->
+<div id="resetGarageScreen" style="display:none;align-items:center;justify-content:center;min-height:100vh;padding:20px">
+  <div class="login-box">
+    <div class="login-logo">🔑 MotoKey</div>
+    <div class="login-sub">Réinitialiser le mot de passe</div>
+    <div class="login-err" id="rgErr1"></div>
+    <div class="field"><label>Email</label><input id="rgEmail" type="email" placeholder="garage@motokey.fr"></div>
+    <button class="btn btn-primary" style="width:100%;margin-top:6px" onclick="requestResetGarage()">Envoyer le code</button>
+    <div style="text-align:center;margin-top:14px"><a href="#" onclick="showLoginFromReset();return false" style="font-size:13px;color:var(--text2);text-decoration:underline">← Retour à la connexion</a></div>
+  </div>
+</div>
+
+<!-- RESET MOT DE PASSE GARAGE — Écran 2 : saisie code OTP + nouveau mot de passe -->
+<div id="resetGarageConfirmScreen" style="display:none;align-items:center;justify-content:center;min-height:100vh;padding:20px">
+  <div class="login-box">
+    <div class="login-logo">🔑 MotoKey</div>
+    <div class="login-sub">Entrez le code reçu par email</div>
+    <div class="login-err" id="rgErr2"></div>
+    <p style="font-size:13px;color:var(--text2);margin:0 0 12px">Un code à 6 chiffres a été envoyé à votre adresse email.</p>
+    <div class="field"><label>Code de vérification</label><input id="rgCode" type="text" placeholder="123456" maxlength="8"></div>
+    <div class="field"><label>Nouveau mot de passe (min. 8 caractères)</label><input id="rgPass1" type="password" placeholder="••••••••"></div>
+    <div class="field"><label>Confirmer le mot de passe</label><input id="rgPass2" type="password" placeholder="••••••••"></div>
+    <button class="btn btn-primary" style="width:100%;margin-top:6px" onclick="confirmResetGarage()">Réinitialiser</button>
+    <div style="text-align:center;margin-top:14px"><a href="#" onclick="showLoginFromReset();return false" style="font-size:13px;color:var(--text2);text-decoration:underline">← Retour à la connexion</a></div>
   </div>
 </div>
 
@@ -386,6 +414,66 @@ function doLogout() {
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('appShell').style.display = 'none';
 }
+
+// ── RESET MOT DE PASSE GARAGE ──────────────────────────────
+var _resetGarageEmail = '';
+
+function showResetGarage() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('resetGarageConfirmScreen').style.display = 'none';
+  document.getElementById('rgErr1').textContent = '';
+  var emailVal = document.getElementById('loginEmail').value;
+  if (emailVal) document.getElementById('rgEmail').value = emailVal;
+  document.getElementById('resetGarageScreen').style.display = 'flex';
+}
+
+function showLoginFromReset() {
+  document.getElementById('resetGarageScreen').style.display = 'none';
+  document.getElementById('resetGarageConfirmScreen').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'flex';
+}
+
+async function requestResetGarage() {
+  var email = document.getElementById('rgEmail').value.trim();
+  var errEl = document.getElementById('rgErr1');
+  errEl.textContent = '';
+  if (!email) { errEl.textContent = 'Veuillez saisir votre adresse email.'; return; }
+  try {
+    await api('/auth/password-reset/garage', 'POST', { email: email });
+    _resetGarageEmail = email;
+    document.getElementById('resetGarageScreen').style.display = 'none';
+    document.getElementById('rgErr2').textContent = '';
+    document.getElementById('rgCode').value = '';
+    document.getElementById('rgPass1').value = '';
+    document.getElementById('rgPass2').value = '';
+    document.getElementById('resetGarageConfirmScreen').style.display = 'flex';
+    toast('Si ce compte existe, un code a été envoyé.');
+  } catch(e) {
+    errEl.textContent = e.message || 'Erreur lors de l\'envoi. Veuillez réessayer.';
+  }
+}
+
+async function confirmResetGarage() {
+  var code = document.getElementById('rgCode').value.trim();
+  var pass1 = document.getElementById('rgPass1').value;
+  var pass2 = document.getElementById('rgPass2').value;
+  var errEl = document.getElementById('rgErr2');
+  errEl.textContent = '';
+  if (!code) { errEl.textContent = 'Veuillez saisir le code reçu par email.'; return; }
+  if (pass1.length < 8) { errEl.textContent = 'Mot de passe : 8 caractères minimum.'; return; }
+  if (pass1 !== pass2) { errEl.textContent = 'Les mots de passe ne correspondent pas.'; return; }
+  try {
+    await api('/auth/password-reset/garage/confirm', 'POST', { email: _resetGarageEmail, code: code, new_password: pass1 });
+    toast('Mot de passe mis à jour — reconnectez-vous');
+    showLoginFromReset();
+    document.getElementById('loginEmail').value = _resetGarageEmail;
+    document.getElementById('loginPass').value = '';
+    _resetGarageEmail = '';
+  } catch(e) {
+    errEl.textContent = e.message || 'Erreur lors de la réinitialisation. Veuillez réessayer.';
+  }
+}
+// ────────────────────────────────────────────────────────────
 
 document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') doLogin();
