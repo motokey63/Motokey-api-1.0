@@ -39,6 +39,7 @@ const TEMPLATES = {
   'billing-confirm': require('../templates/emails/billing-confirm'),
   'trial-ending':    require('../templates/emails/trial-ending'),
   'payment-failed':  require('../templates/emails/payment-failed'),
+  'subscription-cancelled': require('../templates/emails/subscription-cancelled'),
 };
 
 /**
