@@ -160,13 +160,45 @@ async function handleInvoicePaymentFailed(invoice, SBLayer) {
   }
 }
 
-async function handleSubscriptionBlocked(sub, SBLayer) {
+async function handleSubscriptionBlocked(sub, SBLayer, { isDeleted = false } = {}) {
   const customerId = sub.customer;
   const garage = await SBLayer.Garages.getByStripeCustomerId(customerId);
   if (!garage) return;
 
+  // D-05 : résoudre le libellé du plan AVANT la mise à jour Supabase
+  const planLabel = PLANS[garage.plan_code]?.label || garage.plan_code || 'votre abonnement';
+
   await SBLayer.Garages.updateBilling(garage.id, { subscription_status: 'blocked' });
-  console.log(`[webhook] 🔴 subscription blocked → garage ${garage.id}`);
+  console.log(`[webhook] 🔴 subscription blocked → garage ${garage.id} (isDeleted=${isDeleted})`);
+
+  // NOTIF-03 : email d'annulation UNIQUEMENT sur suppression définitive (pas sur pause)
+  if (!isDeleted) return;
+
+  // Email destinataire : garage.email, fallback Stripe customer
+  let toEmail = garage.email;
+  if (!toEmail) {
+    try {
+      const customer = await stripe.customers.retrieve(customerId);
+      toEmail = customer && customer.email;
+    } catch (e) {
+      console.error('[webhook] retrieve customer pour email annulation échoué :', e.message);
+    }
+  }
+  if (!toEmail) {
+    console.error(`[webhook] subscription.deleted → aucun email pour garage ${garage.id}, email non envoyé`);
+    return;
+  }
+
+  const baseUrl   = process.env.FRONTEND_URL || 'https://motokey11-production.up.railway.app';
+  const portalUrl = `${baseUrl}/app?section=params`;
+
+  emailService.send('subscription-cancelled', toEmail, {
+    nom:        garage.nom || 'Garage',
+    plan:       planLabel,
+    portal_url: portalUrl,
+  }).catch(e => console.error('[webhook] Email subscription-cancelled échoué :', e.message));
+
+  console.log(`[webhook] 📧 subscription.deleted → email annulation envoyé à ${toEmail}`);
 }
 
 async function handleSubscriptionUpdated(sub, SBLayer) {
@@ -238,8 +270,10 @@ async function handleWebhookEvent(event, SBLayer) {
       await handleInvoicePaymentFailed(event.data.object, SBLayer);
       break;
     case 'customer.subscription.deleted':
+      await handleSubscriptionBlocked(event.data.object, SBLayer, { isDeleted: true });
+      break;
     case 'customer.subscription.paused':
-      await handleSubscriptionBlocked(event.data.object, SBLayer);
+      await handleSubscriptionBlocked(event.data.object, SBLayer, { isDeleted: false });
       break;
     case 'customer.subscription.updated':
       await handleSubscriptionUpdated(event.data.object, SBLayer);
