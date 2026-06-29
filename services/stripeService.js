@@ -99,6 +99,11 @@ async function handleCheckoutCompleted(session, SBLayer) {
   });
   console.log(`[webhook] ✅ checkout.completed → garage ${garageId} plan ${planKey}`);
 
+  // Pioneer Program : tracer les activations avec coupon dans les logs Railway
+  if (session.total_details?.amount_discount > 0) {
+    console.log(`[pioneer] coupon appliqué → garage ${garageId} (remise ${session.total_details.amount_discount})`);
+  }
+
   // Email de confirmation — non bloquant
   const toEmail = session.customer_details?.email || session.customer_email;
   if (toEmail) {
@@ -260,6 +265,7 @@ async function createCheckoutSession(garageId, planKey, period, stripeCustomerId
   const params = {
     mode: 'subscription',
     payment_method_collection: 'if_required',
+    allow_promotion_codes: true,   // Pioneer Program (Phase 9) — champ Code promo natif Stripe Checkout
     line_items: [{ price: priceId, quantity: 1 }],
     subscription_data: {
       trial_period_days: 14,
