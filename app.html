@@ -788,6 +788,7 @@ function renderDashboard() {
       </div>
       <div class="moto-km">🔧 ${(mo.km||0).toLocaleString('fr-FR')} km</div>
       <span class="score-badge score-${mo.couleur_dossier||'bleu'}">${scoreDot(mo.couleur_dossier)} ${scoreLabel(mo.couleur_dossier)} · ${mo.score||0}/100</span>
+      ${alerteEntretienChip(mo)}
     </div>`).join('') : '<div class="empty"><div class="empty-icon">🏍️</div><div class="empty-text">Aucune moto trouvée</div><div class="empty-sub">Modifiez votre recherche ou créez un dossier</div></div>';
 
   document.getElementById('main').innerHTML = `
@@ -801,6 +802,13 @@ function renderDashboard() {
 
 function scoreDot(c){return{vert:'🟢',bleu:'🔵',jaune:'🟡',rouge:'🔴'}[c]||'🔵'}
 function scoreLabel(c){return{vert:'Excellent',bleu:'Bon',jaune:'Moyen',rouge:'Faible'}[c]||'Bon'}
+function alerteEntretienChip(mo){
+  if(!mo.alerte_entretien) return '';
+  const pct = mo.pct_max_usage||0;
+  const cls = pct>=100 ? 'score-rouge' : 'score-jaune';
+  const lbl = pct>=100 ? '⚠️ Révision dépassée' : '⚠️ Révision à planifier';
+  return `<div><span class="score-badge ${cls}">${lbl}</span></div>`;
+}
 function badgeStatut(s){
   const cls={brouillon:'badge-jaune',en_cours:'badge-bleu',termine:'badge-vert',annule:'badge-rouge'}[s]||'badge-bleu';
   const lbl={brouillon:'Brouillon',en_cours:'En cours',termine:'Terminé',annule:'Annulé'}[s]||s;

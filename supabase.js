@@ -243,7 +243,29 @@ const Motos = {
     if (filters.client_id) q = q.eq('client_id', filters.client_id);
     const { data, error } = await q;
     if (error) throw new Error(error.message);
-    return data;
+    // UX-02 : enrichissement alerte entretien (calculé à l'affichage, aucun champ DB)
+    const rows = data || [];
+    const ids = rows.map(m => m.id);
+    let plans = [];
+    if (ids.length) {
+      const { data: pe, error: peErr } = await supabase.from('plan_entretien')
+        .select('moto_id, km_interval, km_derniere')
+        .in('moto_id', ids);
+      if (peErr) throw new Error(peErr.message);
+      plans = pe || [];
+    }
+    const byMoto = {};
+    for (const op of plans) (byMoto[op.moto_id] = byMoto[op.moto_id] || []).push(op);
+    return rows.map(m => {
+      const ops = byMoto[m.id] || [];
+      let pctMax = 0;
+      for (const op of ops) {
+        const since = (m.km || 0) - (op.km_derniere || 0);
+        const pct = op.km_interval > 0 ? Math.round((since / op.km_interval) * 100) : 0;
+        if (pct > pctMax) pctMax = pct;
+      }
+      return { ...m, pct_max_usage: pctMax, alerte_entretien: ops.length > 0 && pctMax >= 80 };
+    });
   },
 
   async getById(id, garage_id) {
