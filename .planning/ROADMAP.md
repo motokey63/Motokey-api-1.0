@@ -37,7 +37,7 @@ See [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) for full details.
 ### 📋 v1.2 Pioneer Program & Production Go-Live
 
 - [ ] **Phase 8: Stripe Live Mode** — Stripe opérationnel en production réelle (clés live + Price IDs + webhook)
-- [ ] **Phase 9: Pioneer Program** — Programme d'accès fondateur avec coupon 3 mois + prix bloqué 24 mois + compteur 30 places
+- [x] **Phase 9: Pioneer Program** — Programme d'accès fondateur avec coupon 3 mois + prix bloqué 24 mois + compteur 30 places (completed 2026-06-30)
 - [x] **Phase 10: Live Operations** — Enforcement des quotas activé en prod + emails annulation et bienvenue (completed 2026-06-29)
 - [ ] **Phase 11: Dashboard UX Alerts** — Badge ROUGE sur fiches moto + alerte kilométrage révision dépassé
 
@@ -65,8 +65,8 @@ See [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) for full details.
   2. Après activation Pioneer, la fiche Stripe du garage montre un price ID non-migration (tarif figé, insensible aux futures hausses)
   3. Au 30ème garage enrollé, le coupon PIONEER2026 est automatiquement désactivé — le 31ème tentant le code reçoit une erreur Stripe
   4. Le compteur Pioneer (garages enrollés / 30) est visible et précis à tout moment (via Stripe Dashboard ou log applicatif)
-**Plans:** 0/1 plans executed
-- [ ] 09-01-PLAN.md — Coupon PIONEER2026 + PromotionCode (max 30) idempotent, allow_promotion_codes au checkout, note non-migration PIONR-02
+**Plans:** 1/1 plans complete
+- [x] 09-01-PLAN.md — Coupon PIONEER2026 + PromotionCode (max 30) idempotent, allow_promotion_codes au checkout, note non-migration PIONR-02
 **UI hint**: yes
 
 ### Phase 10: Live Operations

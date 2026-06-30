@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Pioneer Program & Production Go-Live
 status: verifying
-last_updated: "2026-06-29T21:12:26.328Z"
-last_activity: 2026-06-29
+last_updated: "2026-06-30T17:17:57.170Z"
+last_activity: 2026-06-30
 progress:
   total_phases: 4
   completed_phases: 1
@@ -19,14 +19,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-24)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 10 — live-operations
+**Current focus:** Phase 09 — pioneer-program
 
 ## Current Position
 
-Phase: 10 (live-operations) — EXECUTING
-Plan: 2 of 2
+Phase: 09 (pioneer-program) — EXECUTING
+Plan: 1 of 1
 Status: Phase complete — ready for verification
-Last activity: 2026-06-29
+Last activity: 2026-06-30
 
 ```
 v1.0 ████████████ SHIPPED
@@ -50,6 +50,7 @@ v1.2 ░░░░░░░░░░░░ EN COURS (Phase 8→11, 0/4 phases)
 | Phase 09-pioneer-program P01 | 15 | 3 tasks | 3 files |
 | Phase 10-live-operations P01 | 2m | 2 tasks | 3 files |
 | Phase 10-live-operations P02 | 5 | 2 tasks | 1 files |
+| Phase 09 P01 | 15 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
