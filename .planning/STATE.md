@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Pioneer Program & Production Go-Live
-status: executing
-last_updated: "2026-06-30T20:01:15.473Z"
-last_activity: 2026-06-30 -- Phase 11 execution started
+status: verifying
+last_updated: "2026-06-30T20:42:00.000Z"
+last_activity: 2026-06-30
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 7
-  completed_plans: 4
+  completed_plans: 6
 ---
 
 # MotoKey API — Project State
@@ -19,23 +19,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-06-24)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 11 — dashboard-ux-alerts
+**Current focus:** Phase 11 — COMPLETE. Phases 9/10/11 livées. Phase 8 ⏸️ PARKED (op humaine Stripe).
 
 ## Current Position
 
-Phase: 11 (dashboard-ux-alerts) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 11
-Last activity: 2026-06-30 -- Phase 11 execution started
+Phase: 11 (dashboard-ux-alerts) — COMPLETE
+Plan: 2 of 2
+Status: Phase complete — UX-01 + UX-02 verified in prod
+Last activity: 2026-06-30 — Phase 11 Plan 02 visual verification complete
 
 ```
 v1.0 ████████████ SHIPPED
 v1.1 ████████████ SHIPPED
-v1.2 ░░░░░░░░░░░░ EN COURS (Phase 8→11, 0/4 phases)
+v1.2 [█████████░] 86% EN COURS (Phase 8→11, 3/4 phases)
      Phase 8  ⏸️ PARKED (bascule live différée — 08-01 ✅, 08-02 en attente op humaine)
-     Phase 9  ░░░ En cours de planification
-     Phase 10 ░░░ Not started
-     Phase 11 ░░░ Not started
+     Phase 9  ✅ COMPLETE (2026-06-30)
+     Phase 10 ✅ COMPLETE (2026-06-29)
+     Phase 11 ✅ COMPLETE (2026-06-30)
 ```
 
 ## Performance Metrics
@@ -51,6 +51,7 @@ v1.2 ░░░░░░░░░░░░ EN COURS (Phase 8→11, 0/4 phases)
 | Phase 10-live-operations P01 | 2m | 2 tasks | 3 files |
 | Phase 10-live-operations P02 | 5 | 2 tasks | 1 files |
 | Phase 09 P01 | 15 | 3 tasks | 3 files |
+| Phase 11 P02 | 5 | 1 tasks | 0 files |
 
 ## Accumulated Context
 
@@ -92,3 +93,4 @@ v1.2 ░░░░░░░░░░░░ EN COURS (Phase 8→11, 0/4 phases)
 | 2026-06-29 | Phase 9 context gathered — allow_promotion_codes Stripe Checkout, coupon 100% off 3 mois repeating, max_redemptions: 30, script stripe-create-pioneer-coupon.js. CONTEXT.md + DISCUSSION-LOG.md créés. |
 | 2026-06-29 | Phase 9 planifiée — 1 plan (09-01), 3 tâches, 1 wave. Researcher: Coupon+PromotionCode (2 objets distincts), max_redemptions sur PromotionCode. Plan checker: VERIFICATION PASSED (10/10 dimensions). |
 | 2026-06-29 | Phase 10 plan 01 exécuté — NOTIF-03 livré. Template subscription-cancelled.js + handleSubscriptionBlocked isDeleted flag + switch webhook différencié. Commits a8473a8 + 1f46fd7. |
+| 2026-06-30 | Phase 11 plans 01+02 exécutés — UX-02 livré (alerteEntretienChip + Motos.list enrichi, commits c416bd7+96d909c). UX-01 confirmé couvert (D-05, .score-badge.score-rouge existant). Vérification visuelle prod approuvée. Phase 11 COMPLETE. |

@@ -39,7 +39,7 @@ See [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) for full details.
 - [ ] **Phase 8: Stripe Live Mode** — Stripe opérationnel en production réelle (clés live + Price IDs + webhook)
 - [x] **Phase 9: Pioneer Program** — Programme d'accès fondateur avec coupon 3 mois + prix bloqué 24 mois + compteur 30 places (completed 2026-06-30)
 - [x] **Phase 10: Live Operations** — Enforcement des quotas activé en prod + emails annulation et bienvenue (completed 2026-06-29)
-- [ ] **Phase 11: Dashboard UX Alerts** — Badge ROUGE sur fiches moto + alerte kilométrage révision dépassé
+- [x] **Phase 11: Dashboard UX Alerts** — Badge ROUGE sur fiches moto + alerte kilométrage révision dépassé (completed 2026-06-30)
 
 ## Phase Details
 
@@ -91,9 +91,9 @@ See [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) for full details.
   2. Une fiche moto dont le kilométrage actuel dépasse le seuil de révision affiche une alerte entretien directement sur la carte
   3. La logique de seuil kilométrique est calculée à l'affichage (sans nouveau champ DB, sans migration SQL)
   4. Les badges et alertes disparaissent immédiatement si le score remonte ou si une intervention remet le compteur à zéro
-**Plans:** 2 plans
-- [ ] 11-01-PLAN.md — Backend Motos.list() enrichi (alerte_entretien + pct_max_usage) + frontend alerteEntretienChip() dans renderDashboard (UX-02)
-- [ ] 11-02-PLAN.md — Checkpoint vérification visuelle dashboard : badge ROUGE (UX-01, D-05) + chips alerte entretien (UX-02)
+**Plans:** 2/2 plans complete
+- [x] 11-01-PLAN.md — Backend Motos.list() enrichi (alerte_entretien + pct_max_usage) + frontend alerteEntretienChip() dans renderDashboard (UX-02)
+- [x] 11-02-PLAN.md — Checkpoint vérification visuelle dashboard : badge ROUGE (UX-01, D-05) + chips alerte entretien (UX-02)
 **UI hint**: yes
 
 ## Progress Table
@@ -107,9 +107,9 @@ See [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) for full details.
 | Phase 6 | v1.1 | — | ✅ Complete | 2026-06-16 |
 | Phase 7 | v1.1 | — | ✅ Complete | 2026-06-16 |
 | Phase 8 | v1.2 | 1/2 | En cours | - |
-| Phase 9 | v1.2 | 0/1 | Planned | - |
-| Phase 10 | v1.2 | 0/2 | Planned | - |
-| Phase 11 | v1.2 | 0/2 | Planned | - |
+| Phase 9 | v1.2 | 1/1 | ✅ Complete | 2026-06-30 |
+| Phase 10 | v1.2 | 2/2 | ✅ Complete | 2026-06-29 |
+| Phase 11 | v1.2 | 2/2 | ✅ Complete | 2026-06-30 |
 
 ---
-*Roadmap updated: 2026-06-30 — Phase 11 planifiée (2 plans, UX-01/UX-02)*
+*Roadmap updated: 2026-06-30 — Phase 11 COMPLETE (UX-01 + UX-02 verified in prod). Phases 9/10/11 done. Phase 8 ⏸️ PARKED.*

@@ -25,7 +25,7 @@ Requirements pour le milestone Pioneer Program & Production Go-Live. Chaque requ
 
 ### UX Dashboard
 
-- [ ] **UX-01**: L'interface garage affiche un badge rouge sur les fiches moto dont le score d'intégrité est < 40 (statut ROUGE)
+- [x] **UX-01**: L'interface garage affiche un badge rouge sur les fiches moto dont le score d'intégrité est < 40 (statut ROUGE)
 - [x] **UX-02**: L'interface garage affiche une alerte entretien sur les fiches moto dont le kilométrage de révision est dépassé (seuil dynamique, sans nouveau champ DB)
 
 ## Requirements Futurs (v1.3+)
@@ -65,7 +65,7 @@ Mapping requirements → phases.
 | BILL-05 | Phase 10 | Complete |
 | NOTIF-03 | Phase 10 | Complete |
 | NOTIF-04 | Phase 10 | Complete |
-| UX-01 | Phase 11 | Pending |
+| UX-01 | Phase 11 | Complete |
 | UX-02 | Phase 11 | Complete |
 
 **Coverage:**
