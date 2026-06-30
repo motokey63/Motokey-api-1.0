@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Pioneer Program & Production Go-Live
-status: verifying
-last_updated: "2026-06-30T20:05:41.874Z"
-last_activity: 2026-06-30
+status: executing
+last_updated: "2026-06-30T20:01:15.473Z"
+last_activity: 2026-06-30 -- Phase 11 execution started
 progress:
   total_phases: 4
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 3
+  completed_phases: 2
+  total_plans: 7
+  completed_plans: 4
 ---
 
 # MotoKey API — Project State
@@ -23,19 +23,19 @@ See: .planning/PROJECT.md (updated 2026-06-24)
 
 ## Current Position
 
-Phase: 11 (dashboard-ux-alerts) — COMPLETE (1/1 plans)
-Plan: 1 of 1 — done
-Status: Phase 11 Plan 01 complete — alerte entretien chips livré
-Last activity: 2026-06-30
+Phase: 11 (dashboard-ux-alerts) — EXECUTING
+Plan: 1 of 2
+Status: Executing Phase 11
+Last activity: 2026-06-30 -- Phase 11 execution started
 
 ```
 v1.0 ████████████ SHIPPED
 v1.1 ████████████ SHIPPED
-v1.2 ░░░░░░░░░░░░ EN COURS (Phase 8→11)
+v1.2 ░░░░░░░░░░░░ EN COURS (Phase 8→11, 0/4 phases)
      Phase 8  ⏸️ PARKED (bascule live différée — 08-01 ✅, 08-02 en attente op humaine)
-     Phase 9  ✅ COMPLETE (coupon PIONEER2026 + allow_promotion_codes)
-     Phase 10 ✅ COMPLETE (NOTIF-03/04 + BILLING-ENFORCE checklist)
-     Phase 11 ✅ COMPLETE (alerte entretien chips dashboard — UX-02)
+     Phase 9  ░░░ En cours de planification
+     Phase 10 ░░░ Not started
+     Phase 11 ░░░ Not started
 ```
 
 ## Performance Metrics
@@ -51,7 +51,6 @@ v1.2 ░░░░░░░░░░░░ EN COURS (Phase 8→11)
 | Phase 10-live-operations P01 | 2m | 2 tasks | 3 files |
 | Phase 10-live-operations P02 | 5 | 2 tasks | 1 files |
 | Phase 09 P01 | 15 | 3 tasks | 3 files |
-| Phase 11-dashboard-ux-alerts P01 | 4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -93,4 +92,3 @@ v1.2 ░░░░░░░░░░░░ EN COURS (Phase 8→11)
 | 2026-06-29 | Phase 9 context gathered — allow_promotion_codes Stripe Checkout, coupon 100% off 3 mois repeating, max_redemptions: 30, script stripe-create-pioneer-coupon.js. CONTEXT.md + DISCUSSION-LOG.md créés. |
 | 2026-06-29 | Phase 9 planifiée — 1 plan (09-01), 3 tâches, 1 wave. Researcher: Coupon+PromotionCode (2 objets distincts), max_redemptions sur PromotionCode. Plan checker: VERIFICATION PASSED (10/10 dimensions). |
 | 2026-06-29 | Phase 10 plan 01 exécuté — NOTIF-03 livré. Template subscription-cancelled.js + handleSubscriptionBlocked isDeleted flag + switch webhook différencié. Commits a8473a8 + 1f46fd7. |
-| 2026-06-30 | Phase 11 plan 01 exécuté — UX-02 alerte entretien livré. Motos.list() enrichi (batch plan_entretien JOIN, pct_max_usage, alerte_entretien). alerteEntretienChip() helper + chip jaune/rouge sur cartes dashboard. Commits c416bd7 + 96d909c. |

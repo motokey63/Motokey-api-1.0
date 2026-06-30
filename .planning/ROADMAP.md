@@ -91,7 +91,9 @@ See [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) for full details.
   2. Une fiche moto dont le kilométrage actuel dépasse le seuil de révision affiche une alerte entretien directement sur la carte
   3. La logique de seuil kilométrique est calculée à l'affichage (sans nouveau champ DB, sans migration SQL)
   4. Les badges et alertes disparaissent immédiatement si le score remonte ou si une intervention remet le compteur à zéro
-**Plans**: TBD
+**Plans:** 2 plans
+- [ ] 11-01-PLAN.md — Backend Motos.list() enrichi (alerte_entretien + pct_max_usage) + frontend alerteEntretienChip() dans renderDashboard (UX-02)
+- [ ] 11-02-PLAN.md — Checkpoint vérification visuelle dashboard : badge ROUGE (UX-01, D-05) + chips alerte entretien (UX-02)
 **UI hint**: yes
 
 ## Progress Table
@@ -107,7 +109,7 @@ See [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md) for full details.
 | Phase 8 | v1.2 | 1/2 | En cours | - |
 | Phase 9 | v1.2 | 0/1 | Planned | - |
 | Phase 10 | v1.2 | 0/2 | Planned | - |
-| Phase 11 | v1.2 | 0/? | Not started | - |
+| Phase 11 | v1.2 | 0/2 | Planned | - |
 
 ---
-*Roadmap updated: 2026-06-29 — Phase 10 planifiée (2 plans, BILL-05/NOTIF-03/NOTIF-04)*
+*Roadmap updated: 2026-06-30 — Phase 11 planifiée (2 plans, UX-01/UX-02)*
