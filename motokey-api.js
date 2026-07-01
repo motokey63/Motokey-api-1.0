@@ -1740,6 +1740,35 @@ const server = http.createServer(async function(req, res){
     } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
   }
 
+  // DELETE /client/device-tokens (CLIENT) — désenregistre un device token précis (simule un logout)
+  if((p=M('DELETE','/client/device-tokens'))!==null){
+    const ctx = req.ctx || (SBLayer ? await rbac.extractRoleFromRequest(req, SBLayer) : null);
+    if (!ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
+    if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
+    try {
+      const deleteBody = await body(req).catch(() => ({}));
+      const token = deleteBody && deleteBody.token;
+      if (!token) return fail(res, 'token requis', 400, 'VALIDATION_ERROR');
+
+      const { data: clientRow, error: cliErr } = await SBLayer.supabase
+        .from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
+      if (cliErr || !clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
+      const clientId = clientRow.id;
+
+      const { data: deleted, error: delErr } = await SBLayer.supabase
+        .from('client_device_tokens')
+        .delete()
+        .eq('token', token)
+        .eq('client_id', clientId)
+        .select();
+      if (delErr) throw new Error(delErr.message);
+      if (!deleted || deleted.length === 0) return fail(res, 'Device token non trouvé', 404, 'NOT_FOUND');
+
+      return ok(res, { deleted: true }, null, 200);
+    } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+  }
+
   /* PARAMS & STATS */
   if((p=M('GET','/params'))!==null){
     // RBAC: MECANO minimum — lecture paramètres garage
