@@ -185,6 +185,14 @@ function hashPwd(pwd) {
   return crypto.createHash('sha256').update(pwd+JWT_SECRET).digest('hex');
 }
 function nowISO()  { return new Date().toISOString(); }
+function isExpoPushToken(token) {
+  return (
+    typeof token === 'string' &&
+    (((token.startsWith('ExponentPushToken[') || token.startsWith('ExpoPushToken[')) &&
+      token.endsWith(']')) ||
+      /^[a-z\d]{8}-[a-z\d]{4}-[a-z\d]{4}-[a-z\d]{4}-[a-z\d]{12}$/i.test(token))
+  );
+}
 function todayFR() {
   const d = new Date();
   return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0')+'/'+d.getFullYear();
@@ -1703,6 +1711,32 @@ const server = http.createServer(async function(req, res){
         .single();
       if (updErr) throw new Error(updErr.message);
       return ok(res, { liaison: updated }, 'Garage quitté — votre historique reste conservé (obligations légales)');
+    } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+  }
+
+  // POST /client/device-tokens (CLIENT) — enregistre/réassigne un device token push Expo
+  if((p=M('POST','/client/device-tokens'))!==null){
+    const ctx = req.ctx || (SBLayer ? await rbac.extractRoleFromRequest(req, SBLayer) : null);
+    if (!ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
+    if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
+    try {
+      const { data: clientRow, error: cliErr } = await SBLayer.supabase
+        .from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
+      if (cliErr || !clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
+      const clientId = clientRow.id;
+
+      const { token, platform } = b;
+      if (!token || !isExpoPushToken(token)) return fail(res, 'token Expo valide requis', 400, 'VALIDATION_ERROR');
+      if (!platform || !['ios', 'android'].includes(platform)) return fail(res, "platform 'ios' ou 'android' requis", 400, 'VALIDATION_ERROR');
+
+      const { data: deviceToken, error: dtErr } = await SBLayer.supabase
+        .from('client_device_tokens')
+        .upsert({ client_id: clientId, token, platform, last_used_at: nowISO() }, { onConflict: 'token' })
+        .select().single();
+      if (dtErr) throw new Error(dtErr.message);
+
+      return ok(res, { device_token: deviceToken }, null, 201);
     } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
   }
 
