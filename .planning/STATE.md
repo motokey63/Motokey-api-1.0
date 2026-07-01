@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Pioneer Program & Production Go-Live
-status: verifying
-last_updated: "2026-06-30T20:49:54.364Z"
-last_activity: 2026-06-30
+status: shipped
+last_updated: "2026-07-01T09:00:00.000Z"
+last_activity: 2026-07-01
 progress:
   total_phases: 4
   completed_phases: 3
@@ -16,42 +16,37 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-06-24)
+See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 11 — COMPLETE. Phases 9/10/11 livées. Phase 8 ⏸️ PARKED (op humaine Stripe).
+**Current focus:** Planning next milestone (v1.3) — not yet defined. Phase 8 (Stripe live mode) parked as known gap, carried forward.
 
 ## Current Position
 
-Phase: 11
-Plan: Not started
-Status: Phase complete — UX-01 + UX-02 verified in prod
-Last activity: 2026-06-30
+Milestone v1.2 shipped 2026-07-01 (audit: gaps_found, closed anyway — Phase 8 known gap).
+Next: `/gsd:new-milestone` to define v1.3.
+Last activity: 2026-07-01
 
 ```
 v1.0 ████████████ SHIPPED
 v1.1 ████████████ SHIPPED
-v1.2 [█████████░] 86% EN COURS (Phase 8→11, 3/4 phases)
-     Phase 8  ⏸️ PARKED (bascule live différée — 08-01 ✅, 08-02 en attente op humaine)
+v1.2 [█████████░] SHIPPED 2026-07-01 (86%, Phase 8 known gap — carried forward)
+     Phase 8  ⏸️ PARKED (bascule live différée — 08-01 ✅, 08-02 en attente op humaine) — carried into v1.3
      Phase 9  ✅ COMPLETE (2026-06-30)
      Phase 10 ✅ COMPLETE (2026-06-29)
      Phase 11 ✅ COMPLETE (2026-06-30)
+v1.3 — not yet defined
 ```
 
 ## Performance Metrics
 
 | Metric | Value |
 |--------|-------|
-| Milestones shipped | 2 (v1.0 + v1.1) |
-| Requirements v1.2 | 9 total, 9/9 mappés |
-| Phases v1.2 | 4 (Phase 8→11) |
-| Next action | `/gsd:discuss-phase 9` puis `/gsd:plan-phase 9` |
-| Phase 08-stripe-live-mode | ⏸️ PARKED — 08-01 ✅, 08-02 bloqué op humaine |
-| Phase 09-pioneer-program P01 | 15 | 3 tasks | 3 files |
-| Phase 10-live-operations P01 | 2m | 2 tasks | 3 files |
-| Phase 10-live-operations P02 | 5 | 2 tasks | 1 files |
-| Phase 09 P01 | 15 | 3 tasks | 3 files |
-| Phase 11 P02 | 5 | 1 tasks | 0 files |
+| Milestones shipped | 3 (v1.0 + v1.1 + v1.2) |
+| Requirements v1.2 | 9 total, 8/9 shipped, BILL-06 carried forward |
+| Phases v1.2 | 4 (Phase 8→11), 3/4 complete |
+| Next action | `/gsd:new-milestone` to define v1.3 (or resume Phase 8 once Stripe live-mode Dashboard steps are done) |
+| Phase 08-stripe-live-mode | ⏸️ PARKED — 08-01 ✅, 08-02 bloqué op humaine — known gap, see MILESTONES.md |
 
 ## Accumulated Context
 
@@ -61,7 +56,7 @@ v1.2 [█████████░] 86% EN COURS (Phase 8→11, 3/4 phases)
 - **RBAC** : ADMIN > CONCESSION > PRO > MECANO — middleware `requireRole()` sur tous les endpoints sensibles
 - **Score anti-fraude** : immuable sans validation Mehdi (pondération 1.0/0.6/0.3, formule 70/30)
 - **Fichiers critiques** : motokey-api.js, app.html, supabase.js, MotoKey_Client.html — pas de modif via scripts shell
-- **Stripe** : activé mode test, BILLING_ENFORCE=false (enforcement pas encore actif) → v1.2 active live mode + enforcement
+- **Stripe** : activé mode test, BILLING_ENFORCE=false (enforcement pas encore actif) → live mode + enforcement reportés en known gap (Phase 8), à reprendre dans un prochain milestone
 - **Billing** : 6 Price IDs Stripe test, Customer Portal bpc_1Tiyd9… configuré, webhook actif
 - **Pioneer Program** : coupon Stripe repeating 3 mois + non-migration price ID 24 mois + max 30 places auto
 - **Phase 8 context** : Live mode → scripts de création Price IDs déjà versionnés en test (scripts/), pattern réutilisable pour live
@@ -94,3 +89,5 @@ v1.2 [█████████░] 86% EN COURS (Phase 8→11, 3/4 phases)
 | 2026-06-29 | Phase 9 planifiée — 1 plan (09-01), 3 tâches, 1 wave. Researcher: Coupon+PromotionCode (2 objets distincts), max_redemptions sur PromotionCode. Plan checker: VERIFICATION PASSED (10/10 dimensions). |
 | 2026-06-29 | Phase 10 plan 01 exécuté — NOTIF-03 livré. Template subscription-cancelled.js + handleSubscriptionBlocked isDeleted flag + switch webhook différencié. Commits a8473a8 + 1f46fd7. |
 | 2026-06-30 | Phase 11 plans 01+02 exécutés — UX-02 livré (alerteEntretienChip + Motos.list enrichi, commits c416bd7+96d909c). UX-01 confirmé couvert (D-05, .score-badge.score-rouge existant). Vérification visuelle prod approuvée. Phase 11 COMPLETE. |
+| 2026-07-01 | Audit milestone v1.2 — status gaps_found. Phase 8 sans VERIFICATION.md, plan 08-02 jamais exécuté, BILL-06 non satisfait (Stripe toujours sk_test_). Intégration checker : 0 lien cassé sur les autres phases, BILL-05/enforcement pleinement câblé malgré flag off. Rapport : .planning/milestones/v1.2-MILESTONE-AUDIT.md. |
+| 2026-07-01 | Milestone v1.2 clôturé (option "proceed anyway") — Phase 8/BILL-06 noté Known Gap, carried forward. Archivage : milestones/v1.2-ROADMAP.md, v1.2-REQUIREMENTS.md, v1.2-MILESTONE-AUDIT.md. REQUIREMENTS.md supprimé (fraîche pour prochain milestone). PROJECT.md évolué (Validated/Active/Key Decisions). Tag v1.2 à créer. |
