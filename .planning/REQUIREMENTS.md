@@ -63,30 +63,31 @@ Exclusions explicites pour éviter le scope creep.
 
 ## Traceability
 
-Mapping requirements → phases. Rempli après création du roadmap.
+Mapping requirements → phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MAUTH-01 | — | Pending |
-| MAUTH-02 | — | Pending |
-| MAUTH-03 | — | Pending |
-| MPARITY-01 | — | Pending |
-| MPARITY-02 | — | Pending |
-| MPARITY-03 | — | Pending |
-| MPARITY-04 | — | Pending |
-| MPARITY-05 | — | Pending |
-| MPUSH-01 | — | Pending |
-| MPUSH-02 | — | Pending |
-| MPUSH-03 | — | Pending |
-| MPUSH-04 | — | Pending |
-| MPUSH-05 | — | Pending |
-| MSTORE-01 | — | Pending |
-| MSTORE-02 | — | Pending |
+| MAUTH-01 | Phase 14 | Pending |
+| MAUTH-02 | Phase 14 | Pending |
+| MAUTH-03 | Phase 14 | Pending |
+| MPARITY-01 | Phase 15 | Pending |
+| MPARITY-02 | Phase 15 | Pending |
+| MPARITY-03 | Phase 15 | Pending |
+| MPARITY-04 | Phase 15 | Pending |
+| MPARITY-05 | Phase 15 | Pending |
+| MPUSH-01 | Phase 16 | Pending |
+| MPUSH-02 | Phase 12 (backend) / Phase 16 (bout-en-bout) | Pending |
+| MPUSH-03 | Phase 16 | Pending |
+| MPUSH-04 | Phase 17 | Pending |
+| MPUSH-05 | Phase 16 | Pending |
+| MSTORE-01 | Phase 17 | Pending |
+| MSTORE-02 | Phase 17 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 15 total
-- Mappés à des phases: 0/15 (à remplir par le roadmapper)
+- Mappés à des phases: 15/15 ✓
 
 ---
 *Requirements définis: 2026-07-01*
 *Milestone: v1.3 App Client Mobile*
+*Roadmap créé: 2026-07-01 — voir .planning/ROADMAP.md (Phases 12-17)*
