@@ -8,9 +8,17 @@ MotoKey est un système de gestion de garage moto (DMS) pour Garage Motolab. Con
 
 Le score d'intégrité anti-fraude (pondération 1.0/0.6/0.3 selon la preuve) — sans lui, MotoKey est un simple DMS ; avec lui, c'est une preuve de valeur vérifiable à la revente.
 
-## Current Milestone
+## Current Milestone: v1.3 App Client Mobile
 
-Planning next milestone (v1.3) — not yet defined. Run `/gsd:new-milestone` to start.
+**Goal:** Les clients moto disposent d'une app mobile native (React Native) pour gérer leur moto, leurs devis et recevoir des notifications push — en complément de MotoKey_Client.html.
+
+**Target features:**
+- Auth : réutilisation de l'auth Supabase existante (login/OTP/reset), consommée via l'API MotoKey — pas de nouveau backend auth
+- Parité fonctionnelle avec MotoKey_Client.html : mes motos, mes devis (valider/refuser), historique entretien, liaison garage
+- Notifications push natives (devis reçu, rappel entretien, etc.) — capacité impossible en HTML classique
+- Backend : endpoints REST existants réutilisés + nouveaux si besoin (ex: enregistrement device token push)
+
+**Explicitly separate from this milestone:** Phase 8 (Stripe live mode / BILL-06) reste un known gap indépendant, à reprendre quand Mehdi aura fait la bascule Stripe Dashboard — ne bloque pas v1.3.
 
 ## Current State (after v1.2 — 2026-07-01)
 
@@ -64,7 +72,6 @@ Planning next milestone (v1.3) — not yet defined. Run `/gsd:new-milestone` to 
 ### Out of Scope
 
 - Mode offline — hors scope actuel, complexité trop élevée
-- App mobile native — web-first, portage mobile ultérieur
 - VIN decoder online complet — NHTSA + WMI local suffisant
 - Stripe Elements in-app — PCI scope, Checkout hosted suffit
 - Multi-garage / per-seat — modèle actuel per-garage suffit
@@ -84,7 +91,8 @@ Planning next milestone (v1.3) — not yet defined. Run `/gsd:new-milestone` to 
 
 ## Constraints
 
-- **Tech stack** : Node.js/Express + HTML vanilla — pas de framework front à introduire
+- **Tech stack (backend + web)** : Node.js/Express + HTML vanilla — pas de framework front à introduire pour `app.html` / `MotoKey_Client.html`
+- **Tech stack (mobile, v1.3+)** : React Native dans `/mobile-app` (nouveau répertoire, même repo) — consomme l'API existante en HTTP, n'introduit aucun changement côté backend/web
 - **Sécurité** : `requireRole()` obligatoire sur tout nouvel endpoint sensible
 - **Score/pondération** : ne pas modifier sans validation Mehdi
 - **Fichiers critiques** : motokey-api.js, app.html, supabase.js, MotoKey_Client.html — édition directe uniquement (pas de scripts PowerShell/sed)
@@ -123,4 +131,4 @@ This document evolves at phase transitions and milestone boundaries.
 5. Key Decisions log updated
 
 ---
-*Last updated: 2026-07-01 — v1.2 Pioneer Program & Production Go-Live milestone completed (Phase 8 parked as known gap)*
+*Last updated: 2026-07-01 — v1.3 App Client Mobile milestone started*
