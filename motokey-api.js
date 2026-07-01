@@ -1769,6 +1769,32 @@ const server = http.createServer(async function(req, res){
     } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
   }
 
+  // GET /client/me (CLIENT) — profil du client authentifié (comble le gap /auth/me)
+  if((p=M('GET','/client/me'))!==null){
+    const ctx = req.ctx || (SBLayer ? await rbac.extractRoleFromRequest(req, SBLayer) : null);
+    if (!ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
+    if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
+    try {
+      const { data: clientRow, error: cliErr } = await SBLayer.supabase
+        .from('clients')
+        .select('id, nom, email, tel, garage_id, created_at, garages(nom)')
+        .eq('auth_user_id', ctx.user_id)
+        .single();
+      if (cliErr || !clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
+
+      return ok(res, {
+        id: clientRow.id,
+        nom: clientRow.nom,
+        email: clientRow.email,
+        tel: clientRow.tel,
+        garage_id: clientRow.garage_id,
+        garage_nom: clientRow.garages ? clientRow.garages.nom : null,
+        client_depuis: clientRow.created_at
+      });
+    } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+  }
+
   /* PARAMS & STATS */
   if((p=M('GET','/params'))!==null){
     // RBAC: MECANO minimum — lecture paramètres garage
