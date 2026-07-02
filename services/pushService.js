@@ -82,4 +82,38 @@ async function sendToToken(token, payload, idempotencyKey) {
   }
 }
 
-module.exports = { sendToToken };
+/**
+ * Fan-out : envoie une notification push à TOUS les devices actifs d'un client.
+ * @param {string} clientId       UUID du client (table clients)
+ * @param {object} payload        { title, body, data }
+ * @param {string} idempotencyKey Clé d'idempotence de base (suffixée par token pour le fan-out)
+ */
+async function sendPush(clientId, payload, idempotencyKey) {
+  const { data: rows, error } = await SBLayer.supabase
+    .from('client_device_tokens')
+    .select('token')
+    .eq('client_id', clientId);
+  if (error) {
+    console.error('❌ [13] sendPush — lookup tokens échoué pour client', clientId, ':', error.message);
+    return { error: error.message }; // jamais throw
+  }
+  if (!rows || rows.length === 0) {
+    console.log('🔔 [13] sendPush — aucun token actif pour client', clientId);
+    return { sent: 0 };
+  }
+
+  // Clé d'idempotence PAR TOKEN : utiliser la clé brute inchangée pour chaque token insérerait
+  // la ligne au premier token puis buterait sur la contrainte UNIQUE (23505) pour tous les autres,
+  // ignorant silencieusement tous les devices sauf un. Suffixer par le token permet à chaque device
+  // de dédupliquer indépendamment tout en gardant l'événement logique idempotent par device.
+  const results = [];
+  for (const row of rows) {
+    const perTokenKey = `${idempotencyKey}::${row.token}`;
+    const res = await sendToToken(row.token, { ...payload, clientId }, perTokenKey);
+    results.push({ token: row.token, res });
+  }
+  console.log(`🔔 [13] sendPush — fan-out ${results.length} device(s) pour client ${clientId} (key base "${idempotencyKey}")`);
+  return { sent: results.length, results };
+}
+
+module.exports = { sendToToken, sendPush };
