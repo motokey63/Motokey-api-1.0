@@ -6,12 +6,13 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { AppState, Alert } from 'react-native';
+import { AppState } from 'react-native';
 import { apiPost, extractTokens, errMsg, tokenSecsLeft } from '../lib/api';
 import { saveSession, loadSession, clearSession } from '../lib/secureStore';
 import { AuthSession } from '../lib/types';
 import { createSessionRefresher } from '../lib/session';
 import { REFRESH_POLL_MS, NEAR_EXPIRY_SECS } from '../constants/config';
+import { showToast } from '../components/Toast';
 
 /**
  * Owns the client auth session end-to-end: cold-start restore (MAUTH-02),
@@ -58,8 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setStatus('unauthenticated');
     if (!hardExpiryNotifiedRef.current) {
       hardExpiryNotifiedRef.current = true;
-      // TODO(14-03): route to shared toast
-      Alert.alert('MotoKey', 'Session expirée — reconnectez-vous');
+      showToast('Session expirée — reconnectez-vous', 'error');
     }
   }, []);
 
