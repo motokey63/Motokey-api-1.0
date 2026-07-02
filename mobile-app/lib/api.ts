@@ -9,8 +9,8 @@ import { ApiResult } from './types';
  * header — omitting it makes the backend return the full session JSON
  * (access_token + refresh_token in the body), which is exactly the mobile flow.
  *
- * This module must NEVER instantiate a @supabase/supabase-js client — see
- * README.md "Hard rule: API-only access".
+ * This module must NEVER instantiate a direct Supabase JS data/auth client —
+ * see README.md "Hard rule: API-only access".
  */
 export async function apiFetch<T = any>(
   method: string,
