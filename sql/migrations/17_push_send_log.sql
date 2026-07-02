@@ -1,10 +1,16 @@
 -- Migration 17 : Table push_send_log — garde d'idempotency pour l'envoi de push (D-01/D-02)
 -- À appliquer manuellement via Supabase Dashboard > SQL Editor
 
+-- NOTE (2026-07-02): client_id is intentionally a plain UUID, NOT a foreign key to clients(id).
+-- The original REFERENCES clients(id) ON DELETE SET NULL clause caused the multi-column
+-- ALTER TABLE application to fail/rollback in the live Supabase project (root cause not
+-- identified; clients.id confirmed present and UUID-shaped). Dropping the FK unblocked it.
+-- Not required by any current code path: client_id is nullable, used only for debugging
+-- per CONTEXT.md's discretion note, and never enforced/joined by pushService.js.
 CREATE TABLE push_send_log (
   id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   idempotency_key TEXT        NOT NULL UNIQUE,
-  client_id       UUID        REFERENCES clients(id) ON DELETE SET NULL,
+  client_id       UUID,
   token           TEXT,
   sent_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
   created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
