@@ -52,7 +52,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
 **Milestone Goal:** Les clients moto disposent d'une app mobile native (React Native/Expo) pour gérer leur moto, leurs devis et recevoir des notifications push — en complément de `MotoKey_Client.html`, sans changement au backend/web existant hors nouvelle surface push.
 
 - [x] **Phase 12: Backend Push Foundation** - Device tokens + profil client exposés via API, curl-testable sans app mobile (completed 2026-07-01)
-- [ ] **Phase 13: Push Dispatch Service** - Service d'envoi de push modelé sur emailService.js, testable indépendamment
+- [x] **Phase 13: Push Dispatch Service** - Service d'envoi de push modelé sur emailService.js, testable indépendamment (completed 2026-07-02, SC-1 real-device delivery deferred — see Phase Details)
 - [ ] **Phase 14: RN App Scaffolding + Native Auth** - Scaffold Expo Router + authentification native sécurisée
 - [ ] **Phase 15: Feature-Parity Screens** - Motos, devis, historique, liaison garage — parité MotoKey_Client.html
 - [ ] **Phase 16: Push Wiring End-to-End** - Soft-ask, enregistrement token, push devis reçu, deep link
@@ -80,9 +80,9 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
   2. Avec un flag `PUSH_ENABLED=false`, l'envoi tombe en fallback `console.log` sans erreur (même convention que `EMAIL_ENABLED`)
   3. Un envoi avec la même clé d'idempotency qu'un envoi précédent ne déclenche pas une deuxième notification
   4. Un token invalide/expiré est journalisé sans faire planter le processus
-**Plans**: 2 plans
+**Plans**: 2/2 plans complete (13-01 foundation, 13-02 pushService) — 2026-07-02. SC-2/SC-3/SC-4 confirmed (fallback, idempotency verified live, invalid-token safety). SC-1 (real device delivery) explicitly deferred — no Expo Go / mobile device token available yet; to be exercised once one exists (naturally during Phase 14 or as a standalone check). Migration 17 (push_send_log) applied to prod Supabase — migration file's client_id FK to clients(id) was dropped to match a live schema-apply drift (no functional impact, client_id is debugging-only).
 - [x] 13-01-PLAN.md — Foundation Wave 0 : expo-server-sdk + migration 17 push_send_log + PushSendLog helper (supabase.js) + harness scripts/test-push.js
-- [ ] 13-02-PLAN.md — services/pushService.js : sendToToken/sendPush, garde d'idempotency, fallback PUSH_ENABLED, gestion ticket-level + checkpoint device SC-1/SC-3
+- [x] 13-02-PLAN.md — services/pushService.js : sendToToken/sendPush, garde d'idempotency, fallback PUSH_ENABLED, gestion ticket-level + checkpoint device SC-1/SC-3 (SC-1 deferred, SC-3 confirmed live)
 
 ### Phase 14: RN App Scaffolding + Native Auth
 **Goal**: Les clients peuvent s'authentifier depuis l'app mobile native, avec une session stockée de façon chiffrée et rafraîchie proactivement.
@@ -151,11 +151,11 @@ Phases exécutent en ordre numérique : 12 → 13 → 14 → 15 → 16 → 17
 | Phase 10 | v1.2 | 2/2 | ✅ Complete | 2026-06-29 |
 | Phase 11 | v1.2 | 2/2 | ✅ Complete | 2026-06-30 |
 | Phase 12 | v1.3 | 2/2 | ✅ Complete | 2026-07-01 |
-| Phase 13 | v1.3 | 1/2 | In Progress | - |
+| Phase 13 | v1.3 | 2/2 | ✅ Complete (SC-1 deferred) | 2026-07-02 |
 | Phase 14 | v1.3 | 0/TBD | Not started | - |
 | Phase 15 | v1.3 | 0/TBD | Not started | - |
 | Phase 16 | v1.3 | 0/TBD | Not started | - |
 | Phase 17 | v1.3 | 0/TBD | Not started | - |
 
 ---
-*Roadmap updated: 2026-07-02 — Phase 13 planned (2 plans : 13-01 foundation, 13-02 pushService).*
+*Roadmap updated: 2026-07-02 — Phase 13 complete (13-01 foundation + 13-02 pushService), SC-1 real-device delivery deferred pending a mobile device token.*
