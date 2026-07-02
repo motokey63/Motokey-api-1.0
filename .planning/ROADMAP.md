@@ -51,7 +51,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
 
 **Milestone Goal:** Les clients moto disposent d'une app mobile native (React Native/Expo) pour gérer leur moto, leurs devis et recevoir des notifications push — en complément de `MotoKey_Client.html`, sans changement au backend/web existant hors nouvelle surface push.
 
-- [ ] **Phase 12: Backend Push Foundation** - Device tokens + profil client exposés via API, curl-testable sans app mobile
+- [x] **Phase 12: Backend Push Foundation** - Device tokens + profil client exposés via API, curl-testable sans app mobile (completed 2026-07-01)
 - [ ] **Phase 13: Push Dispatch Service** - Service d'envoi de push modelé sur emailService.js, testable indépendamment
 - [ ] **Phase 14: RN App Scaffolding + Native Auth** - Scaffold Expo Router + authentification native sécurisée
 - [ ] **Phase 15: Feature-Parity Screens** - Motos, devis, historique, liaison garage — parité MotoKey_Client.html
@@ -65,11 +65,11 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
 **Depends on**: Nothing (zero dépendance RN, peut démarrer en parallèle de tout le reste)
 **Requirements**: MPUSH-02
 **Success Criteria** (what must be TRUE):
-  1. Un appel `POST /client/device-tokens` avec un token Expo valide et un JWT client valide crée une entrée liée à cet utilisateur, vérifiable via curl
-  2. Un appel `DELETE /client/device-tokens` supprime l'entrée correspondante (simule un logout)
-  3. `GET /client/me` retourne le profil du client authentifié (comble le gap `/auth/me` identifié en recherche)
-  4. Les deux endpoints device-tokens sont protégés par `requireRole('CLIENT')` — un appel sans JWT valide échoue
-**Plans**: TBD
+  1. Un appel `POST /client/device-tokens` avec un token Expo valide et un JWT client valide crée une entrée liée à cet utilisateur, vérifiable via curl — code livré, vérifié manuellement (400/401 live), happy-path 201 non testé en live tant que migration 16 n'est pas appliquée
+  2. Un appel `DELETE /client/device-tokens` supprime l'entrée correspondante (simule un logout) — code livré, même statut de vérification que SC1
+  3. `GET /client/me` retourne le profil du client authentifié (comble le gap `/auth/me` identifié en recherche) — vérifié live end-to-end (200 confirmé contre Supabase prod)
+  4. Les deux endpoints device-tokens sont protégés par `requireRole('CLIENT')` — un appel sans JWT valide échoue — vérifié live (401 confirmé)
+**Plans**: 2/2 plans complete (12-01 data+harness, 12-02 endpoints) — 2026-07-01. Vérification manuelle effectuée ; migration 16 (sql/migrations/16_client_device_tokens.sql) reste à appliquer en Supabase Dashboard (rzbqbaccjyxvtlnfitrr) avant que SC1/SC2 soient prouvés en conditions réelles.
 
 ### Phase 13: Push Dispatch Service
 **Goal**: Un service d'envoi de notifications push existe côté backend, testable manuellement avant même que l'app mobile ou un compte provider push soient prêts.
@@ -80,7 +80,9 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
   2. Avec un flag `PUSH_ENABLED=false`, l'envoi tombe en fallback `console.log` sans erreur (même convention que `EMAIL_ENABLED`)
   3. Un envoi avec la même clé d'idempotency qu'un envoi précédent ne déclenche pas une deuxième notification
   4. Un token invalide/expiré est journalisé sans faire planter le processus
-**Plans**: TBD
+**Plans**: 2 plans
+- [x] 13-01-PLAN.md — Foundation Wave 0 : expo-server-sdk + migration 17 push_send_log + PushSendLog helper (supabase.js) + harness scripts/test-push.js
+- [ ] 13-02-PLAN.md — services/pushService.js : sendToToken/sendPush, garde d'idempotency, fallback PUSH_ENABLED, gestion ticket-level + checkpoint device SC-1/SC-3
 
 ### Phase 14: RN App Scaffolding + Native Auth
 **Goal**: Les clients peuvent s'authentifier depuis l'app mobile native, avec une session stockée de façon chiffrée et rafraîchie proactivement.
@@ -148,12 +150,12 @@ Phases exécutent en ordre numérique : 12 → 13 → 14 → 15 → 16 → 17
 | Phase 9 | v1.2 | 1/1 | ✅ Complete | 2026-06-30 |
 | Phase 10 | v1.2 | 2/2 | ✅ Complete | 2026-06-29 |
 | Phase 11 | v1.2 | 2/2 | ✅ Complete | 2026-06-30 |
-| Phase 12 | v1.3 | 0/TBD | Not started | - |
-| Phase 13 | v1.3 | 0/TBD | Not started | - |
+| Phase 12 | v1.3 | 2/2 | ✅ Complete | 2026-07-01 |
+| Phase 13 | v1.3 | 1/2 | In Progress | - |
 | Phase 14 | v1.3 | 0/TBD | Not started | - |
 | Phase 15 | v1.3 | 0/TBD | Not started | - |
 | Phase 16 | v1.3 | 0/TBD | Not started | - |
 | Phase 17 | v1.3 | 0/TBD | Not started | - |
 
 ---
-*Roadmap updated: 2026-07-01 — v1.3 App Client Mobile roadmap créé, 6 phases (12→17), 15/15 requirements mappés.*
+*Roadmap updated: 2026-07-02 — Phase 13 planned (2 plans : 13-01 foundation, 13-02 pushService).*
