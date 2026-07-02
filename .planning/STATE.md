@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: App Client Mobile
 status: executing
-stopped_at: Completed 13-02-PLAN.md
-last_updated: "2026-07-02T16:35:19.000Z"
+stopped_at: Completed 14-01-PLAN.md
+last_updated: "2026-07-02T20:38:36.097Z"
 last_activity: 2026-07-02
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 8
+  completed_plans: 5
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 13 — push-dispatch-service — COMPLETE. Next: Phase 14 (RN App Scaffolding + Native Auth)
+**Current focus:** Phase 14 — rn-app-scaffolding-native-auth
 
 ## Current Position
 
-Phase: 13 (push-dispatch-service) — COMPLETE (both plans)
-Plan: 2 of 2 — done
-Status: Ready to plan Phase 14
+Phase: 14 (rn-app-scaffolding-native-auth) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
 Last activity: 2026-07-02
 
 Progress: [░░░░░░░░░░] 0%
@@ -53,6 +53,7 @@ v1.3 [░░░░░░░░░░] ROADMAP READY — App Client Mobile (React
 | Phase 12 P02 | 25min | 4 tasks | 1 files |
 | Phase 13 P01 | 10min | 3 tasks | 5 files |
 | Phase 13 P02 | ~70min | 3 tasks | 2 files |
+| Phase 14 P01 | 20min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - [Phase 13]: Phase 13-02: services/pushService.js ships sendToToken + sendPush (client fan-out) against expo-server-sdk, mirroring emailService.js (PUSH_ENABLED fallback) and stripeService.js (insert-first idempotency guard) conventions; per-token idempotency key suffix (`${key}::${token}`) prevents multi-device fan-out collapsing to one send
 - [Phase 13]: Phase 13-02: migration 17 (push_send_log) applied to live Supabase with a schema drift — client_id FK to clients(id) dropped (broke the live ALTER TABLE apply, root cause not identified) — migration file reconciled to a plain nullable UUID, no functional impact (client_id is debugging-only, never joined/enforced by code)
 - [Phase 13]: Phase 13-02: SC-1 (real device push delivery) explicitly DEFERRED by Mehdi's decision — no Expo Go / mobile device token exists yet (mobile app starts Phase 14). SC-2/SC-3/SC-4 confirmed (fallback, idempotency, invalid-token safety). This is the plan's own allowed resolution, not a gap requiring a dedicated closure phase — see Pending Todos below.
+- [Phase 14]: [Phase 14-01]: Flattened Expo SDK 57's new src/app default template layout to root-level app/ so it matches every path plans 14-02/14-03/14-04 already commit to
+- [Phase 14]: [Phase 14-01]: Pinned jest@^29.7.0 + @types/jest@^29 + @react-native/jest-preset@^0.86.0 (--legacy-peer-deps) to resolve jest-expo@57.0.0's internal ^29.2.1 jest-runtime deps conflicting with jest's latest 30.x tag and RN 0.86.0
 
 ### Pending Todos
 
@@ -87,6 +90,6 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 
 ## Session Continuity
 
-Last session: 2026-07-02T16:35:19.000Z
-Stopped at: Completed 13-02-PLAN.md — Phase 13 (push-dispatch-service) fully executed, both plans complete
+Last session: 2026-07-02T20:38:36.094Z
+Stopped at: Completed 14-01-PLAN.md
 Resume file: None

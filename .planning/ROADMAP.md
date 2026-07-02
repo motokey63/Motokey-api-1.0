@@ -93,7 +93,11 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
   2. Le token de session est stocké via `expo-secure-store` (jamais en clair dans AsyncStorage) (MAUTH-02)
   3. Après un retour en premier plan (app remise au premier plan après mise en arrière-plan prolongée), le token est rafraîchi proactivement avant expiration, sans erreur 401 visible par l'utilisateur (MAUTH-03)
   4. L'utilisateur reste connecté entre deux ouvertures de l'app (session persistée)
-**Plans**: TBD
+**Plans**: 4 plans (waves 1-4, sequential — layered auth foundation)
+- [x] 14-01-PLAN.md — Scaffold Expo Router+TS app, AES LargeSecureStore token store, fetch API client (MAUTH-01/02)
+- [ ] 14-02-PLAN.md — Auth session context + single-flight proactive refresh (timer + AppState foreground) (MAUTH-01/02/03)
+- [ ] 14-03-PLAN.md — Branded auth screens (login/register/OTP-verify/reset) + placeholder Home + router guard (MAUTH-01)
+- [ ] 14-04-PLAN.md — Human E2E verification of MAUTH-01/02/03 on device (checkpoint)
 **UI hint**: yes
 
 ### Phase 15: Feature-Parity Screens
@@ -152,7 +156,7 @@ Phases exécutent en ordre numérique : 12 → 13 → 14 → 15 → 16 → 17
 | Phase 11 | v1.2 | 2/2 | ✅ Complete | 2026-06-30 |
 | Phase 12 | v1.3 | 2/2 | ✅ Complete | 2026-07-01 |
 | Phase 13 | v1.3 | 2/2 | ✅ Complete (SC-1 deferred) | 2026-07-02 |
-| Phase 14 | v1.3 | 0/TBD | Not started | - |
+| Phase 14 | v1.3 | 1/4 | In Progress | - |
 | Phase 15 | v1.3 | 0/TBD | Not started | - |
 | Phase 16 | v1.3 | 0/TBD | Not started | - |
 | Phase 17 | v1.3 | 0/TBD | Not started | - |
