@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: App Client Mobile
 status: executing
-stopped_at: Completed 14-01-PLAN.md
-last_updated: "2026-07-02T20:38:36.097Z"
+stopped_at: Completed 14-02-PLAN.md
+last_updated: "2026-07-02T20:49:46.674Z"
 last_activity: 2026-07-02
 progress:
   total_phases: 6
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 ## Current Position
 
 Phase: 14 (rn-app-scaffolding-native-auth) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-07-02
 
@@ -54,6 +54,7 @@ v1.3 [░░░░░░░░░░] ROADMAP READY — App Client Mobile (React
 | Phase 13 P01 | 10min | 3 tasks | 5 files |
 | Phase 13 P02 | ~70min | 3 tasks | 2 files |
 | Phase 14 P01 | 20min | 3 tasks | 11 files |
+| Phase 14 P02 | 15min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,7 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - [Phase 13]: Phase 13-02: SC-1 (real device push delivery) explicitly DEFERRED by Mehdi's decision — no Expo Go / mobile device token exists yet (mobile app starts Phase 14). SC-2/SC-3/SC-4 confirmed (fallback, idempotency, invalid-token safety). This is the plan's own allowed resolution, not a gap requiring a dedicated closure phase — see Pending Todos below.
 - [Phase 14]: [Phase 14-01]: Flattened Expo SDK 57's new src/app default template layout to root-level app/ so it matches every path plans 14-02/14-03/14-04 already commit to
 - [Phase 14]: [Phase 14-01]: Pinned jest@^29.7.0 + @types/jest@^29 + @react-native/jest-preset@^0.86.0 (--legacy-peer-deps) to resolve jest-expo@57.0.0's internal ^29.2.1 jest-runtime deps conflicting with jest's latest 30.x tag and RN 0.86.0
+- [Phase 14]: [Phase 14-02]: session.ts single-flight refresher uses a closure-scoped inFlight promise guard; AuthContext ports all six MotoKey_Client.html auth handlers verbatim with Alert.alert as interim hard-expiry notice pending 14-03's toast system
 
 ### Pending Todos
 
@@ -87,9 +89,10 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - Phase 12-02 Task 4: migration 16 (client_device_tokens) non appliquee en prod Supabase Dashboard -- POST/DELETE /client/device-tokens verifies code-correct via curl direct avec un vrai access_token Supabase mais renvoient 'relation does not exist' tant que la migration n'est pas executee. GET /client/me fonctionne deja end-to-end en prod.
 - Phase 13-02: SC-1 (real device push delivery) deferred — see Pending Todos above. Migration 17 (push_send_log) IS applied to prod Supabase (with FK-drift reconciled in the migration file, no functional impact).
 - Windows-only Node libuv teardown crash (`UV_HANDLE_CLOSING` assertion) after any local script that calls Supabase then `process.exit()` — pre-existing (reproduces with Phase 9 code too), confirmed not a Phase 13 regression, won't occur on Railway (Linux). Details: `.planning/phases/13-push-dispatch-service/deferred-items.md`. No action needed.
+- Phase 14-01: 14-01-SUMMARY.md is missing from .planning/phases/14-rn-app-scaffolding-native-auth/ on the main checkout -- written in the 14-01 worktree but .planning/phases/ is gitignored, so it never merged in. Progress counters (STATE.md completed_plans, ROADMAP.md Phase 14 summary_count) undercount by 1 plan as a result. No functional impact on 14-01 shipped code (already merged via b9af9fd) -- cosmetic/tracking gap only.
 
 ## Session Continuity
 
-Last session: 2026-07-02T20:38:36.094Z
-Stopped at: Completed 14-01-PLAN.md
+Last session: 2026-07-02T20:49:18.181Z
+Stopped at: Completed 14-02-PLAN.md
 Resume file: None

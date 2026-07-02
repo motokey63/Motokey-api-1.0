@@ -9,9 +9,9 @@ Requirements pour le milestone App Client Mobile. Chaque requirement mappe à un
 
 ### Auth Mobile
 
-- [ ] **MAUTH-01**: L'utilisateur peut se connecter / s'inscrire / réinitialiser son mot de passe depuis l'app mobile (réutilise les endpoints Supabase auth existants — parité avec MotoKey_Client.html)
-- [ ] **MAUTH-02**: Le token de session est stocké chiffré sur l'appareil (expo-secure-store, pas AsyncStorage en clair)
-- [ ] **MAUTH-03**: L'app rafraîchit proactivement le token avant expiration au retour d'arrière-plan (pas seulement en réaction à un 401)
+- [x] **MAUTH-01**: L'utilisateur peut se connecter / s'inscrire / réinitialiser son mot de passe depuis l'app mobile (réutilise les endpoints Supabase auth existants — parité avec MotoKey_Client.html)
+- [x] **MAUTH-02**: Le token de session est stocké chiffré sur l'appareil (expo-secure-store, pas AsyncStorage en clair)
+- [x] **MAUTH-03**: L'app rafraîchit proactivement le token avant expiration au retour d'arrière-plan (pas seulement en réaction à un 401)
 
 ### Parité Fonctionnelle
 
@@ -67,9 +67,9 @@ Mapping requirements → phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| MAUTH-01 | Phase 14 | Pending |
-| MAUTH-02 | Phase 14 | Pending |
-| MAUTH-03 | Phase 14 | Pending |
+| MAUTH-01 | Phase 14 | Complete |
+| MAUTH-02 | Phase 14 | Complete |
+| MAUTH-03 | Phase 14 | Complete |
 | MPARITY-01 | Phase 15 | Pending |
 | MPARITY-02 | Phase 15 | Pending |
 | MPARITY-03 | Phase 15 | Pending |

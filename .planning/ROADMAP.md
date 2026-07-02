@@ -95,7 +95,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
   4. L'utilisateur reste connecté entre deux ouvertures de l'app (session persistée)
 **Plans**: 4 plans (waves 1-4, sequential — layered auth foundation)
 - [x] 14-01-PLAN.md — Scaffold Expo Router+TS app, AES LargeSecureStore token store, fetch API client (MAUTH-01/02)
-- [ ] 14-02-PLAN.md — Auth session context + single-flight proactive refresh (timer + AppState foreground) (MAUTH-01/02/03)
+- [x] 14-02-PLAN.md — Auth session context + single-flight proactive refresh (timer + AppState foreground) (MAUTH-01/02/03)
 - [ ] 14-03-PLAN.md — Branded auth screens (login/register/OTP-verify/reset) + placeholder Home + router guard (MAUTH-01)
 - [ ] 14-04-PLAN.md — Human E2E verification of MAUTH-01/02/03 on device (checkpoint)
 **UI hint**: yes
