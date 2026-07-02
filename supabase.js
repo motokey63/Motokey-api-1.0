@@ -1435,6 +1435,21 @@ const BillingEvents = {
   }
 };
 
+// ══════════════════════════════════════════════════════════
+// PUSH SEND LOG — idempotency guard pour l'envoi de push (Phase 13)
+// ══════════════════════════════════════════════════════════
+const PushSendLog = {
+  async insert(idempotency_key, client_id, token) {
+    const { data, error } = await supabase
+      .from('push_send_log')
+      .insert({ idempotency_key, client_id: client_id || null, token: token || null })
+      .select()
+      .single();
+    if (error) throw new Error(`[push_send_log] ${error.message}`);
+    return data;
+  }
+};
+
 // EXPORT
 // ══════════════════════════════════════════════════════════
 module.exports = {
@@ -1458,5 +1473,6 @@ module.exports = {
   resolveProprietaire,
   checkLimiteMotosClient,
   cessionMoto,
-  BillingEvents
+  BillingEvents,
+  PushSendLog
 };
