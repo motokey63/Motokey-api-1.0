@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: App Client Mobile
 status: executing
-stopped_at: Completed 15-04-PLAN.md
-last_updated: "2026-07-03T19:58:24.106Z"
+stopped_at: Completed 15-06-PLAN.md
+last_updated: "2026-07-03T20:23:07.729Z"
 last_activity: 2026-07-03
 progress:
   total_phases: 6
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 ## Current Position
 
 Phase: 15 (feature-parity-screens) — EXECUTING
-Plan: 4 of 8 (this plan complete; parallel plans in this phase may be executing in sibling worktrees)
+Plan: 5 of 8 (this plan complete; parallel plans in this phase may be executing in sibling worktrees)
 Status: Ready to execute
 Last activity: 2026-07-03
 
@@ -59,6 +59,7 @@ v1.3 [░░░░░░░░░░] ROADMAP READY — App Client Mobile (React
 | Phase 14 P04 | ~45min | 2 tasks | 3 files |
 | Phase 15 P03 | 20min | 2 tasks | 5 files |
 | Phase 15 P04 | 25min | 3 tasks | 6 files |
+| Phase 15 P06 | ~20min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,7 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - [Phase 14]: [Phase 14-04]: Phase 13 SC-1 (real device push delivery) now explicitly targeted for Phase 15 — Previously an open-ended deferral ("once a device token exists"). Mehdi's decision during the 14-04 checkpoint: close it out specifically in Phase 15 rather than leave the timing open.
 - [Phase 15-03]: Navigation shell (Tabs Motos/Devis/Compte + nested Motos Stack) built; placeholder Home deleted, root redirect now targets /(app)/(tabs)/motos
 - [Phase 15]: [Phase 15-04]: Six shared presentational components (ScoreBadge/StatutBadge/EmptyState/OfflineBanner/MotoListCard/RevokeGarageModal) built under mobile-app/components/, wired to Wave 1 (motoDisplay/motoParse/cache) — RevokeGarageModal's destructive confirm is a standalone Pressable (Button has no destructive variant), StatutBadge stays generic (label+color props, callers own statut->color mapping)
+- [Phase 15]: [Phase 15-06]: Devis tab (index.tsx) built as a flat inline-expand FlatList (no detail stack push) per RESEARCH Open Question 2 recommendation; Refuser button implemented as a standalone Pressable (Button has no destructive variant), mirroring RevokeGarageModal's fallback pattern
 
 ### Pending Todos
 
@@ -104,9 +106,10 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - Phase 14-01: 14-01-SUMMARY.md is missing from .planning/phases/14-rn-app-scaffolding-native-auth/ on the main checkout -- written in the 14-01 worktree but .planning/phases/ is gitignored, so it never merged in. Progress counters (STATE.md completed_plans, ROADMAP.md Phase 14 summary_count) undercount by 1 plan as a result. No functional impact on 14-01 shipped code (already merged via b9af9fd) -- cosmetic/tracking gap only.
 - Phase 14-04: MAUTH-03 (proactive foreground refresh after long background) not yet exercised on a real device -- checkpoint confirmed checks 1-4 (register/login/reset/persistence) only. Needs a dedicated pass (background ~1h, foreground, confirm no visible session error) before Phase 14's auth layer is considered fully hardened. Not a bug -- untested.
 - Phase 15-04: worktree .planning/ was stale at branch start (missing Wave 1 merges 15-01/02/03) -- fast-forward merged master in before Task 1. Also this worktree's .planning/ only holds this plan's own SUMMARY.md (sibling worktrees' 15-01/02/03/05..08 SUMMARY files never synced here since .planning is gitignored) -- state update-progress/roadmap counts computed here undercount; orchestrator should reconcile from the shared main-checkout .planning/ after all Phase 15 worktrees complete.
+- Phase 15-06: worktree .planning/ only holds this plan's own SUMMARY.md (sibling worktrees' 15-01..05/07/08 SUMMARY files never synced here, .planning is gitignored) -- state update-progress/roadmap counts computed here undercount; orchestrator should reconcile from the shared main-checkout .planning/ after all Phase 15 worktrees complete (same gap already noted for 15-04).
 
 ## Session Continuity
 
-Last session: 2026-07-03T19:58:24.102Z
-Stopped at: Completed 15-04-PLAN.md
+Last session: 2026-07-03T20:23:07.726Z
+Stopped at: Completed 15-06-PLAN.md
 Resume file: None
