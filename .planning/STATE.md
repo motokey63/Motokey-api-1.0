@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: App Client Mobile
 status: executing
-stopped_at: Completed 15-04-PLAN.md
-last_updated: "2026-07-03T19:58:24.106Z"
+stopped_at: Completed 15-05-PLAN.md
+last_updated: "2026-07-03T20:17:45.288Z"
 last_activity: 2026-07-03
 progress:
   total_phases: 6
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 ## Current Position
 
 Phase: 15 (feature-parity-screens) — EXECUTING
-Plan: 4 of 8 (this plan complete; parallel plans in this phase may be executing in sibling worktrees)
+Plan: 5 of 8 (this plan complete; parallel plans in this phase may be executing in sibling worktrees)
 Status: Ready to execute
 Last activity: 2026-07-03
 
@@ -59,6 +59,7 @@ v1.3 [░░░░░░░░░░] ROADMAP READY — App Client Mobile (React
 | Phase 14 P04 | ~45min | 2 tasks | 3 files |
 | Phase 15 P03 | 20min | 2 tasks | 5 files |
 | Phase 15 P04 | 25min | 3 tasks | 6 files |
+| Phase 15 P05 | 25min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,7 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - [Phase 14]: [Phase 14-04]: Phase 13 SC-1 (real device push delivery) now explicitly targeted for Phase 15 — Previously an open-ended deferral ("once a device token exists"). Mehdi's decision during the 14-04 checkpoint: close it out specifically in Phase 15 rather than leave the timing open.
 - [Phase 15-03]: Navigation shell (Tabs Motos/Devis/Compte + nested Motos Stack) built; placeholder Home deleted, root redirect now targets /(app)/(tabs)/motos
 - [Phase 15]: [Phase 15-04]: Six shared presentational components (ScoreBadge/StatutBadge/EmptyState/OfflineBanner/MotoListCard/RevokeGarageModal) built under mobile-app/components/, wired to Wave 1 (motoDisplay/motoParse/cache) — RevokeGarageModal's destructive confirm is a standalone Pressable (Button has no destructive variant), StatutBadge stays generic (label+color props, callers own statut->color mapping)
+- [Phase 15]: [Phase 15-05]: Motos list ports loadMotos()'s parallel per-moto enrichment (interventions+alertes) verbatim into an AsyncStorage-cached FlatList; Fiche Moto detail re-fetches independently by id (online-only, D-09) rather than reusing the list's enriched cache entry; plan d'entretien section renders only when alertes is non-null and non-empty, matching MotoKey_Client.html's 403-hides-section discipline exactly
 
 ### Pending Todos
 
@@ -107,6 +109,6 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 
 ## Session Continuity
 
-Last session: 2026-07-03T19:58:24.102Z
-Stopped at: Completed 15-04-PLAN.md
+Last session: 2026-07-03T20:17:45.285Z
+Stopped at: Completed 15-05-PLAN.md
 Resume file: None
