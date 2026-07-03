@@ -1,15 +1,16 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useAuth } from '../../hooks/useAuth';
-import { Logo } from '../../components/Logo';
-import { Button } from '../../components/Button';
-import { colors } from '../../theme/colors';
+import { useAuth } from '../../../hooks/useAuth';
+import { Logo } from '../../../components/Logo';
+import { Button } from '../../../components/Button';
+import { colors } from '../../../theme/colors';
 
 /**
- * Placeholder Home (D-05) — proves the session/token flow end-to-end.
- * Phase 15 replaces this with real feature screens; nothing else belongs here.
+ * Compte tab (D-06): minimal placeholder at Phase 14 parity — email +
+ * logout. Full profile-edit/change-password UI is out of scope for
+ * Phase 15 (not an MPARITY requirement).
  */
-export default function HomeScreen() {
+export default function CompteScreen() {
   const { email, logout } = useAuth();
 
   return (

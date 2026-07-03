@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: App Client Mobile
-status: verifying
-stopped_at: Phase 15 context gathered
-last_updated: "2026-07-03T12:07:07.558Z"
+status: executing
+stopped_at: Completed 15-03-PLAN.md
+last_updated: "2026-07-03T19:28:07.704Z"
 last_activity: 2026-07-03
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
+  total_plans: 16
+  completed_plans: 9
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 14 — rn-app-scaffolding-native-auth
+**Current focus:** Phase 15 — feature-parity-screens
 
 ## Current Position
 
-Phase: 14 (rn-app-scaffolding-native-auth) — EXECUTING
-Plan: 4 of 4
-Status: Phase complete — ready for verification
+Phase: 15 (feature-parity-screens) — EXECUTING
+Plan: 03 of 8 (this plan complete; parallel plans in this phase may be executing in sibling worktrees)
+Status: Executing Phase 15
 Last activity: 2026-07-03
 
 Progress: [░░░░░░░░░░] 0%
@@ -57,6 +57,7 @@ v1.3 [░░░░░░░░░░] ROADMAP READY — App Client Mobile (React
 | Phase 14 P02 | 15min | 2 tasks | 4 files |
 | Phase 14 P03 | 20min | 3 tasks | 15 files |
 | Phase 14 P04 | ~45min | 2 tasks | 3 files |
+| Phase 15 P03 | 20min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -83,6 +84,7 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - [Phase 14]: [Phase 14-04]: SDK 57->54 downgrade required to unblock device testing (Rule 3 - Blocking) — Tester's installed Expo Go only supports SDK 54; mobile-app was on SDK 57 and refused to load. Downgraded expo/react/react-native and all expo-managed deps to SDK54-compatible versions (verified against expo-template-default@54.0.62 + bundledNativeModules.json), dropped @react-native/jest-preset (unneeded by jest-expo@54). Verified clean via expo-doctor 18/18, tsc --noEmit, jest 20/20. Commit 1e31d6f.
 - [Phase 14]: [Phase 14-04]: MAUTH-01/02 confirmed end-to-end on device; MAUTH-03 and real-email delivery remain open — Human verification confirmed register->OTP->Home, login, and password-reset->OTP->login (MAUTH-01) plus encrypted session persistence across app restart (MAUTH-02), against the live API. OTP codes retrieved via the documented console.log fallback (RESEND_API_KEY not yet configured on Railway) rather than a real email inbox -- pre-existing known gap, not new. MAUTH-03 (proactive foreground refresh after long background) was not exercised this session -- open item, needs a dedicated backgrounded-device pass before Phase 14's auth layer is considered fully hardened.
 - [Phase 14]: [Phase 14-04]: Phase 13 SC-1 (real device push delivery) now explicitly targeted for Phase 15 — Previously an open-ended deferral ("once a device token exists"). Mehdi's decision during the 14-04 checkpoint: close it out specifically in Phase 15 rather than leave the timing open.
+- [Phase 15-03]: Navigation shell (Tabs Motos/Devis/Compte + nested Motos Stack) built; placeholder Home deleted, root redirect now targets /(app)/(tabs)/motos
 
 ### Pending Todos
 
@@ -102,6 +104,6 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 
 ## Session Continuity
 
-Last session: 2026-07-03T12:07:07.555Z
-Stopped at: Phase 15 context gathered
-Resume file: .planning/phases/15-feature-parity-screens/15-CONTEXT.md
+Last session: 2026-07-03T19:28:07.701Z
+Stopped at: Completed 15-03-PLAN.md
+Resume file: None

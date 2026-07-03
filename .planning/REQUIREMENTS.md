@@ -15,7 +15,7 @@ Requirements pour le milestone App Client Mobile. Chaque requirement mappe à un
 
 ### Parité Fonctionnelle
 
-- [ ] **MPARITY-01**: L'utilisateur voit la liste de ses motos (couleur statut + score d'intégrité) depuis l'app mobile
+- [x] **MPARITY-01**: L'utilisateur voit la liste de ses motos (couleur statut + score d'intégrité) depuis l'app mobile
 - [ ] **MPARITY-02**: L'utilisateur consulte et valide/refuse ses devis depuis l'app mobile
 - [ ] **MPARITY-03**: L'utilisateur consulte l'historique d'entretien/interventions de chaque moto
 - [ ] **MPARITY-04**: L'utilisateur peut revendiquer/révoquer une liaison garage depuis l'app mobile
@@ -70,7 +70,7 @@ Mapping requirements → phases.
 | MAUTH-01 | Phase 14 | Complete |
 | MAUTH-02 | Phase 14 | Complete |
 | MAUTH-03 | Phase 14 | Complete |
-| MPARITY-01 | Phase 15 | Pending |
+| MPARITY-01 | Phase 15 | Complete |
 | MPARITY-02 | Phase 15 | Pending |
 | MPARITY-03 | Phase 15 | Pending |
 | MPARITY-04 | Phase 15 | Pending |
