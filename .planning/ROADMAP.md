@@ -117,7 +117,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
 - [x] 15-04-PLAN.md — shared presentational components (ScoreBadge/StatutBadge/EmptyState/OfflineBanner/MotoListCard/RevokeGarageModal)
 - [x] 15-05-PLAN.md
 - [ ] 15-06-PLAN.md
-- [ ] 15-07-PLAN.md
+- [x] 15-07-PLAN.md — add-moto + claim-moto forms (MPARITY-04 add/claim halves)
 - [ ] 15-08-PLAN.md
 **UI hint**: yes
 
@@ -165,7 +165,7 @@ Phases exécutent en ordre numérique : 12 → 13 → 14 → 15 → 16 → 17
 | Phase 12 | v1.3 | 2/2 | ✅ Complete | 2026-07-01 |
 | Phase 13 | v1.3 | 2/2 | ✅ Complete (SC-1 deferred) | 2026-07-02 |
 | Phase 14 | v1.3 | 1/4 | In Progress | - |
-| Phase 15 | v1.3 | 3/8 | In Progress | - |
+| Phase 15 | v1.3 | 4/8 (this worktree's view; may undercount sibling worktrees in flight) | In Progress | - |
 | Phase 16 | v1.3 | 0/TBD | Not started | - |
 | Phase 17 | v1.3 | 0/TBD | Not started | - |
 
