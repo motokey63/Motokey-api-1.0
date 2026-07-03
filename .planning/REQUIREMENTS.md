@@ -16,10 +16,10 @@ Requirements pour le milestone App Client Mobile. Chaque requirement mappe à un
 ### Parité Fonctionnelle
 
 - [x] **MPARITY-01**: L'utilisateur voit la liste de ses motos (couleur statut + score d'intégrité) depuis l'app mobile
-- [ ] **MPARITY-02**: L'utilisateur consulte et valide/refuse ses devis depuis l'app mobile
+- [x] **MPARITY-02**: L'utilisateur consulte et valide/refuse ses devis depuis l'app mobile
 - [ ] **MPARITY-03**: L'utilisateur consulte l'historique d'entretien/interventions de chaque moto
-- [ ] **MPARITY-04**: L'utilisateur peut revendiquer/révoquer une liaison garage depuis l'app mobile
-- [ ] **MPARITY-05**: L'utilisateur consulte le dernier état connu (motos/devis) hors-ligne, avec horodatage "dernière mise à jour" (lecture seule, pas de sync offline)
+- [x] **MPARITY-04**: L'utilisateur peut revendiquer/révoquer une liaison garage depuis l'app mobile
+- [x] **MPARITY-05**: L'utilisateur consulte le dernier état connu (motos/devis) hors-ligne, avec horodatage "dernière mise à jour" (lecture seule, pas de sync offline)
 
 ### Notifications Push
 
@@ -71,10 +71,10 @@ Mapping requirements → phases.
 | MAUTH-02 | Phase 14 | Complete |
 | MAUTH-03 | Phase 14 | Complete |
 | MPARITY-01 | Phase 15 | Complete |
-| MPARITY-02 | Phase 15 | Pending |
+| MPARITY-02 | Phase 15 | Complete |
 | MPARITY-03 | Phase 15 | Pending |
-| MPARITY-04 | Phase 15 | Pending |
-| MPARITY-05 | Phase 15 | Pending |
+| MPARITY-04 | Phase 15 | Complete |
+| MPARITY-05 | Phase 15 | Complete |
 | MPUSH-01 | Phase 16 | Pending |
 | MPUSH-02 | Phase 12 (backend) / Phase 16 (bout-en-bout) | Pending |
 | MPUSH-03 | Phase 16 | Pending |
