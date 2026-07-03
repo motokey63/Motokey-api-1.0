@@ -101,7 +101,7 @@ export default function MotosScreen() {
           keyExtractor={(m) => m.id}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
-            <MotoListCard moto={item} onPress={() => router.push('/(app)/(tabs)/motos/' + item.id)} />
+            <MotoListCard moto={item} onPress={() => router.push({ pathname: '/(app)/(tabs)/motos/[id]', params: { id: item.id } })} />
           )}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         />

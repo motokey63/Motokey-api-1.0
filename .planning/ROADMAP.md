@@ -110,15 +110,15 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
   3. L'utilisateur consulte l'historique d'entretien/interventions de chaque moto (MPARITY-03)
   4. L'utilisateur peut revendiquer ou révoquer une liaison garage (MPARITY-04)
   5. Hors connexion, l'utilisateur voit le dernier état connu de ses motos/devis avec un horodatage "dernière mise à jour" (lecture seule) (MPARITY-05)
-**Plans**: 8 plans (wave 1: 15-01/02/03 logic+cache+nav; wave 2: 15-04 components + 15-05..08 screens)
-- [x] 15-01-PLAN.md — motoDisplay + motoParse + devisDisplay logic modules
-- [x] 15-02-PLAN.md — cache.ts (offline read-only fallback) + garageLiaison.ts payload builders/validators
-- [x] 15-03-PLAN.md — navigation shell (Tabs Motos/Devis/Compte + nested Motos stack)
-- [x] 15-04-PLAN.md — shared presentational components (ScoreBadge/StatutBadge/EmptyState/OfflineBanner/MotoListCard/RevokeGarageModal)
-- [x] 15-05-PLAN.md
-- [ ] 15-06-PLAN.md
-- [x] 15-07-PLAN.md — add-moto + claim-moto forms (MPARITY-04 add/claim halves)
-- [ ] 15-08-PLAN.md
+**Plans**: 8 plans (waves 1-3, frontend-only — zero backend changes)
+- [x] 15-01-PLAN.md — Display/parse logic modules (couleur/score, interventions/alertes, devis statut) + tests
+- [x] 15-02-PLAN.md — Cache + garage-liaison logic modules (offline fallback, add/claim payloads) + tests
+- [x] 15-03-PLAN.md — Navigation shell: Motos/Devis/Compte tabs + nested Motos stack + root redirect
+- [x] 15-04-PLAN.md — Shared component kit (ScoreBadge, StatutBadge, EmptyState, OfflineBanner, MotoListCard, RevokeGarageModal)
+- [x] 15-05-PLAN.md — Motos tab: list (couleur/score, cached) + Fiche Moto detail (historique, plan-403-hidden, pneus)
+- [x] 15-06-PLAN.md — Devis tab: list + accept/refuse with confirm + cache
+- [x] 15-07-PLAN.md — Liaison forms: Ajouter une moto (plan-limit + Passer Pro) + Réclamer une moto (VIN+plaque)
+- [x] 15-08-PLAN.md — Liaison lists: Mes réclamations + Mes garages (leave-garage revoke modal)
 **UI hint**: yes
 
 ### Phase 16: Push Wiring End-to-End
@@ -165,7 +165,7 @@ Phases exécutent en ordre numérique : 12 → 13 → 14 → 15 → 16 → 17
 | Phase 12 | v1.3 | 2/2 | ✅ Complete | 2026-07-01 |
 | Phase 13 | v1.3 | 2/2 | ✅ Complete (SC-1 deferred) | 2026-07-02 |
 | Phase 14 | v1.3 | 1/4 | In Progress | - |
-| Phase 15 | v1.3 | 4/8 (this worktree's view; may undercount sibling worktrees in flight) | In Progress | - |
+| Phase 15 | v1.3 | 8/8 | In Progress (pending verification) | - |
 | Phase 16 | v1.3 | 0/TBD | Not started | - |
 | Phase 17 | v1.3 | 0/TBD | Not started | - |
 

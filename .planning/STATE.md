@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: App Client Mobile
 status: executing
-stopped_at: Completed 15-08-PLAN.md
-last_updated: "2026-07-03T20:28:11.092Z"
+stopped_at: Completed 15-08-PLAN.md (Phase 15 all 8 plans complete — pending phase verification)
+last_updated: "2026-07-03T22:20:00.000Z"
 last_activity: 2026-07-03
 progress:
   total_phases: 6
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 2
+  completed_phases: 3
+  total_plans: 16
+  completed_plans: 16
   percent: 0
 ---
 
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 ## Current Position
 
 Phase: 15 (feature-parity-screens) — EXECUTING
-Plan: 5 of 8 (this plan complete; parallel plans in this phase may be executing in sibling worktrees)
-Status: Ready to execute
+Plan: 8 of 8 (all plans complete — pending phase verification)
+Status: Executing Phase 15
 Last activity: 2026-07-03
 
 Progress: [░░░░░░░░░░] 0%
@@ -57,8 +57,13 @@ v1.3 [░░░░░░░░░░] ROADMAP READY — App Client Mobile (React
 | Phase 14 P02 | 15min | 2 tasks | 4 files |
 | Phase 14 P03 | 20min | 3 tasks | 15 files |
 | Phase 14 P04 | ~45min | 2 tasks | 3 files |
-| Phase 15 P03 | 20min | 2 tasks | 5 files |
+| Phase 15 P01 | 20min | 2 tasks | 6 files |
+| Phase 15 P02 | ~15min | 2 tasks | 4 files |
+| Phase 15 P03 | 20min | 2 tasks | 6 files |
 | Phase 15 P04 | 25min | 3 tasks | 6 files |
+| Phase 15 P05 | ~25min | 2 tasks | 2 files |
+| Phase 15 P06 | ~20min | 1 task | 1 files |
+| Phase 15 P07 | ~20min | 2 tasks | 2 files |
 | Phase 15 P08 | ~20min | 2 tasks | 2 files |
 
 ## Accumulated Context
@@ -86,8 +91,13 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - [Phase 14]: [Phase 14-04]: SDK 57->54 downgrade required to unblock device testing (Rule 3 - Blocking) — Tester's installed Expo Go only supports SDK 54; mobile-app was on SDK 57 and refused to load. Downgraded expo/react/react-native and all expo-managed deps to SDK54-compatible versions (verified against expo-template-default@54.0.62 + bundledNativeModules.json), dropped @react-native/jest-preset (unneeded by jest-expo@54). Verified clean via expo-doctor 18/18, tsc --noEmit, jest 20/20. Commit 1e31d6f.
 - [Phase 14]: [Phase 14-04]: MAUTH-01/02 confirmed end-to-end on device; MAUTH-03 and real-email delivery remain open — Human verification confirmed register->OTP->Home, login, and password-reset->OTP->login (MAUTH-01) plus encrypted session persistence across app restart (MAUTH-02), against the live API. OTP codes retrieved via the documented console.log fallback (RESEND_API_KEY not yet configured on Railway) rather than a real email inbox -- pre-existing known gap, not new. MAUTH-03 (proactive foreground refresh after long background) was not exercised this session -- open item, needs a dedicated backgrounded-device pass before Phase 14's auth layer is considered fully hardened.
 - [Phase 14]: [Phase 14-04]: Phase 13 SC-1 (real device push delivery) now explicitly targeted for Phase 15 — Previously an open-ended deferral ("once a device token exists"). Mehdi's decision during the 14-04 checkpoint: close it out specifically in Phase 15 rather than leave the timing open.
-- [Phase 15-03]: Navigation shell (Tabs Motos/Devis/Compte + nested Motos Stack) built; placeholder Home deleted, root redirect now targets /(app)/(tabs)/motos
+- [Phase 15]: [Phase 15-01]: All motoDisplay/motoParse/devisDisplay label/color/parse logic ported verbatim from MotoKey_Client.html; every list parser unwraps the REAL two-level backend envelope (data?.data?.<key>) before flatter fallbacks; parseAlertes returns null (not []) on 403 so CLIENT role hides the Plan d'entretien section
+- [Phase 15]: [Phase 15-02]: cache.ts shouldServeCache gates offline fallback to status===0 only (never 401/403/500); garageLiaison.ts parseLimite/parseReclamations/parseGarages unwrap the REAL two-level backend envelope (data?.data?.<key>) with flat-shape fallback, guarded by dedicated REAL-envelope test fixtures
+- [Phase 15]: [Phase 15-03]: Navigation shell restructured — 3-tab bottom bar (Motos/Devis/Compte), nested Stack inside Motos tab for list→detail drill-down, root redirect now targets `/(app)/(tabs)/motos` instead of the deleted Phase 14 placeholder Home; Wave 3 screens (15-05..08) render inside this shell
 - [Phase 15]: [Phase 15-04]: Six shared presentational components (ScoreBadge/StatutBadge/EmptyState/OfflineBanner/MotoListCard/RevokeGarageModal) built under mobile-app/components/, wired to Wave 1 (motoDisplay/motoParse/cache) — RevokeGarageModal's destructive confirm is a standalone Pressable (Button has no destructive variant), StatutBadge stays generic (label+color props, callers own statut->color mapping)
+- [Phase 15]: [Phase 15-05]: Motos tab list (FlatList+RefreshControl, per-moto enrichment via interventions+alertes, AsyncStorage cache fallback gated on shouldServeCache(status===0)) + Fiche Moto detail (historique interventions, plan d'entretien rendered only when alertes && alertes.length > 0 — 403-hides-section discipline, pneumatiques); confirmed this plan resolves the transient typed-routes tsc gap by creating motos/index.tsx + motos/[id].tsx
+- [Phase 15]: [Phase 15-06]: Devis tab (FlatList) ports loadClientDevis/acceptDevis/refuseDevis — statut pill, inline line-item breakdown, total TTC, Accepter/Refuser behind Alert.alert confirms, read-only AsyncStorage cache fallback + OfflineBanner
+- [Phase 15]: [Phase 15-07]: Ajouter une moto (plan-limit gate via parseLimite + Passer Pro CTA on 402) and Réclamer une moto (VIN+plaque via validateClaim/buildClaimPayload, photo input disabled per D-02, no Cloudinary) forms built under mobile-app/app/(app)/(tabs)/motos/{add,claim}.tsx
 - [Phase 15]: [Phase 15-08]: Réclamations + Garages list screens ported verbatim from MotoKey_Client.html's loadClientReclamationsTab/loadClientGaragesTab/openRevokeModal/submitRevoke; reused garageLiaison.ts parsers + devisDisplay.ts label/color lookups + RevokeGarageModal (15-04) with no adaptation needed
 
 ### Pending Todos
@@ -105,11 +115,11 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - Windows-only Node libuv teardown crash (`UV_HANDLE_CLOSING` assertion) after any local script that calls Supabase then `process.exit()` — pre-existing (reproduces with Phase 9 code too), confirmed not a Phase 13 regression, won't occur on Railway (Linux). Details: `.planning/phases/13-push-dispatch-service/deferred-items.md`. No action needed.
 - Phase 14-01: 14-01-SUMMARY.md is missing from .planning/phases/14-rn-app-scaffolding-native-auth/ on the main checkout -- written in the 14-01 worktree but .planning/phases/ is gitignored, so it never merged in. Progress counters (STATE.md completed_plans, ROADMAP.md Phase 14 summary_count) undercount by 1 plan as a result. No functional impact on 14-01 shipped code (already merged via b9af9fd) -- cosmetic/tracking gap only.
 - Phase 14-04: MAUTH-03 (proactive foreground refresh after long background) not yet exercised on a real device -- checkpoint confirmed checks 1-4 (register/login/reset/persistence) only. Needs a dedicated pass (background ~1h, foreground, confirm no visible session error) before Phase 14's auth layer is considered fully hardened. Not a bug -- untested.
-- Phase 15-04: worktree .planning/ was stale at branch start (missing Wave 1 merges 15-01/02/03) -- fast-forward merged master in before Task 1. Also this worktree's .planning/ only holds this plan's own SUMMARY.md (sibling worktrees' 15-01/02/03/05..08 SUMMARY files never synced here since .planning is gitignored) -- state update-progress/roadmap counts computed here undercount; orchestrator should reconcile from the shared main-checkout .planning/ after all Phase 15 worktrees complete.
-- Phase 15-08: this worktree's .planning/ only holds this plan's own SUMMARY.md (sibling Wave 3 worktrees' 15-05/06/07 SUMMARY files never synced here since .planning/phases/ is gitignored) -- state update-progress/roadmap counts computed here undercount; orchestrator should reconcile from the shared main-checkout .planning/ after all Phase 15 worktrees complete (same known pattern as 15-04).
+- Phase 15-03 (post-Wave-1-merge): `npx tsc --noEmit` briefly failed on `app/_layout.tsx`'s `router.replace('/(app)/(tabs)/motos')` because Expo Router's typed-routes doesn't consider a directory a navigable `Href` until it has an `index.tsx` — RESOLVED by 15-05 (creates `motos/index.tsx` + `motos/[id].tsx`); confirmed `tsc --noEmit` fully clean afterward. No action needed.
+- Phase 15 parallel worktrees repeatedly branch from a stale `.planning/` snapshot (gitignored, not synced across worktree branches) and each independently mutate the shared STATE.md/ROADMAP.md/REQUIREMENTS.md docs — every wave merge back to master needed manual reconciliation of progress counters and requirement checkboxes (regressions occurred at Wave 1→2 boundary: an off-by-one completed_plans count, and MPARITY-03 flipping back to Pending). Fully reconciled as of Phase 15 completion (all 8 plans, all 5 MPARITY reqs, progress counters correct). Worth automating for future phases (e.g. computing progress/requirements from actual plan SUMMARY files at merge time instead of trusting each worktree's local edit).
 
 ## Session Continuity
 
-Last session: 2026-07-03T20:28:00.774Z
-Stopped at: Completed 15-08-PLAN.md
+Last session: 2026-07-03T22:20:00.000Z
+Stopped at: Completed 15-08-PLAN.md (Phase 15 all 8 plans complete — pending phase verification)
 Resume file: None

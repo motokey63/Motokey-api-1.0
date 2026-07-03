@@ -27,13 +27,16 @@ Le score d'intégrité anti-fraude (pondération 1.0/0.6/0.3 selon la preuve) �
 - **Pioneer Program:** code PIONEER2026 configuré et câblé de bout en bout (`allow_promotion_codes: true`), mais uniquement en Stripe TEST — inactif en argent réel tant que Phase 8 n'est pas exécutée
 - **Live Ops:** enforcement BILL-05 (HTTP 402) et emails NOTIF-03/NOTIF-04 code-complets et vérifiés câblés ; `BILLING_ENFORCE` reste `false` en prod (flip différé à Phase 8 par décision documentée)
 - **Billing status:** Stripe toujours en mode test — `STRIPE_SECRET_KEY=sk_test_…`, `BILLING_ENFORCE=false`
-- **Migration:** 15 appliquées prod
+- **Migration:** 15 appliquées prod, migration 16 (`client_device_tokens`) écrite mais **pas encore appliquée** — voir Known Gaps
 - **Quick task 260624-l0e:** Mot de passe oublié comptes garage livré 2026-06-24
+- **Phase 12 (v1.3) complete — 2026-07-01** : Backend Push Foundation — `POST/DELETE /client/device-tokens` + `GET /client/me` code-complets dans `motokey-api.js`, RBAC `requireAnyRole(['CLIENT'])`, migration 16 écrite. Voir Known Gaps pour le blocage restant.
 
 ### Known Gaps (carried into next milestone)
 
 - **Phase 8 — Stripe Live Mode (BILL-06)** : non exécutée. Le script de seed live (08-01) existe ; la bascule opérationnelle (08-02 : clés live, webhook live, Price IDs live, flip Railway) reste bloquée sur une action humaine Stripe Dashboard non encore faite. Détails : `.planning/milestones/v1.2-MILESTONE-AUDIT.md`.
 - Script manquant : `scripts/stripe-create-pioneer-coupon-live.js` (référencé par le script TEST, à créer avant l'exécution de Phase 8).
+- **Migration 16 (`client_device_tokens`) non appliquée en prod** : bloque le happy-path (SC1/SC2) de `POST`/`DELETE /client/device-tokens` (Phase 12, 2026-07-01) — action humaine requise via Supabase Dashboard > SQL Editor (projet `rzbqbaccjyxvtlnfitrr`), fichier `sql/migrations/16_client_device_tokens.sql`. Voir `.planning/phases/12-backend-push-foundation/12-HUMAN-UAT.md`.
+- **Fixture de login CLIENT cassée** (`sophie@email.com`/`client123` → 401) : préexistante, casse aussi `test-api.js` et d'autres endpoints — pas liée à Phase 12, à investiguer séparément.
 
 ## Requirements
 
@@ -131,4 +134,4 @@ This document evolves at phase transitions and milestone boundaries.
 5. Key Decisions log updated
 
 ---
-*Last updated: 2026-07-01 — v1.3 App Client Mobile milestone started*
+*Last updated: 2026-07-01 — Phase 12 (Backend Push Foundation) complete*
