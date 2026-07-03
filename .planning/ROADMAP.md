@@ -110,7 +110,15 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
   3. L'utilisateur consulte l'historique d'entretien/interventions de chaque moto (MPARITY-03)
   4. L'utilisateur peut revendiquer ou révoquer une liaison garage (MPARITY-04)
   5. Hors connexion, l'utilisateur voit le dernier état connu de ses motos/devis avec un horodatage "dernière mise à jour" (lecture seule) (MPARITY-05)
-**Plans**: TBD
+**Plans**: 8 plans (wave 1: 15-01/02/03 logic+cache+nav; wave 2: 15-04 components + 15-05..08 screens)
+- [x] 15-01-PLAN.md — motoDisplay + motoParse + devisDisplay logic modules
+- [x] 15-02-PLAN.md — cache.ts (offline read-only fallback) + garageLiaison.ts payload builders/validators
+- [x] 15-03-PLAN.md — navigation shell (Tabs Motos/Devis/Compte + nested Motos stack)
+- [x] 15-04-PLAN.md — shared presentational components (ScoreBadge/StatutBadge/EmptyState/OfflineBanner/MotoListCard/RevokeGarageModal)
+- [ ] 15-05-PLAN.md
+- [ ] 15-06-PLAN.md
+- [ ] 15-07-PLAN.md
+- [ ] 15-08-PLAN.md
 **UI hint**: yes
 
 ### Phase 16: Push Wiring End-to-End
@@ -157,7 +165,7 @@ Phases exécutent en ordre numérique : 12 → 13 → 14 → 15 → 16 → 17
 | Phase 12 | v1.3 | 2/2 | ✅ Complete | 2026-07-01 |
 | Phase 13 | v1.3 | 2/2 | ✅ Complete (SC-1 deferred) | 2026-07-02 |
 | Phase 14 | v1.3 | 1/4 | In Progress | - |
-| Phase 15 | v1.3 | 0/TBD | Not started | - |
+| Phase 15 | v1.3 | 3/8 | In Progress | - |
 | Phase 16 | v1.3 | 0/TBD | Not started | - |
 | Phase 17 | v1.3 | 0/TBD | Not started | - |
 
