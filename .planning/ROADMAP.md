@@ -53,7 +53,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
 
 - [x] **Phase 12: Backend Push Foundation** - Device tokens + profil client exposés via API, curl-testable sans app mobile (completed 2026-07-01)
 - [x] **Phase 13: Push Dispatch Service** - Service d'envoi de push modelé sur emailService.js, testable indépendamment (completed 2026-07-02, SC-1 real-device delivery deferred — see Phase Details)
-- [ ] **Phase 14: RN App Scaffolding + Native Auth** - Scaffold Expo Router + authentification native sécurisée
+- [x] **Phase 14: RN App Scaffolding + Native Auth** - Scaffold Expo Router + authentification native sécurisée (completed 2026-07-03)
 - [ ] **Phase 15: Feature-Parity Screens** - Motos, devis, historique, liaison garage — parité MotoKey_Client.html
 - [ ] **Phase 16: Push Wiring End-to-End** - Soft-ask, enregistrement token, push devis reçu, deep link
 - [ ] **Phase 17: Maintenance Alert Cron + App Store Submission** - Push rappel entretien + soumission stores
@@ -96,8 +96,8 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
 **Plans**: 4 plans (waves 1-4, sequential — layered auth foundation)
 - [x] 14-01-PLAN.md — Scaffold Expo Router+TS app, AES LargeSecureStore token store, fetch API client (MAUTH-01/02)
 - [x] 14-02-PLAN.md — Auth session context + single-flight proactive refresh (timer + AppState foreground) (MAUTH-01/02/03)
-- [ ] 14-03-PLAN.md — Branded auth screens (login/register/OTP-verify/reset) + placeholder Home + router guard (MAUTH-01)
-- [ ] 14-04-PLAN.md — Human E2E verification of MAUTH-01/02/03 on device (checkpoint)
+- [x] 14-03-PLAN.md — Branded auth screens (login/register/OTP-verify/reset) + placeholder Home + router guard (MAUTH-01)
+- [x] 14-04-PLAN.md — Human E2E verification of MAUTH-01/02/03 on device (checkpoint)
 **UI hint**: yes
 
 ### Phase 15: Feature-Parity Screens
