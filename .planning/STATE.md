@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: App Client Mobile
 status: verifying
-stopped_at: Completed 14-04-PLAN.md
-last_updated: "2026-07-03T11:28:03.954Z"
+stopped_at: Phase 15 context gathered
+last_updated: "2026-07-03T12:07:07.558Z"
 last_activity: 2026-07-03
 progress:
   total_phases: 6
@@ -102,6 +102,6 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 
 ## Session Continuity
 
-Last session: 2026-07-03T11:28:03.950Z
-Stopped at: Completed 14-04-PLAN.md
-Resume file: None
+Last session: 2026-07-03T12:07:07.555Z
+Stopped at: Phase 15 context gathered
+Resume file: .planning/phases/15-feature-parity-screens/15-CONTEXT.md
