@@ -115,7 +115,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
 - [x] 15-02-PLAN.md — cache.ts (offline read-only fallback) + garageLiaison.ts payload builders/validators
 - [x] 15-03-PLAN.md — navigation shell (Tabs Motos/Devis/Compte + nested Motos stack)
 - [x] 15-04-PLAN.md — shared presentational components (ScoreBadge/StatutBadge/EmptyState/OfflineBanner/MotoListCard/RevokeGarageModal)
-- [ ] 15-05-PLAN.md
+- [x] 15-05-PLAN.md
 - [ ] 15-06-PLAN.md
 - [ ] 15-07-PLAN.md
 - [ ] 15-08-PLAN.md
