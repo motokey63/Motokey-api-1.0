@@ -58,7 +58,7 @@ function RootNav() {
     if (status === 'unauthenticated' && !inAuthGroup) {
       router.replace('/(auth)/login');
     } else if (status === 'authenticated' && inAuthGroup) {
-      router.replace('/(app)/home');
+      router.replace('/(app)/(tabs)/motos');
     }
   }, [status, segments, router]);
 
