@@ -1,0 +1,34 @@
+jest.mock('expo-notifications', () => ({
+  __esModule: true,
+  setNotificationHandler: jest.fn(),
+  getLastNotificationResponseAsync: jest.fn(),
+  addNotificationResponseReceivedListener: jest.fn(),
+}));
+
+jest.mock('expo-router', () => ({
+  __esModule: true,
+  useRouter: jest.fn(),
+}));
+
+import { mapNotificationDataToRoute } from '../useNotificationObserver';
+
+// Pure-function tests only (Pitfall 3 / RESEARCH.md Test Map) — the
+// useNotificationObserver() hook itself is not tested here since
+// @testing-library/react-hooks is not installed in this repo.
+describe('mapNotificationDataToRoute (pure)', () => {
+  it("Test 1: {type: 'devis_recu'} maps to the Devis tab route", () => {
+    expect(mapNotificationDataToRoute({ type: 'devis_recu' })).toBe('/(app)/(tabs)/devis');
+  });
+
+  it('Test 2: an unknown type maps to null', () => {
+    expect(mapNotificationDataToRoute({ type: 'something_else' })).toBeNull();
+  });
+
+  it('Test 3: undefined data maps to null (no throw)', () => {
+    expect(mapNotificationDataToRoute(undefined)).toBeNull();
+  });
+
+  it('Test 4: empty object maps to null', () => {
+    expect(mapNotificationDataToRoute({})).toBeNull();
+  });
+});
