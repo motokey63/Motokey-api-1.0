@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: App Client Mobile
-status: executing
-stopped_at: Completed 15-08-PLAN.md (Phase 15 all 8 plans complete — pending phase verification)
-last_updated: "2026-07-03T22:20:00.000Z"
-last_activity: 2026-07-03
+status: verifying
+stopped_at: Completed 15-09-PLAN.md (Phase 15 all 9 plans complete)
+last_updated: "2026-07-04T08:57:31.535Z"
+last_activity: 2026-07-04
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 16
-  completed_plans: 16
-  percent: 0
+  total_plans: 17
+  completed_plans: 13
+  percent: 76
 ---
 
 # MotoKey API — Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 
 ## Current Position
 
-Phase: 15 (feature-parity-screens) — EXECUTING
-Plan: 8 of 8 (all plans complete — pending phase verification)
-Status: Executing Phase 15
-Last activity: 2026-07-03
+Phase: 15 (feature-parity-screens) — ALL PLANS COMPLETE (9/9)
+Plan: 9 of 9
+Status: Phase 15 complete — UAT Test 4 gap closed and human-verified on-device 2026-07-04
+Last activity: 2026-07-04
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [████████░░] 76%
 
 ```
 v1.0 ████████████ SHIPPED
@@ -65,6 +65,7 @@ v1.3 [░░░░░░░░░░] ROADMAP READY — App Client Mobile (React
 | Phase 15 P06 | ~20min | 1 task | 1 files |
 | Phase 15 P07 | ~20min | 2 tasks | 2 files |
 | Phase 15 P08 | ~20min | 2 tasks | 2 files |
+| Phase 15 P09 | ~15min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -99,6 +100,7 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - [Phase 15]: [Phase 15-06]: Devis tab (FlatList) ports loadClientDevis/acceptDevis/refuseDevis — statut pill, inline line-item breakdown, total TTC, Accepter/Refuser behind Alert.alert confirms, read-only AsyncStorage cache fallback + OfflineBanner
 - [Phase 15]: [Phase 15-07]: Ajouter une moto (plan-limit gate via parseLimite + Passer Pro CTA on 402) and Réclamer une moto (VIN+plaque via validateClaim/buildClaimPayload, photo input disabled per D-02, no Cloudinary) forms built under mobile-app/app/(app)/(tabs)/motos/{add,claim}.tsx
 - [Phase 15]: [Phase 15-08]: Réclamations + Garages list screens ported verbatim from MotoKey_Client.html's loadClientReclamationsTab/loadClientGaragesTab/openRevokeModal/submitRevoke; reused garageLiaison.ts parsers + devisDisplay.ts label/color lookups + RevokeGarageModal (15-04) with no adaptation needed
+- [Phase 15]: [Phase 15-09]: Guarded useFocusEffect (isFirstFocus ref) added to Motos + Devis tabs closes UAT Test 4 gap — accepted réclamations / out-of-band devis changes now surface on tab-return without a manual pull-to-refresh; confirmed via on-device reproduction 2026-07-04
 
 ### Pending Todos
 
@@ -120,6 +122,6 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 
 ## Session Continuity
 
-Last session: 2026-07-03T22:20:00.000Z
-Stopped at: Completed 15-08-PLAN.md (Phase 15 all 8 plans complete — pending phase verification)
+Last session: 2026-07-04T08:53:23.187Z
+Stopped at: Completed 15-09-PLAN.md (Phase 15 all 9 plans complete)
 Resume file: None

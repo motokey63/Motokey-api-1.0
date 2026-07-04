@@ -53,8 +53,8 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
 
 - [x] **Phase 12: Backend Push Foundation** - Device tokens + profil client exposés via API, curl-testable sans app mobile (completed 2026-07-01)
 - [x] **Phase 13: Push Dispatch Service** - Service d'envoi de push modelé sur emailService.js, testable indépendamment (completed 2026-07-02, SC-1 real-device delivery deferred — see Phase Details)
-- [x] **Phase 14: RN App Scaffolding + Native Auth** - Scaffold Expo Router + authentification native sécurisée (completed 2026-07-03)
-- [ ] **Phase 15: Feature-Parity Screens** - Motos, devis, historique, liaison garage — parité MotoKey_Client.html
+- [x] **Phase 14: RN App Scaffolding + Native Auth** - Scaffold Expo Router + authentification native sécurisée (completed 2026-07-03)
+- [x] **Phase 15: Feature-Parity Screens** - Motos, devis, historique, liaison garage — parité MotoKey_Client.html (completed 2026-07-04, 15-09 gap closure — UAT Test 4)
 - [ ] **Phase 16: Push Wiring End-to-End** - Soft-ask, enregistrement token, push devis reçu, deep link
 - [ ] **Phase 17: Maintenance Alert Cron + App Store Submission** - Push rappel entretien + soumission stores
 
@@ -110,7 +110,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
   3. L'utilisateur consulte l'historique d'entretien/interventions de chaque moto (MPARITY-03)
   4. L'utilisateur peut revendiquer ou révoquer une liaison garage (MPARITY-04)
   5. Hors connexion, l'utilisateur voit le dernier état connu de ses motos/devis avec un horodatage "dernière mise à jour" (lecture seule) (MPARITY-05)
-**Plans**: 8 plans (waves 1-3, frontend-only — zero backend changes)
+**Plans**: 9 plans (waves 1-3 delivered + 15-09 gap closure — frontend-only, zero backend changes)
 - [x] 15-01-PLAN.md — Display/parse logic modules (couleur/score, interventions/alertes, devis statut) + tests
 - [x] 15-02-PLAN.md — Cache + garage-liaison logic modules (offline fallback, add/claim payloads) + tests
 - [x] 15-03-PLAN.md — Navigation shell: Motos/Devis/Compte tabs + nested Motos stack + root redirect
@@ -119,6 +119,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
 - [x] 15-06-PLAN.md — Devis tab: list + accept/refuse with confirm + cache
 - [x] 15-07-PLAN.md — Liaison forms: Ajouter une moto (plan-limit + Passer Pro) + Réclamer une moto (VIN+plaque)
 - [x] 15-08-PLAN.md — Liaison lists: Mes réclamations + Mes garages (leave-garage revoke modal)
+- [x] 15-09-PLAN.md — Gap closure (UAT Test 4): refetch-on-focus (useFocusEffect) for Motos + Devis tabs so accepted réclamations / out-of-band changes appear on tab-return
 **UI hint**: yes
 
 ### Phase 16: Push Wiring End-to-End
@@ -165,9 +166,9 @@ Phases exécutent en ordre numérique : 12 → 13 → 14 → 15 → 16 → 17
 | Phase 12 | v1.3 | 2/2 | ✅ Complete | 2026-07-01 |
 | Phase 13 | v1.3 | 2/2 | ✅ Complete (SC-1 deferred) | 2026-07-02 |
 | Phase 14 | v1.3 | 1/4 | In Progress | - |
-| Phase 15 | v1.3 | 8/8 | In Progress (pending verification) | - |
+| Phase 15 | v1.3 | 9/9 | ✅ Complete (15-09 gap closure — UAT Test 4 resolved) | 2026-07-04 |
 | Phase 16 | v1.3 | 0/TBD | Not started | - |
 | Phase 17 | v1.3 | 0/TBD | Not started | - |
 
 ---
-*Roadmap updated: 2026-07-02 — Phase 13 complete (13-01 foundation + 13-02 pushService), SC-1 real-device delivery deferred pending a mobile device token.*
+*Roadmap updated: 2026-07-04 — Phase 15 complete (9/9 plans): 15-09 gap closure (refetch-on-focus for Motos + Devis tabs) confirmed on-device, closes UAT Test 4 stale-list-on-focus-return.*
