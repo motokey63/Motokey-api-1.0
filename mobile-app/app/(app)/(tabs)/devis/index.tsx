@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, FlatList, RefreshControl, ActivityIndicator, Pressable, StyleSheet, Alert } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { apiGet, apiPost, errMsg } from '../../../../lib/api';
 import { useAuth } from '../../../../hooks/useAuth';
 import {
@@ -32,6 +33,7 @@ export default function DevisListScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [staleSince, setStaleSince] = useState<number | null>(null);
+  const isFirstFocus = useRef(true);
 
   const load = useCallback(async () => {
     setError(null);
@@ -62,6 +64,18 @@ export default function DevisListScreen() {
       setLoading(false);
     })();
   }, [load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstFocus.current) {
+        // Initial focus coincides with mount — the mount effect already loaded.
+        isFirstFocus.current = false;
+        return;
+      }
+      // Silent background refresh on tab-return (no spinner, list stays visible).
+      load();
+    }, [load])
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

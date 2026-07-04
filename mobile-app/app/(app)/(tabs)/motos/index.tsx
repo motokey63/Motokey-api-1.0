@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, FlatList, RefreshControl, ActivityIndicator, StyleSheet, Text, ScrollView } from 'react-native';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useFocusEffect } from 'expo-router';
 import { apiGet, errMsg } from '../../../../lib/api';
 import { useAuth } from '../../../../hooks/useAuth';
 import { getCached, setCached, shouldServeCache, CACHE_KEY_MOTOS } from '../../../../lib/cache';
@@ -25,6 +25,7 @@ export default function MotosScreen() {
   const [motos, setMotos] = useState<Moto[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [staleSince, setStaleSince] = useState<number | null>(null);
+  const isFirstFocus = useRef(true);
 
   const load = useCallback(async () => {
     setError(null);
@@ -62,6 +63,18 @@ export default function MotosScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstFocus.current) {
+        // Initial focus coincides with mount — the mount effect already loaded.
+        isFirstFocus.current = false;
+        return;
+      }
+      // Silent background refresh on tab-return (no spinner, list stays visible).
+      load();
+    }, [load])
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
