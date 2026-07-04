@@ -470,16 +470,19 @@ const Devis = {
 
   async list(garage_id) {
     const { data, error } = await supabase.from('devis')
-      .select('*, motos(marque, modele, plaque)')
+      .select('*, motos(marque, modele, plaque), devis_lignes(*)')
       .eq('garage_id', garage_id)
       .order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
-    return data;
+    // total_ttc is only persisted at valider time; compute on read so brouillon/envoye
+    // rows show a real total instead of 0. _calcTotaux is deterministic from devis_lignes,
+    // so recomputing valide rows yields the same persisted value (safe/consistent).
+    return (data || []).map(dv => ({ ...dv, ...Devis._calcTotaux(dv) }));
   },
 
   async getById(id, garage_id) {
     const { data, error } = await supabase.from('devis')
-      .select('*, motos(marque, modele, plaque, clients(nom, email)), devis_lignes(*)')
+      .select('*, motos(marque, modele, plaque, client_id, clients(nom, email)), devis_lignes(*)')
       .eq('id', id).eq('garage_id', garage_id).single();
     if (error) throw new Error(error.message);
     return data;
@@ -516,6 +519,14 @@ const Devis = {
         );
       }
     }
+    return Devis.getById(id, garage_id);
+  },
+
+  async envoyer(id, garage_id) {
+    const dv = await Devis.getById(id, garage_id);
+    if (!dv) throw new Error('Devis non trouvé');
+    if (dv.statut !== 'brouillon') throw new Error('Ce devis a déjà été envoyé');
+    await update('devis', id, { statut: 'envoye', updated_at: new Date().toISOString() });
     return Devis.getById(id, garage_id);
   },
 

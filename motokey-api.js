@@ -78,6 +78,7 @@ const url        = require('url');
 const https2     = require('https');
 const clientAuth  = require('./auth/client_auth');
 const emailService = require('./services/emailService');
+const pushService  = require('./services/pushService');
 const rbac        = require('./auth/rbac');
 const { stripe: stripeClient, handleWebhookEvent, createCheckoutSession, createAutoTrial, createPortalSession } = require('./services/stripeService');
 const planLimits = require('./auth/planLimits');
@@ -572,7 +573,7 @@ const server = http.createServer(async function(req, res){
         motos:['GET /motos','POST /motos','GET /motos/:id','PUT /motos/:id','DELETE /motos/:id','GET /motos/:id/score'],
         interventions:['GET /motos/:id/interventions','POST /motos/:id/interventions','PUT /motos/:id/interventions/:iid','DELETE /motos/:id/interventions/:iid'],
         entretien:['GET /motos/:id/entretien','GET /motos/:id/entretien/alertes'],
-        devis:['GET /devis','POST /devis','GET /devis/:id','PUT /devis/:id','POST /devis/:id/valider','POST /devis/:id/pdf'],
+        devis:['GET /devis','POST /devis','GET /devis/:id','PUT /devis/:id','POST /devis/:id/envoyer','POST /devis/:id/valider','POST /devis/:id/pdf'],
         fraude:['POST /fraude/analyser','GET /fraude/historique'],
         transfert:['POST /transfert/initier','POST /transfert/confirmer-vendeur','POST /transfert/consulter','POST /transfert/finaliser','GET /transfert/:code'],
         client:['GET /client/moto','GET /client/alertes','GET /client/documents'],
@@ -1228,6 +1229,9 @@ const server = http.createServer(async function(req, res){
 
     if (USE_SUPABASE && SBLayer) {
       try {
+        const { data: current } = await SBLayer.supabase.from('devis').select('statut').eq('id', p.id).eq('garage_id', garageId).single();
+        if (!current) return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND');
+        if (current.statut !== 'brouillon') return fail(res, 'Devis déjà envoyé — créez un nouveau devis pour modifier', 400, 'INVALID_STATUS');
         const dv = await SBLayer.Devis.update(p.id, garageId, { entete: b.entete, lignes: b.lignes });
         return ok(res, { devis: dv }, 'Devis mis à jour');
       } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
@@ -1235,8 +1239,46 @@ const server = http.createServer(async function(req, res){
     // ── RAM fallback ──
     const i = DB.devis.findIndex(function(d){return d.id===p.id&&d.garage_id===garageId;});
     if(i<0) return fail(res,'Devis non trouvé',404,'NOT_FOUND');
+    if(DB.devis[i].statut!=='brouillon') return fail(res,'Devis déjà envoyé — créez un nouveau devis pour modifier',400,'INVALID_STATUS');
     DB.devis[i] = Object.assign({},DB.devis[i],b,{id:p.id,garage_id:garageId,updated_at:nowISO()});
     return ok(res,{devis:DB.devis[i],totaux:calcDevis(DB.devis[i])},'Devis mis à jour');
+  }
+
+  if((p=M('POST','/devis/:id/envoyer'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const dv = await SBLayer.Devis.envoyer(p.id, garageId);
+        if (dv.motos && dv.motos.client_id) {
+          pushService.sendPush(dv.motos.client_id, {
+            title: 'Nouveau devis reçu',
+            body: `Un devis (${dv.numero}) vous a été envoyé.`,
+            data: { type: 'devis_recu', devisId: dv.id }
+          }, `devis-envoye-${dv.id}`).catch(() => {});
+        }
+        return ok(res, { devis: dv }, 'Devis envoyé au client');
+      } catch(e) { return fail(res, e.message, 400, 'INVALID_STATUS'); }
+    }
+    // ── RAM fallback ──
+    const i = DB.devis.findIndex(function(d){return d.id===p.id&&d.garage_id===garageId;});
+    if(i<0) return fail(res,'Devis non trouvé',404,'NOT_FOUND');
+    if(DB.devis[i].statut!=='brouillon') return fail(res,'Ce devis a déjà été envoyé',400,'INVALID_STATUS');
+    DB.devis[i].statut='envoye'; DB.devis[i].updated_at=nowISO();
+    const mRam = DB.motos.find(function(x){return x.id===DB.devis[i].moto_id;});
+    if (mRam && mRam.client_id) {
+      pushService.sendPush(mRam.client_id, {
+        title: 'Nouveau devis reçu',
+        body: `Un devis (${DB.devis[i].numero}) vous a été envoyé.`,
+        data: { type: 'devis_recu', devisId: DB.devis[i].id }
+      }, `devis-envoye-${DB.devis[i].id}`).catch(() => {});
+    }
+    return ok(res,{devis:DB.devis[i]},'Devis envoyé au client');
   }
 
   if((p=M('POST','/devis/:id/valider'))!==null){
