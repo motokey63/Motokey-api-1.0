@@ -1179,7 +1179,7 @@ const server = http.createServer(async function(req, res){
         try {
           const { data: clientRow } = await SBLayer.supabase.from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
           if (!clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
-          const { data: dv } = await SBLayer.supabase.from('devis').select('*, motos(marque, modele, plaque, clients(nom, email)), devis_lignes(*)').eq('id', p.id).single();
+          const { data: dv } = await SBLayer.supabase.from('devis').select('*, motos(marque, modele, plaque, clients(nom, email))').eq('id', p.id).single();
           if (!dv) return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND');
           const { data: motoCheck } = await SBLayer.supabase.from('motos').select('id').eq('id', dv.moto_id).eq('client_id', clientRow.id).limit(1).single();
           if (!motoCheck) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
@@ -1255,8 +1255,11 @@ const server = http.createServer(async function(req, res){
     if (USE_SUPABASE && SBLayer) {
       try {
         const dv = await SBLayer.Devis.envoyer(p.id, garageId);
-        if (dv.motos && dv.motos.client_id) {
-          pushService.sendPush(dv.motos.client_id, {
+        // client_id est une colonne snapshot directe sur `devis` (schéma réel live) — fallback
+        // sur la jointure motos.client_id si absent pour compat avec d'anciennes lignes.
+        const pushClientId = dv.client_id || (dv.motos && dv.motos.client_id);
+        if (pushClientId) {
+          pushService.sendPush(pushClientId, {
             title: 'Nouveau devis reçu',
             body: `Un devis (${dv.numero}) vous a été envoyé.`,
             data: { type: 'devis_recu', devisId: dv.id }
