@@ -1,0 +1,14 @@
+name: Maintenance Alerts Cron
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 06:00 UTC ≈ 08:00 Europe/Paris (best-effort timing; delays are fine — logic is idempotent per tier)
+  workflow_dispatch: {}
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call maintenance-alerts cron endpoint
+        run: |
+          curl --fail -X POST "https://motokey11-production.up.railway.app/cron/maintenance-alerts" \
+            -H "X-Cron-Secret: ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json"

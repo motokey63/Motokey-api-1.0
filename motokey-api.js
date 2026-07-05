@@ -79,6 +79,7 @@ const https2     = require('https');
 const clientAuth  = require('./auth/client_auth');
 const emailService = require('./services/emailService');
 const pushService  = require('./services/pushService');
+const maintenanceAlertService = require('./services/maintenanceAlertService');
 const rbac        = require('./auth/rbac');
 const { stripe: stripeClient, handleWebhookEvent, createCheckoutSession, createAutoTrial, createPortalSession } = require('./services/stripeService');
 const planLimits = require('./auth/planLimits');
@@ -561,6 +562,21 @@ const server = http.createServer(async function(req, res){
   function M(m,p){ return match(m,method,p,pathname); }
 
   let p;
+
+  /* CRON — authentifié par secret partagé (X-Cron-Secret), pas de JWT (job planifié sans session utilisateur) */
+  if ((p = M('POST', '/cron/maintenance-alerts')) !== null) {
+    const secret = req.headers['x-cron-secret'];
+    if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+      return fail(res, 'Non autorisé', 401, 'UNAUTHORIZED');
+    }
+    try {
+      const result = await maintenanceAlertService.runMaintenanceAlertCron();
+      return ok(res, result, 'Cron entretien exécuté');
+    } catch (e) {
+      console.error('[cron] maintenance-alerts échoué:', e.message);
+      return fail(res, e.message, 500, 'CRON_ERROR');
+    }
+  }
 
   /* ROOT */
   if((p=M('GET','/'))!==null){
