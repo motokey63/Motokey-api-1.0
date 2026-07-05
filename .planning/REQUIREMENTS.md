@@ -78,7 +78,7 @@ Mapping requirements → phases.
 | MPUSH-01 | Phase 16 | Complete |
 | MPUSH-02 | Phase 12 (backend) / Phase 16 (bout-en-bout) | Complete |
 | MPUSH-03 | Phase 16 | Complete |
-| MPUSH-04 | Phase 17 (17-01, 2026-07-05) | Complete (backend code-complete; live smoke test deferred to 17-04 pending manual Supabase/Railway/GitHub setup) |
+| MPUSH-04 | Phase 17 (17-01/02/04, 2026-07-06) | Complete — proven end-to-end on a real device (push delivery + deep link + idempotent re-run against prod) |
 | MPUSH-05 | Phase 16 | Complete |
 | MSTORE-01 | Phase 17 | Complete |
 | MSTORE-02 | Phase 17 | Pending |

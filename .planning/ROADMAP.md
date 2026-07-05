@@ -56,7 +56,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
 - [x] **Phase 14: RN App Scaffolding + Native Auth** - Scaffold Expo Router + authentification native sécurisée (completed 2026-07-03)
 - [x] **Phase 15: Feature-Parity Screens** - Motos, devis, historique, liaison garage — parité MotoKey_Client.html (completed 2026-07-04, 15-09 gap closure — UAT Test 4)
 - [x] **Phase 16: Push Wiring End-to-End** - Soft-ask, enregistrement token, push devis reçu, deep link (completed 2026-07-05, MPUSH-02/03 real-device token+delivery deferred to Phase 17 EAS setup — see Phase Details)
-- [ ] **Phase 17: Maintenance Alert Cron + App Store Submission** - Push rappel entretien + soumission stores
+- [x] **Phase 17: Maintenance Alert Cron + App Store Submission** - Push rappel entretien + soumission stores (completed 2026-07-05)
 
 ## Phase Details
 
@@ -151,7 +151,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
 - [x] 17-01-PLAN.md — Backend cron: migration 18 tier-state columns + maintenanceAlertService.runMaintenanceAlertCron + secret-authed POST /cron/maintenance-alerts + GitHub Actions workflow + Wave 0 harness/seed (MPUSH-04)
 - [x] 17-02-PLAN.md — Mobile deep link: extend mapNotificationDataToRoute for moto_entretien -> Fiche Moto {pathname, params} + tests (MPUSH-04)
 - [x] 17-03-PLAN.md — Store-readiness config: com.motokey.app identifiers + ios.privacyManifests + eas.json + expo-dev-client + Apple/Google compliance content docs (MSTORE-01)
-- [ ] 17-04-PLAN.md — Checkpoint: EAS Android dev build + Firebase FCM V1 + live cron enablement + end-to-end on-device verification; MSTORE-02 submission PARKED (MPUSH-04, MSTORE-01, MSTORE-02)
+- [x] 17-04-PLAN.md — Checkpoint: EAS Android dev build + Firebase FCM V1 + live cron enablement + end-to-end on-device verification; MSTORE-02 submission PARKED (MPUSH-04, MSTORE-01, MSTORE-02)
 
 ## Progress
 
@@ -176,7 +176,7 @@ Phases exécutent en ordre numérique : 12 → 13 → 14 → 15 → 16 → 17
 | Phase 14 | v1.3 | 1/4 | In Progress | - |
 | Phase 15 | v1.3 | 9/9 | ✅ Complete (15-09 gap closure — UAT Test 4 resolved) | 2026-07-04 |
 | Phase 16 | v1.3 | 4/4 | Complete | 2026-07-05 |
-| Phase 17 | v1.3 | 3/4 | In Progress | - |
+| Phase 17 | v1.3 | 4/4 | ✅ Complete (MSTORE-02 parked, known gap) | 2026-07-06 |
 
 ---
 *Roadmap updated: 2026-07-04 — Phase 15 complete (9/9 plans): 15-09 gap closure (refetch-on-focus for Motos + Devis tabs) confirmed on-device, closes UAT Test 4 stale-list-on-focus-return.*
