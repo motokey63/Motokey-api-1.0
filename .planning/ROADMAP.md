@@ -56,7 +56,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
 - [x] **Phase 14: RN App Scaffolding + Native Auth** - Scaffold Expo Router + authentification native sécurisée (completed 2026-07-03)
 - [x] **Phase 15: Feature-Parity Screens** - Motos, devis, historique, liaison garage — parité MotoKey_Client.html (completed 2026-07-04, 15-09 gap closure — UAT Test 4)
 - [x] **Phase 16: Push Wiring End-to-End** - Soft-ask, enregistrement token, push devis reçu, deep link (completed 2026-07-05, MPUSH-02/03 real-device token+delivery deferred to Phase 17 EAS setup — see Phase Details)
-- [ ] **Phase 17: Maintenance Alert Cron + App Store Submission** - Push rappel entretien + soumission stores
+- [ ] **Phase 17: Maintenance Alert Cron + App Store Submission** - Push rappel entretien + soumission stores (17-01 MPUSH-04 backend cron complete 2026-07-05, code-complete pending manual Supabase/Railway/GitHub setup)
 
 ## Phase Details
 
@@ -147,7 +147,11 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
   2. Taper sur la notification de rappel entretien ouvre directement la fiche de la moto concernée (réutilise le deep link de Phase 16)
   3. L'app inclut un Privacy Manifest (Apple) et un formulaire Data Safety (Google) complets pour la soumission (MSTORE-01)
   4. L'app a été validée via TestFlight et une piste de test interne Android avant toute soumission publique (MSTORE-02)
-**Plans**: TBD
+**Plans**: 4 plans
+- [x] 17-01-PLAN.md — Backend: migration 18 (last_maintenance_tier_notified(_at) on motos) + services/maintenanceAlertService.js (runMaintenanceAlertCron, tier-crossing detection via Entretien.getPlan + pushService.sendPush) + POST /cron/maintenance-alerts (secret-header auth) + .github/workflows/maintenance-alerts.yml + seed/test harness scaffolds — code-complete 2026-07-05, live smoke test deferred to 17-04 (pending Supabase migration apply + CRON_SECRET setup)
+- [ ] 17-02-PLAN.md — TBD (EAS build setup)
+- [ ] 17-03-PLAN.md — TBD (store compliance content)
+- [ ] 17-04-PLAN.md — TBD (verification/checkpoint)
 
 ## Progress
 
@@ -172,7 +176,7 @@ Phases exécutent en ordre numérique : 12 → 13 → 14 → 15 → 16 → 17
 | Phase 14 | v1.3 | 1/4 | In Progress | - |
 | Phase 15 | v1.3 | 9/9 | ✅ Complete (15-09 gap closure — UAT Test 4 resolved) | 2026-07-04 |
 | Phase 16 | v1.3 | 4/4 | Complete | 2026-07-05 |
-| Phase 17 | v1.3 | 0/TBD | Not started | - |
+| Phase 17 | v1.3 | 1/4 | In Progress | - |
 
 ---
-*Roadmap updated: 2026-07-04 — Phase 15 complete (9/9 plans): 15-09 gap closure (refetch-on-focus for Motos + Devis tabs) confirmed on-device, closes UAT Test 4 stale-list-on-focus-return.*
+*Roadmap updated: 2026-07-05 — Phase 17 Plan 01 complete: MPUSH-04 backend cron (maintenanceAlertService.js + migration 18 + POST /cron/maintenance-alerts + GitHub Actions workflow), code-complete pending manual Supabase/Railway/GitHub setup steps.*

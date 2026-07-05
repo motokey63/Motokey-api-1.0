@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: App Client Mobile
 status: executing
-stopped_at: Phase 16 complete — 16-04 Task 2 human-verify checkpoint passed (all 8 on-device steps confirmed 2026-07-05), including a found+fixed notification-trigger bug in compte.tsx. Ready to plan Phase 17.
-last_updated: "2026-07-05T02:02:29.912Z"
-last_activity: 2026-07-05
+stopped_at: Phase 17 Plan 01 complete (MPUSH-04 backend cron) — 3 plans remaining
+last_updated: "2026-07-05T17:18:18Z"
+last_activity: 2026-07-05 -- Phase 17 Plan 01 executed
 progress:
   total_phases: 6
-  completed_phases: 5
-  total_plans: 21
-  completed_plans: 17
-  percent: 81
+  completed_phases: 4
+  total_plans: 25
+  completed_plans: 18
+  percent: 82
 ---
 
 # MotoKey API — Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 17 — maintenance-alert-cron-app-store-submission (not yet planned)
+**Current focus:** Phase 17 — maintenance-alert-cron-app-store-submission
 
 ## Current Position
 
-Phase: 16 (push-wiring-end-to-end) — ✅ COMPLETE (2026-07-05)
-Plan: 4 of 4 — all done
-Status: Ready to plan Phase 17
-Last activity: 2026-07-05
+Phase: 17 (maintenance-alert-cron-app-store-submission) — EXECUTING
+Plan: 2 of 4
+Status: Plan 17-01 complete (MPUSH-04 backend cron shipped, code-complete). Plans 02-04 remaining.
+Last activity: 2026-07-05 -- Phase 17 Plan 01 executed
 
-Progress: [████████░░] 81%
+Progress: [████████░░] 82%
 
 ```
 v1.0 ████████████ SHIPPED
@@ -47,7 +47,7 @@ v1.3 [░░░░░░░░░░] ROADMAP READY — App Client Mobile (React
 | Milestones shipped | 3 (v1.0 + v1.1 + v1.2) |
 | v1.3 phases | 6 (Phases 12→17), 0 complétées |
 | v1.3 requirements | 15 total, 15/15 mappés au roadmap, 0 shippés |
-| Next action | `/gsd:plan-phase 17` (Maintenance Alert Cron + App Store Submission) |
+| Next action | Execute 17-02-PLAN.md (EAS build setup) |
 | Phase 08-stripe-live-mode | ⏸️ PARKED — 08-01 ✅, 08-02 bloqué op humaine — known gap, indépendant de v1.3 |
 | Phase 12 P01 | 8min | 2 tasks | 2 files |
 | Phase 12 P02 | 25min | 4 tasks | 1 files |
@@ -69,6 +69,7 @@ v1.3 [░░░░░░░░░░] ROADMAP READY — App Client Mobile (React
 | Phase 16 P02 | 20min | 3 tasks | 6 files |
 | Phase 16 P01 | 55min | 3 tasks | 4 files |
 | Phase 16 P03 | 12min | 3 tasks | 6 files |
+| Phase 17 P01 | 3min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -111,12 +112,14 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - [Phase 16]: [Phase 16-03]: worktree mobile-app/node_modules was never installed after the master fast-forward merge (package.json/lock arrived via merge, npm install never run) -- ran npm install --legacy-peer-deps before tsc/jest verification could execute; left a cosmetic 3-line package-lock.json devOptional->dev flag diff unstaged
 - [Phase 16]: [Phase 16-04]: Discovered 51 local commits (all of 16-01/16-02/16-03) had never been pushed to origin/master -- Railway prod was serving pre-Phase-16 code, causing an initial 404 on POST /devis/:id/envoyer. Pushed origin master (commit 7f6dc86), waited for Railway redeploy, then confirmed full curl smoke test (envoyer transition, PUT lock, no-double-send) against live prod. Full mobile jest suite (121/121) and tsc --noEmit both clean.
 - [Phase 16]: [Phase 16-04]: Task 2 human-verify checkpoint passed on-device (all 8 steps) 2026-07-05, run over Expo Go via `npx expo start --tunnel`. Step 7 initially crashed with `TypeError: The trigger object you provided is invalid` — `compte.tsx`'s __DEV__ test-notification button used an untyped `trigger: { seconds: 2 } as any`, which masked a real SDK-54 breaking change: `NotificationTriggerInput` is now a discriminated union requiring an explicit `type` tag. Fixed to `{ type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 2 }` (shape confirmed from the installed package's own `Notifications.types.d.ts`, per mobile-app/AGENTS.md's "Expo HAS CHANGED" rule, not from memory). Re-verified tsc clean + jest 121/121 + step 7 passing after the fix. Phase 16 is now genuinely complete — MPUSH-01/05 fully proven on-device, MPUSH-02/03 real-device token/delivery explicitly deferred to Phase 17 EAS setup per the 2026-07-04 planning decision.
+- [Phase 17]: [Phase 17-01]: Cron computes worst tier via SBLayer.Entretien.getPlan direct function call, never the RBAC-gated /motos/:id/entretien/alertes HTTP endpoint (would 403 for CLIENT-owned motos per auth/rbac.js hierarchy); last_maintenance_tier_notified persisted on motos (not a new table); POST /cron/maintenance-alerts is the first secret-header-authenticated endpoint in the codebase (X-Cron-Secret vs process.env.CRON_SECRET), fail-closed 401 when unconfigured. Executed on parallel worktree branch `worktree-agent-ad10d482ffbc4ab10` (commits 26a83a1/98d6b05/46b0486) — orchestrator merges to master.
 
 ### Pending Todos
 
 - **[Phase 13→17] SC-1 real device push delivery — DEFERRED again, now to Phase 17 (EAS development build setup).** `sendToToken`/`sendPush` in `services/pushService.js` have never been confirmed to deliver a visible remote notification to a real device — Expo Go dropped remote push support in SDK 53, so this requires an EAS dev build (no `eas.json`/`projectId`/Expo account login exist yet in this repo). Originally targeted for Phase 15, then Phase 16 — both closed without it per explicit Mehdi decisions, since local notifications (MPUSH-05, confirmed 2026-07-05) cover everything achievable without EAS. To close: set up EAS project in Phase 17, then run `PUSH_ENABLED=true node scripts/test-push.js <real-ExponentPushToken>` against a real device token and confirm the notification banner appears. SC-2/SC-3/SC-4 already confirmed — only SC-1 (real delivery) is open.
 - **[Phase 14] MAUTH-03 proactive foreground refresh — not yet exercised on a real device.** The 14-04 human-verify checkpoint confirmed MAUTH-01 (register/login/reset) and MAUTH-02 (encrypted persistence) but not MAUTH-03. Needs a dedicated pass: background the app long enough for the access token to near/pass expiry (~5min, ideally ~1h), foreground it, confirm no visible "Session expirée" and the app keeps working.
 - **[Phase 14] Real email delivery (Resend) still untested end-to-end.** OTP codes for register/reset were confirmed via the console.log fallback, not a real inbox — pre-existing gap, tracked in PROJECT.md "À faire" (`RESEND_API_KEY` + `EMAIL_ENABLED=true` on Railway).
+- **[Phase 17-01] Migration 18 + CRON_SECRET (Railway + GitHub Actions secret) not yet applied/configured.** Backend code is complete and syntax-verified but the cron cannot run in prod until Mehdi: (1) applies `sql/migrations/18_motos_maintenance_alert_state.sql` via Supabase Dashboard, (2) sets `CRON_SECRET` on Railway, (3) adds the same `CRON_SECRET` as a GitHub Actions repo secret. Live smoke test deferred to Plan 04's checkpoint.
 
 ### Blockers/Concerns
 
@@ -130,9 +133,10 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - Phase 15-03 (post-Wave-1-merge): `npx tsc --noEmit` briefly failed on `app/_layout.tsx`'s `router.replace('/(app)/(tabs)/motos')` because Expo Router's typed-routes doesn't consider a directory a navigable `Href` until it has an `index.tsx` — RESOLVED by 15-05 (creates `motos/index.tsx` + `motos/[id].tsx`); confirmed `tsc --noEmit` fully clean afterward. No action needed.
 - Phase 15 parallel worktrees repeatedly branch from a stale `.planning/` snapshot (gitignored, not synced across worktree branches) and each independently mutate the shared STATE.md/ROADMAP.md/REQUIREMENTS.md docs — every wave merge back to master needed manual reconciliation of progress counters and requirement checkboxes (regressions occurred at Wave 1→2 boundary: an off-by-one completed_plans count, and MPARITY-03 flipping back to Pending). Fully reconciled as of Phase 15 completion (all 8 plans, all 5 MPARITY reqs, progress counters correct). Worth automating for future phases (e.g. computing progress/requirements from actual plan SUMMARY files at merge time instead of trusting each worktree's local edit).
 - ~~Phase 16-04 frontmatter counter discrepancy~~ → **RESOLVED 2026-07-05**: Task 2's checkpoint passed, `16-04-SUMMARY.md` finalized to `status: complete`, so the frontmatter counters (completed_phases=5, completed_plans=17) are now accurate, not just coincidentally matching. Noting for future reference: `gsd-tools` computes these counters purely from SUMMARY.md file *count* vs PLAN.md count on disk, with no awareness of a SUMMARY's own in-progress status marker — worth remembering if a future phase ends on a blocking checkpoint again.
+- Phase 17-01 (this plan): executed inside parallel worktree `agent-ad10d482ffbc4ab10` against a STALE local `.planning/STATE.md` snapshot (still showed "Phase 16 complete, Phase 17 not yet planned" despite Phase 17 already being in-flight on the shared main checkout). Running `gsd-tools state advance-plan` against this stale snapshot produced an incorrect result (jumped to "Phase 16 plan 4/4, status verifying"); this STATE.md file was manually reconstructed from the correct shared-checkout content (read at session start) plus this plan's own updates, rather than trusting the tool's mutation. Orchestrator should treat this worktree's STATE.md as a reference draft to reconcile against the shared main-checkout copy at merge time, not merge it verbatim.
 
 ## Session Continuity
 
-Last session: 2026-07-05T02:02:29.909Z
-Stopped at: Phase 16 complete — 16-04 Task 2 checkpoint passed (all 8 on-device steps), notification-trigger bug found and fixed in compte.tsx. Ready to plan Phase 17.
-Resume file: None
+Last session: 2026-07-05T17:18:18Z
+Stopped at: Phase 17 Plan 01 complete (MPUSH-04 backend cron shipped, code-complete, pending manual Supabase/Railway/GitHub setup)
+Resume file: .planning/phases/17-maintenance-alert-cron-app-store-submission/17-02-PLAN.md
