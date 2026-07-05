@@ -12,7 +12,9 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export type NotificationRoute = '/(app)/(tabs)/devis';
+export type NotificationRoute =
+  | '/(app)/(tabs)/devis'
+  | { pathname: '/(app)/(tabs)/motos/[id]'; params: { id: string } };
 
 /**
  * Pure, exported for unit testing (Pitfall 3 — typedRoutes needs a static
@@ -22,6 +24,9 @@ export type NotificationRoute = '/(app)/(tabs)/devis';
  */
 export function mapNotificationDataToRoute(data: any): NotificationRoute | null {
   if (data && data.type === 'devis_recu') return '/(app)/(tabs)/devis';
+  if (data && data.type === 'moto_entretien' && data.motoId) {
+    return { pathname: '/(app)/(tabs)/motos/[id]', params: { id: String(data.motoId) } };
+  }
   return null;
 }
 
