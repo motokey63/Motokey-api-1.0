@@ -466,56 +466,118 @@ const Entretien = {
 // ══════════════════════════════════════════════════════════
 // DEVIS
 // ══════════════════════════════════════════════════════════
+// NOTE (Phase 16-01, reconciliation schema réel) : la table `devis` en prod live est un schéma
+// dénormalisé/snapshot — PAS celui documenté à l'origine dans ce fichier. Confirmé par
+// introspection OpenAPI PostgREST (GET {SUPABASE_URL}/rest/v1/?apikey=...) le 04/07/2026 :
+//   - Colonnes réelles : id, numero, garage_id, entite_facturation_id, moto_id, client_id, or_id,
+//     statut, client_nom (NOT NULL), client_adresse/cp/ville/email/tel/siret/tva (snapshot),
+//     moto_label, moto_vin, moto_km (snapshot), lignes (jsonb, NOT NULL — remplace la table
+//     `devis_lignes` qui N'EXISTE PLUS), total_ht/total_tva/total_ttc (numeric, NOT NULL,
+//     persistés à l'écriture — plus un calcul "on read"), remise_pct, remise_montant,
+//     date_creation/date_validite/date_envoi/date_acceptation/date_refus, notes, pdf_url,
+//     cree_par, created_at, updated_at, remise_note, remise_type, tva.
+//   - `devis_lignes` (table séparée) N'EXISTE PAS dans le schéma live — confirmé absent des
+//     définitions OpenAPI. Les lignes vivent dans la colonne jsonb `devis.lignes`.
+//   - `entite_facturation_id` est NOT NULL : toute création de devis doit résoudre l'entité de
+//     facturation active du garage (même convention que `GET /entites-facturation`,
+//     motokey-api.js ~L1917 : filtre `garage_id` + `actif=true`).
+// Tout le bloc ci-dessous a été réécrit pour cibler ce schéma réel (le code précédent, qui
+// joignait `devis_lignes(*)`, plantait systématiquement en prod — table inexistante).
 const Devis = {
 
   async list(garage_id) {
+    // total_ht/total_tva/total_ttc sont désormais des colonnes persistées (calculées à
+    // l'écriture dans create()/update()/valider()) — plus besoin de recalcul "on read".
     const { data, error } = await supabase.from('devis')
       .select('*, motos(marque, modele, plaque)')
       .eq('garage_id', garage_id)
       .order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
-    return data;
+    return data || [];
   },
 
   async getById(id, garage_id) {
     const { data, error } = await supabase.from('devis')
-      .select('*, motos(marque, modele, plaque, clients(nom, email)), devis_lignes(*)')
+      .select('*, motos(marque, modele, plaque, client_id, clients(nom, email))')
       .eq('id', id).eq('garage_id', garage_id).single();
     if (error) throw new Error(error.message);
     return data;
   },
 
+  // Résout l'entité de facturation active du garage (schéma réel : entite_facturation_id NOT NULL).
+  // Même convention que GET /entites-facturation (motokey-api.js) : garage_id + actif=true.
+  async _getEntiteActive(garage_id) {
+    const { data: entite, error } = await supabase.from('entites_facturation')
+      .select('id').eq('garage_id', garage_id).eq('actif', true)
+      .order('created_at', { ascending: true }).limit(1).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!entite) throw new Error('Aucune entité de facturation configurée pour ce garage — impossible de créer un devis');
+    return entite;
+  },
+
   async create(garage_id, payload) {
+    if (!payload.moto_id) throw new Error('moto_id requis');
+    const entite = await Devis._getEntiteActive(garage_id);
+
+    // Snapshot moto/client — schéma réel dénormalisé : client_nom (NOT NULL) et les champs
+    // moto_label/moto_vin/moto_km sont capturés à la création, pas re-dérivés par jointure vivante.
+    const moto = await Motos.getById(payload.moto_id, garage_id);
+    if (!moto) throw new Error('Moto non trouvée');
+    const client_id    = moto.client_id || null;
+    const client_nom    = moto.clients?.nom || 'Client inconnu';
+    const client_email  = moto.clients?.email || null;
+    const moto_label    = [moto.marque, moto.modele, moto.plaque].filter(Boolean).join(' ') || null;
+
+    const lignes = payload.lignes || [];
+    const remise_pct = payload.remise_pct || 0;
+    const tva = 20;
+    const totaux = Devis._calcTotaux({ lignes, remise_pct, tva });
     const num = `2026-${String(Date.now()).slice(-4)}`;
-    const dv  = await insert('devis', {
+
+    const dv = await insert('devis', {
       garage_id, moto_id: payload.moto_id,
+      entite_facturation_id: entite.id,
+      client_id, client_nom, client_email,
+      moto_label, moto_vin: moto.vin || null, moto_km: moto.km || 0,
       numero: num, statut: 'brouillon',
+      lignes,
       remise_type: payload.remise_type || 'aucun',
-      remise_pct:  payload.remise_pct  || 0,
+      remise_pct,
       remise_note: payload.remise_note || '',
-      tva: 20
+      tva,
+      total_ht:  totaux.base_ht,
+      total_tva: totaux.tva_montant,
+      total_ttc: totaux.total_ttc
     });
-    // Insérer les lignes
-    if (payload.lignes?.length > 0) {
-      await supabase.from('devis_lignes').insert(
-        payload.lignes.map((l, i) => ({ ...l, devis_id: dv.id, position: i }))
-      );
-    }
     return Devis.getById(dv.id, garage_id);
   },
 
   async update(id, garage_id, payload) {
-    // Mise à jour entête
-    if (payload.entete) await update('devis', id, payload.entete);
-    // Remplacement des lignes
-    if (payload.lignes) {
-      await supabase.from('devis_lignes').delete().eq('devis_id', id);
-      if (payload.lignes.length > 0) {
-        await supabase.from('devis_lignes').insert(
-          payload.lignes.map((l, i) => ({ ...l, devis_id: id, position: i }))
-        );
-      }
-    }
+    const current = await Devis.getById(id, garage_id);
+    if (!current) throw new Error('Devis non trouvé');
+    const entete = payload.entete || {};
+    const lignes = payload.lignes !== undefined ? payload.lignes : current.lignes;
+    const remise_pct = entete.remise_pct !== undefined ? entete.remise_pct : current.remise_pct;
+    const tva = entete.tva !== undefined ? entete.tva : current.tva;
+    const totaux = Devis._calcTotaux({ lignes, remise_pct, tva });
+    await update('devis', id, {
+      ...entete,
+      lignes,
+      remise_pct,
+      tva,
+      total_ht:  totaux.base_ht,
+      total_tva: totaux.tva_montant,
+      total_ttc: totaux.total_ttc,
+      updated_at: new Date().toISOString()
+    });
+    return Devis.getById(id, garage_id);
+  },
+
+  async envoyer(id, garage_id) {
+    const dv = await Devis.getById(id, garage_id);
+    if (!dv) throw new Error('Devis non trouvé');
+    if (dv.statut !== 'brouillon') throw new Error('Ce devis a déjà été envoyé');
+    await update('devis', id, { statut: 'envoye', date_envoi: new Date().toISOString(), updated_at: new Date().toISOString() });
     return Devis.getById(id, garage_id);
   },
 
@@ -523,26 +585,28 @@ const Devis = {
     const dv = await Devis.getById(id, garage_id);
     if (!dv) throw new Error('Devis non trouvé');
     if (dv.statut === 'valide') throw new Error('Déjà validé');
-    // Calculer les totaux
+    // Calculer les totaux (persistés — plus de calcul "on read")
     const totaux = Devis._calcTotaux(dv);
     // Valider
-    await update('devis', id, { statut: 'valide', date_acceptation: new Date().toISOString(), ...totaux });
+    await update('devis', id, { statut: 'valide', date_acceptation: new Date().toISOString(), total_ht: totaux.base_ht, total_tva: totaux.tva_montant, total_ttc: totaux.total_ttc });
     // Créer l'intervention correspondante
     const result = await Interventions.create(garage_id, dv.moto_id, {
       type:        'bleu',
       titre:       `Facture ${dv.numero}`,
-      description: (dv.devis_lignes || []).map(l => l.description).join(', '),
-      km:          dv.motos?.km || 0,
+      description: (dv.lignes || []).map(l => l.description).join(', '),
+      km:          dv.moto_km || dv.motos?.km || 0,
       montant_ht:  totaux.base_ht,
       montant_ttc: totaux.total_ttc
     });
     return { devis: await Devis.getById(id, garage_id), totaux, ...result };
   },
 
+  // Lit désormais dv.lignes (jsonb embarqué sur la ligne devis) au lieu de dv.devis_lignes
+  // (ancienne table séparée, n'existe plus en prod).
   _calcTotaux(dv) {
     let moHT = 0, pieHT = 0, remL = 0;
-    (dv.devis_lignes || []).forEach(l => {
-      const brut = l.prix_unitaire * l.quantite;
+    (dv.lignes || []).forEach(l => {
+      const brut = (l.prix_unitaire || 0) * (l.quantite || 0);
       const rem  = brut * ((l.remise_pct || 0) / 100);
       remL += rem;
       if (l.type_ligne === 'mo') moHT += brut - rem;

@@ -1207,8 +1207,22 @@ async function loadDevis() {
           </div>
         </div>
         <div>
-          ${liste.length ? `<table class="table"><thead><tr><th>Réf.</th><th>Date</th><th>Moto</th><th>Total HT</th></tr></thead><tbody>
-            ${liste.map(d=>`<tr><td><strong>${d.reference||d.id}</strong></td><td>${d.date||'—'}</td><td>${d.moto||'—'}</td><td>${(d.total_ht||0).toLocaleString('fr-FR',{minimumFractionDigits:2})} €</td></tr>`).join('')}
+          ${liste.length ? `<table class="table"><thead><tr><th>Réf.</th><th>Date</th><th>Moto</th><th>Statut</th><th>Total TTC</th><th></th></tr></thead><tbody>
+            ${liste.map(d=>{
+              const motoLabel = d.motos ? [d.motos.marque,d.motos.modele,d.motos.plaque].filter(Boolean).join(' ') : (d.moto_label||d.moto_info||'—');
+              const statutBadge = {brouillon:'badge-jaune',envoye:'badge-bleu',valide:'badge-vert',refuse:'badge-rouge'}[d.statut]||'badge-jaune';
+              const statutLabel = {brouillon:'Brouillon',envoye:'Envoyé',valide:'Validé',refuse:'Refusé'}[d.statut]||d.statut;
+              const dateStr = d.created_at ? new Date(d.created_at).toLocaleDateString('fr-FR') : '—';
+              const total = (d.total_ttc||0).toLocaleString('fr-FR',{minimumFractionDigits:2});
+              return `<tr>
+                <td><strong>${d.numero||d.id}</strong></td>
+                <td>${dateStr}</td>
+                <td>${motoLabel}</td>
+                <td><span class="badge ${statutBadge}">${statutLabel}</span></td>
+                <td>${total} €</td>
+                <td>${d.statut==='brouillon' ? `<button class="btn btn-primary btn-sm" onclick="envoyerDevis('${d.id}')">Envoyer au client</button>` : ''}</td>
+              </tr>`;
+            }).join('')}
           </tbody></table>` : '<div class="empty"><div class="empty-icon">📄</div><div class="empty-text">Aucun devis</div></div>'}
         </div>
       </div>`;
@@ -1243,6 +1257,15 @@ async function saveDevis() {
     toast('✅ Devis créé');
     await loadDevis();
   } catch(e) { err.textContent = e.message; err.style.display='block'; }
+}
+
+async function envoyerDevis(id) {
+  if (!confirm('Envoyer ce devis au client ? Il ne sera plus modifiable ensuite.')) return;
+  try {
+    await api('/devis/'+id+'/envoyer','POST');
+    toast('✅ Devis envoyé au client');
+    await loadDevis();
+  } catch(e) { toast('❌ '+e.message); }
 }
 
 // ── ORDRES DE RÉPARATION ──
