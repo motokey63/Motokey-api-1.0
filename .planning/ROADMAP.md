@@ -131,7 +131,11 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
   2. Au login, le device token de l'utilisateur est enregistré côté backend ; au logout, il est désenregistré (MPUSH-02 bout-en-bout)
   3. Quand un nouveau devis est créé pour l'utilisateur, une notification push arrive sur son appareil en quelques secondes (MPUSH-03)
   4. Taper sur la notification "devis reçu" ouvre directement l'écran du devis concerné (MPUSH-05, deep link)
-**Plans**: TBD
+**Plans**: 4 plans (waves 1-3)
+- [x] 16-01-PLAN.md — Backend: Devis.envoyer() + POST /devis/:id/envoyer (brouillon->envoye + sendPush) + PUT lock-on-send guard + seed fixture + app.html devis list fix
+- [x] 16-02-PLAN.md — Mobile foundation: expo-notifications dependency + lib/softAsk.ts + lib/push.ts + hooks/useNotificationObserver.ts (all unit-tested pure logic)
+- [x] 16-03-PLAN.md — Mobile wiring: soft-ask screen + AuthContext logout unregister + root layout redirect gating + notification observer/retry-hook mounting + Compte tab entry point
+- [ ] 16-04-PLAN.md — Verification: backend curl smoke test + full mobile suite + human E2E checkpoint (real on-device push delivery explicitly deferred to Phase 17 EAS setup)
 **UI hint**: yes
 
 ### Phase 17: Maintenance Alert Cron + App Store Submission
@@ -167,7 +171,7 @@ Phases exécutent en ordre numérique : 12 → 13 → 14 → 15 → 16 → 17
 | Phase 13 | v1.3 | 2/2 | ✅ Complete (SC-1 deferred) | 2026-07-02 |
 | Phase 14 | v1.3 | 1/4 | In Progress | - |
 | Phase 15 | v1.3 | 9/9 | ✅ Complete (15-09 gap closure — UAT Test 4 resolved) | 2026-07-04 |
-| Phase 16 | v1.3 | 0/TBD | Not started | - |
+| Phase 16 | v1.3 | 3/4 | In Progress | - |
 | Phase 17 | v1.3 | 0/TBD | Not started | - |
 
 ---

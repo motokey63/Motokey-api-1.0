@@ -23,11 +23,11 @@ Requirements pour le milestone App Client Mobile. Chaque requirement mappe à un
 
 ### Notifications Push
 
-- [ ] **MPUSH-01**: L'utilisateur voit un écran de pré-demande ("soft-ask") avant le prompt système de permission push
-- [ ] **MPUSH-02**: Le device token est enregistré/désenregistré auprès du backend au login/logout
-- [ ] **MPUSH-03**: L'utilisateur reçoit une notification push immédiate quand un nouveau devis est créé pour lui
+- [x] **MPUSH-01**: L'utilisateur voit un écran de pré-demande ("soft-ask") avant le prompt système de permission push
+- [x] **MPUSH-02**: Le device token est enregistré/désenregistré auprès du backend au login/logout
+- [x] **MPUSH-03**: L'utilisateur reçoit une notification push immédiate quand un nouveau devis est créé pour lui
 - [ ] **MPUSH-04**: L'utilisateur reçoit une notification push quand sa moto dépasse le seuil de révision (réutilise la logique de seuil UX-02 existante)
-- [ ] **MPUSH-05**: Taper sur une notification navigue directement vers l'écran concerné (deep link devis ou fiche moto)
+- [x] **MPUSH-05**: Taper sur une notification navigue directement vers l'écran concerné (deep link devis ou fiche moto)
 
 ### App Store
 
@@ -75,11 +75,11 @@ Mapping requirements → phases.
 | MPARITY-03 | Phase 15 | Complete |
 | MPARITY-04 | Phase 15 | Complete |
 | MPARITY-05 | Phase 15 | Complete |
-| MPUSH-01 | Phase 16 | Pending |
-| MPUSH-02 | Phase 12 (backend) / Phase 16 (bout-en-bout) | Pending |
-| MPUSH-03 | Phase 16 | Pending |
+| MPUSH-01 | Phase 16 | Complete |
+| MPUSH-02 | Phase 12 (backend) / Phase 16 (bout-en-bout) | Complete |
+| MPUSH-03 | Phase 16 | Complete |
 | MPUSH-04 | Phase 17 | Pending |
-| MPUSH-05 | Phase 16 | Pending |
+| MPUSH-05 | Phase 16 | Complete |
 | MSTORE-01 | Phase 17 | Pending |
 | MSTORE-02 | Phase 17 | Pending |
 

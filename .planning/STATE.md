@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: App Client Mobile
-status: verifying
-stopped_at: Phase 16 context gathered
-last_updated: "2026-07-04T09:32:07.531Z"
-last_activity: 2026-07-04
+status: executing
+stopped_at: Completed 16-03-PLAN.md
+last_updated: "2026-07-05T01:44:25.554Z"
+last_activity: 2026-07-05
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 17
-  completed_plans: 13
+  total_plans: 21
+  completed_plans: 16
   percent: 76
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 15 — feature-parity-screens
+**Current focus:** Phase 16 — push-wiring-end-to-end
 
 ## Current Position
 
-Phase: 16
-Plan: Not started
-Status: Phase 15 complete — UAT Test 4 gap closed and human-verified on-device 2026-07-04
-Last activity: 2026-07-04
+Phase: 16 (push-wiring-end-to-end) — EXECUTING
+Plan: 4 of 4
+Status: Ready to execute
+Last activity: 2026-07-05
 
 Progress: [████████░░] 76%
 
@@ -66,6 +66,9 @@ v1.3 [░░░░░░░░░░] ROADMAP READY — App Client Mobile (React
 | Phase 15 P07 | ~20min | 2 tasks | 2 files |
 | Phase 15 P08 | ~20min | 2 tasks | 2 files |
 | Phase 15 P09 | ~15min | 2 tasks | 2 files |
+| Phase 16 P02 | 20min | 3 tasks | 6 files |
+| Phase 16 P01 | 55min | 3 tasks | 4 files |
+| Phase 16 P03 | 12min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -101,6 +104,11 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - [Phase 15]: [Phase 15-07]: Ajouter une moto (plan-limit gate via parseLimite + Passer Pro CTA on 402) and Réclamer une moto (VIN+plaque via validateClaim/buildClaimPayload, photo input disabled per D-02, no Cloudinary) forms built under mobile-app/app/(app)/(tabs)/motos/{add,claim}.tsx
 - [Phase 15]: [Phase 15-08]: Réclamations + Garages list screens ported verbatim from MotoKey_Client.html's loadClientReclamationsTab/loadClientGaragesTab/openRevokeModal/submitRevoke; reused garageLiaison.ts parsers + devisDisplay.ts label/color lookups + RevokeGarageModal (15-04) with no adaptation needed
 - [Phase 15]: [Phase 15-09]: Guarded useFocusEffect (isFirstFocus ref) added to Motos + Devis tabs closes UAT Test 4 gap — accepted réclamations / out-of-band devis changes now surface on tab-return without a manual pull-to-refresh; confirmed via on-device reproduction 2026-07-04
+- [Phase 16]: [Phase 16-02]: Worktree branch was 37 commits behind master (missing all of Phase 15's mobile-app work incl. cache.ts) -- fast-forward merged master into the worktree branch (0 divergent local commits, safe) before starting, then copied 16-*.md plan/context docs from the main checkout into the worktree's .planning/ for reference
+- [Phase 16]: [Phase 16-02]: lib/push.ts + lib/softAsk.ts + hooks/useNotificationObserver.ts built exactly per plan; registerForPushAsync/retryRegistrationIfGranted/unregisterPushAsync fully unit-tested against mocked expo-notifications/expo-device/expo-constants/api, D-08 no-reprompt guarantee verified by grep (exactly 1 requestPermissionsAsync call site)
+- [Phase 16]: [Phase 16-01]: Reconciled devis schema drift — live prod devis table is a denormalized snapshot schema (embedded lignes jsonb, NOT NULL client_nom/entite_facturation_id, persisted total_ht/tva/ttc), not the devis+devis_lignes two-table schema the plan assumed. Re-ran PostgREST OpenAPI introspection to get authoritative schema, rewrote supabase.js Devis object entirely (list/getById/create/update/valider/_calcTotaux), verified brouillon->envoye transition + PUT lock guard end-to-end via curl against live prod.
+- [Phase 16]: [Phase 16-03]: Soft-ask screen (Accept/Decline both mark seen flag before nav), AuthContext.logout() unregisters push token before clearSession (D-09, fail-open), RootNav gates authenticated redirect on hasSeenSoftAsk() (D-04), usePushRegistrationRetry hook (AppState foreground, never re-prompts OS, D-08) + useNotificationObserver mounted at (app)/_layout.tsx boundary, Compte tab retry entry point + __DEV__ local test-notification trigger for MPUSH-05 manual verification
+- [Phase 16]: [Phase 16-03]: worktree mobile-app/node_modules was never installed after the master fast-forward merge (package.json/lock arrived via merge, npm install never run) -- ran npm install --legacy-peer-deps before tsc/jest verification could execute; left a cosmetic 3-line package-lock.json devOptional->dev flag diff unstaged
 
 ### Pending Todos
 
@@ -122,6 +130,6 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 
 ## Session Continuity
 
-Last session: 2026-07-04T09:32:07.528Z
-Stopped at: Phase 16 context gathered
-Resume file: .planning/phases/16-push-wiring-end-to-end/16-CONTEXT.md
+Last session: 2026-07-05T01:44:25.551Z
+Stopped at: Completed 16-03-PLAN.md
+Resume file: None
