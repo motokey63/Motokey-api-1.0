@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-07-01)
 
 Phase: 17 (maintenance-alert-cron-app-store-submission) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Executing — Plan 17-04 Task 1 complete, Task 2 paused at human-action checkpoint (Firebase project + FCM V1 credentials)
 Last activity: 2026-07-05
 
 Progress: [████████░░] 81%
@@ -114,6 +114,7 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 
 ### Pending Todos
 
+- **[Phase 17-04] Task 2 (Firebase project + FCM V1 credentials + Android dev build) paused at human-action checkpoint.** Task 1 (Expo account + `eas login`/`eas init`) is complete — `mobile-app/app.json` has `owner: "motokey"` + `extra.eas.projectId: "f81c1373-4d65-428c-b6ca-ae231da7b41b"` (commit `b990c2f`). `eas-cli` is installed (`npx eas-cli` works, v20.5.1) and still logged in as `r4yjin` (with access to the `motokey` team account). `eas.json` already has an installable `development` Android profile (from Plan 03). Blocked on: (1) create a free Firebase project at console.firebase.google.com, add an Android app with package `com.motokey.app`, download `google-services.json` into `mobile-app/`; (2) generate an FCM V1 service-account key and upload it to EAS credentials; (3) then `eas build --profile development --platform android` and install on a real device. None of these are automatable — no `google-services.json` exists on disk yet and `app.json` has no `googleServicesFile` reference.
 - **[Phase 13→17] SC-1 real device push delivery — DEFERRED again, now to Phase 17 (EAS development build setup).** `sendToToken`/`sendPush` in `services/pushService.js` have never been confirmed to deliver a visible remote notification to a real device — Expo Go dropped remote push support in SDK 53, so this requires an EAS dev build (no `eas.json`/`projectId`/Expo account login exist yet in this repo). Originally targeted for Phase 15, then Phase 16 — both closed without it per explicit Mehdi decisions, since local notifications (MPUSH-05, confirmed 2026-07-05) cover everything achievable without EAS. To close: set up EAS project in Phase 17, then run `PUSH_ENABLED=true node scripts/test-push.js <real-ExponentPushToken>` against a real device token and confirm the notification banner appears. SC-2/SC-3/SC-4 already confirmed — only SC-1 (real delivery) is open.
 - **[Phase 14] MAUTH-03 proactive foreground refresh — not yet exercised on a real device.** The 14-04 human-verify checkpoint confirmed MAUTH-01 (register/login/reset) and MAUTH-02 (encrypted persistence) but not MAUTH-03. Needs a dedicated pass: background the app long enough for the access token to near/pass expiry (~5min, ideally ~1h), foreground it, confirm no visible "Session expirée" and the app keeps working.
 - **[Phase 14] Real email delivery (Resend) still untested end-to-end.** OTP codes for register/reset were confirmed via the console.log fallback, not a real inbox — pre-existing gap, tracked in PROJECT.md "À faire" (`RESEND_API_KEY` + `EMAIL_ENABLED=true` on Railway).
