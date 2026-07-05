@@ -147,7 +147,11 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
   2. Taper sur la notification de rappel entretien ouvre directement la fiche de la moto concernée (réutilise le deep link de Phase 16)
   3. L'app inclut un Privacy Manifest (Apple) et un formulaire Data Safety (Google) complets pour la soumission (MSTORE-01)
   4. L'app a été validée via TestFlight et une piste de test interne Android avant toute soumission publique (MSTORE-02)
-**Plans**: TBD
+**Plans**: 4 plans (parallel execution across worktrees — this worktree tracks 17-03 only; see main-checkout STATE.md for cross-plan status)
+- [x] 17-03-PLAN.md — Mobile store-submission groundwork: app.json (com.motokey.app identifiers + Apple privacy manifests), eas.json (dev/preview/production profiles), expo-dev-client dependency, Apple App Privacy + Google Data Safety content docs (MSTORE-01, code/content complete; actual submission stays parked pending Apple/Google developer accounts per D-01/D-02)
+- [ ] 17-01-PLAN.md — status not visible from this worktree
+- [ ] 17-02-PLAN.md — status not visible from this worktree
+- [ ] 17-04-PLAN.md — status not visible from this worktree
 
 ## Progress
 
@@ -172,7 +176,7 @@ Phases exécutent en ordre numérique : 12 → 13 → 14 → 15 → 16 → 17
 | Phase 14 | v1.3 | 1/4 | In Progress | - |
 | Phase 15 | v1.3 | 9/9 | ✅ Complete (15-09 gap closure — UAT Test 4 resolved) | 2026-07-04 |
 | Phase 16 | v1.3 | 4/4 | Complete | 2026-07-05 |
-| Phase 17 | v1.3 | 0/TBD | Not started | - |
+| Phase 17 | v1.3 | 1/4 (this worktree) | In Progress | - |
 
 ---
-*Roadmap updated: 2026-07-04 — Phase 15 complete (9/9 plans): 15-09 gap closure (refetch-on-focus for Motos + Devis tabs) confirmed on-device, closes UAT Test 4 stale-list-on-focus-return.*
+*Roadmap updated: 2026-07-05 — Phase 17 Plan 03 complete (mobile store-submission groundwork: app.json/eas.json/expo-dev-client + compliance content docs, MSTORE-01). Parallel plans 17-01/17-02/17-04 executed in sibling worktrees — reconcile against main-checkout STATE.md/ROADMAP.md at merge.*

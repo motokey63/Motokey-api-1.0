@@ -31,7 +31,7 @@ Requirements pour le milestone App Client Mobile. Chaque requirement mappe à un
 
 ### App Store
 
-- [ ] **MSTORE-01**: L'app respecte les exigences Privacy Manifest (Apple) et Data Safety (Google) pour la première soumission
+- [x] **MSTORE-01**: L'app respecte les exigences Privacy Manifest (Apple) et Data Safety (Google) pour la première soumission
 - [ ] **MSTORE-02**: L'app est validée via TestFlight / piste de test interne Android avant soumission publique
 
 ## v2 Requirements
@@ -80,7 +80,7 @@ Mapping requirements → phases.
 | MPUSH-03 | Phase 16 | Complete |
 | MPUSH-04 | Phase 17 | Pending |
 | MPUSH-05 | Phase 16 | Complete |
-| MSTORE-01 | Phase 17 | Pending |
+| MSTORE-01 | Phase 17 | Complete |
 | MSTORE-02 | Phase 17 | Pending |
 
 **Coverage:**

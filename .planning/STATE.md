@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: App Client Mobile
 status: executing
-stopped_at: Phase 16 complete — 16-04 Task 2 human-verify checkpoint passed (all 8 on-device steps confirmed 2026-07-05), including a found+fixed notification-trigger bug in compte.tsx. Ready to plan Phase 17.
-last_updated: "2026-07-05T02:02:29.912Z"
-last_activity: 2026-07-05
+stopped_at: Completed 17-03-PLAN.md (mobile store-submission groundwork: app.json/eas.json/expo-dev-client + compliance content docs)
+last_updated: "2026-07-05T17:35:00.000Z"
+last_activity: 2026-07-05 -- Phase 17 Plan 03 executed (worktree-local .planning snapshot; reconcile against main-checkout .planning at merge)
 progress:
   total_phases: 6
-  completed_phases: 5
-  total_plans: 21
-  completed_plans: 17
-  percent: 81
+  completed_phases: 4
+  total_plans: 25
+  completed_plans: 18
+  percent: 84
 ---
 
 # MotoKey API — Project State
@@ -21,22 +21,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 17 — maintenance-alert-cron-app-store-submission (not yet planned)
+**Current focus:** Phase 17 — maintenance-alert-cron-app-store-submission
 
 ## Current Position
 
-Phase: 16 (push-wiring-end-to-end) — ✅ COMPLETE (2026-07-05)
-Plan: 4 of 4 — all done
-Status: Ready to plan Phase 17
-Last activity: 2026-07-05
+Phase: 17 (maintenance-alert-cron-app-store-submission) — EXECUTING
+Plan: 03 of 4 — complete (this worktree's assignment)
+Status: Executing Phase 17 (parallel plans 17-01/17-02/17-04 executed in sibling worktrees — see main-checkout STATE.md for authoritative cross-plan status once merged)
+Last activity: 2026-07-05 -- 17-03 (mobile store-submission groundwork) complete
 
-Progress: [████████░░] 81%
+Progress: [████████░░] 84%
 
 ```
 v1.0 ████████████ SHIPPED
 v1.1 ████████████ SHIPPED
 v1.2 [█████████░] SHIPPED 2026-07-01 (86%, Phase 8 known gap — carried forward, séparé de v1.3)
-v1.3 [░░░░░░░░░░] ROADMAP READY — App Client Mobile (React Native), Phases 12-17
+v1.3 [░░░░░░░░░░] EXECUTING — App Client Mobile (React Native), Phases 12-17
      Phase 8 (Stripe live mode) ⏸️ PARKED — séparé/indépendant, hors scope v1.3
 ```
 
@@ -45,9 +45,9 @@ v1.3 [░░░░░░░░░░] ROADMAP READY — App Client Mobile (React
 | Metric | Value |
 |--------|-------|
 | Milestones shipped | 3 (v1.0 + v1.1 + v1.2) |
-| v1.3 phases | 6 (Phases 12→17), 0 complétées |
-| v1.3 requirements | 15 total, 15/15 mappés au roadmap, 0 shippés |
-| Next action | `/gsd:plan-phase 17` (Maintenance Alert Cron + App Store Submission) |
+| v1.3 phases | 6 (Phases 12→17), Phase 17 in progress |
+| v1.3 requirements | 15 total, 15/15 mappés au roadmap |
+| Next action | Merge 17-01/17-02/17-03/17-04 worktrees, run `/gsd:verify-work` for Phase 17 |
 | Phase 08-stripe-live-mode | ⏸️ PARKED — 08-01 ✅, 08-02 bloqué op humaine — known gap, indépendant de v1.3 |
 | Phase 12 P01 | 8min | 2 tasks | 2 files |
 | Phase 12 P02 | 25min | 4 tasks | 1 files |
@@ -69,6 +69,7 @@ v1.3 [░░░░░░░░░░] ROADMAP READY — App Client Mobile (React
 | Phase 16 P02 | 20min | 3 tasks | 6 files |
 | Phase 16 P01 | 55min | 3 tasks | 4 files |
 | Phase 16 P03 | 12min | 3 tasks | 6 files |
+| Phase 17 P03 | ~15min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -111,10 +112,11 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - [Phase 16]: [Phase 16-03]: worktree mobile-app/node_modules was never installed after the master fast-forward merge (package.json/lock arrived via merge, npm install never run) -- ran npm install --legacy-peer-deps before tsc/jest verification could execute; left a cosmetic 3-line package-lock.json devOptional->dev flag diff unstaged
 - [Phase 16]: [Phase 16-04]: Discovered 51 local commits (all of 16-01/16-02/16-03) had never been pushed to origin/master -- Railway prod was serving pre-Phase-16 code, causing an initial 404 on POST /devis/:id/envoyer. Pushed origin master (commit 7f6dc86), waited for Railway redeploy, then confirmed full curl smoke test (envoyer transition, PUT lock, no-double-send) against live prod. Full mobile jest suite (121/121) and tsc --noEmit both clean.
 - [Phase 16]: [Phase 16-04]: Task 2 human-verify checkpoint passed on-device (all 8 steps) 2026-07-05, run over Expo Go via `npx expo start --tunnel`. Step 7 initially crashed with `TypeError: The trigger object you provided is invalid` — `compte.tsx`'s __DEV__ test-notification button used an untyped `trigger: { seconds: 2 } as any`, which masked a real SDK-54 breaking change: `NotificationTriggerInput` is now a discriminated union requiring an explicit `type` tag. Fixed to `{ type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 2 }` (shape confirmed from the installed package's own `Notifications.types.d.ts`, per mobile-app/AGENTS.md's "Expo HAS CHANGED" rule, not from memory). Re-verified tsc clean + jest 121/121 + step 7 passing after the fix. Phase 16 is now genuinely complete — MPUSH-01/05 fully proven on-device, MPUSH-02/03 real-device token/delivery explicitly deferred to Phase 17 EAS setup per the 2026-07-04 planning decision.
+- [Phase 17]: [Phase 17-03]: app.json now declares com.motokey.app for both ios.bundleIdentifier/android.package (D-03) + ios.privacyManifests.NSPrivacyAccessedAPITypes (standard RN/Expo required-reason set, flagged LOW confidence pending reconciliation against a real EAS build/prebuild manifest in Plan 04); eas.json created (development/preview/production profiles); expo-dev-client@~6.0.21 installed; Apple App Privacy + Google Data Safety content docs written under store-content/ from the real (minimal) data inventory -- no camera/location/payment/analytics collected. extra.eas.projectId and android.googleServicesFile deliberately left unset for Plan 04.
 
 ### Pending Todos
 
-- **[Phase 13→17] SC-1 real device push delivery — DEFERRED again, now to Phase 17 (EAS development build setup).** `sendToToken`/`sendPush` in `services/pushService.js` have never been confirmed to deliver a visible remote notification to a real device — Expo Go dropped remote push support in SDK 53, so this requires an EAS dev build (no `eas.json`/`projectId`/Expo account login exist yet in this repo). Originally targeted for Phase 15, then Phase 16 — both closed without it per explicit Mehdi decisions, since local notifications (MPUSH-05, confirmed 2026-07-05) cover everything achievable without EAS. To close: set up EAS project in Phase 17, then run `PUSH_ENABLED=true node scripts/test-push.js <real-ExponentPushToken>` against a real device token and confirm the notification banner appears. SC-2/SC-3/SC-4 already confirmed — only SC-1 (real delivery) is open.
+- **[Phase 13→17] SC-1 real device push delivery — DEFERRED again, now to Phase 17 (EAS development build setup).** `sendToToken`/`sendPush` in `services/pushService.js` have never been confirmed to deliver a visible remote notification to a real device — Expo Go dropped remote push support in SDK 53, so this requires an EAS dev build (no `eas.json`/`projectId`/Expo account login exist yet in this repo). Originally targeted for Phase 15, then Phase 16 — both closed without it per explicit Mehdi decisions, since local notifications (MPUSH-05, confirmed 2026-07-05) cover everything achievable without EAS. To close: set up EAS project in Phase 17 Plan 04, then run `PUSH_ENABLED=true node scripts/test-push.js <real-ExponentPushToken>` against a real device token and confirm the notification banner appears. SC-2/SC-3/SC-4 already confirmed — only SC-1 (real delivery) is open. 17-03 has completed the code-only prerequisite (eas.json + expo-dev-client); Plan 04 still needs eas login/init/build (account-gated human checkpoints).
 - **[Phase 14] MAUTH-03 proactive foreground refresh — not yet exercised on a real device.** The 14-04 human-verify checkpoint confirmed MAUTH-01 (register/login/reset) and MAUTH-02 (encrypted persistence) but not MAUTH-03. Needs a dedicated pass: background the app long enough for the access token to near/pass expiry (~5min, ideally ~1h), foreground it, confirm no visible "Session expirée" and the app keeps working.
 - **[Phase 14] Real email delivery (Resend) still untested end-to-end.** OTP codes for register/reset were confirmed via the console.log fallback, not a real inbox — pre-existing gap, tracked in PROJECT.md "À faire" (`RESEND_API_KEY` + `EMAIL_ENABLED=true` on Railway).
 
@@ -130,9 +132,10 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - Phase 15-03 (post-Wave-1-merge): `npx tsc --noEmit` briefly failed on `app/_layout.tsx`'s `router.replace('/(app)/(tabs)/motos')` because Expo Router's typed-routes doesn't consider a directory a navigable `Href` until it has an `index.tsx` — RESOLVED by 15-05 (creates `motos/index.tsx` + `motos/[id].tsx`); confirmed `tsc --noEmit` fully clean afterward. No action needed.
 - Phase 15 parallel worktrees repeatedly branch from a stale `.planning/` snapshot (gitignored, not synced across worktree branches) and each independently mutate the shared STATE.md/ROADMAP.md/REQUIREMENTS.md docs — every wave merge back to master needed manual reconciliation of progress counters and requirement checkboxes (regressions occurred at Wave 1→2 boundary: an off-by-one completed_plans count, and MPARITY-03 flipping back to Pending). Fully reconciled as of Phase 15 completion (all 8 plans, all 5 MPARITY reqs, progress counters correct). Worth automating for future phases (e.g. computing progress/requirements from actual plan SUMMARY files at merge time instead of trusting each worktree's local edit).
 - ~~Phase 16-04 frontmatter counter discrepancy~~ → **RESOLVED 2026-07-05**: Task 2's checkpoint passed, `16-04-SUMMARY.md` finalized to `status: complete`, so the frontmatter counters (completed_phases=5, completed_plans=17) are now accurate, not just coincidentally matching. Noting for future reference: `gsd-tools` computes these counters purely from SUMMARY.md file *count* vs PLAN.md count on disk, with no awareness of a SUMMARY's own in-progress status marker — worth remembering if a future phase ends on a blocking checkpoint again.
+- Phase 17: this worktree (`worktree-agent-a437be7bf4bff31e9`) only executed Plan 03 — sibling plans 17-01/17-02/17-04 run in separate parallel worktrees, each with their own local (gitignored, unsynced) `.planning/` copy. This worktree's `.planning/phases/17-.../` only contains 17-03's own SUMMARY.md and store-content/ docs; the other plans' PLAN.md/SUMMARY.md files are not present here. STATE.md/ROADMAP.md/REQUIREMENTS.md progress numbers in this worktree reflect only this agent's local view and must be reconciled against the main-checkout `.planning/` (and the other parallel worktrees) at merge time — same known pattern documented for Phase 15's parallel waves above.
 
 ## Session Continuity
 
-Last session: 2026-07-05T02:02:29.909Z
-Stopped at: Phase 16 complete — 16-04 Task 2 checkpoint passed (all 8 on-device steps), notification-trigger bug found and fixed in compte.tsx. Ready to plan Phase 17.
-Resume file: None
+Last session: 2026-07-05T17:35:00.000Z
+Stopped at: Completed 17-03-PLAN.md (mobile store-submission groundwork)
+Resume file: .planning/phases/17-maintenance-alert-cron-app-store-submission/17-03-SUMMARY.md
