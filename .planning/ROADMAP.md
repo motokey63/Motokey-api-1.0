@@ -55,7 +55,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
 - [x] **Phase 13: Push Dispatch Service** - Service d'envoi de push modelé sur emailService.js, testable indépendamment (completed 2026-07-02, SC-1 real-device delivery deferred — see Phase Details)
 - [x] **Phase 14: RN App Scaffolding + Native Auth** - Scaffold Expo Router + authentification native sécurisée (completed 2026-07-03)
 - [x] **Phase 15: Feature-Parity Screens** - Motos, devis, historique, liaison garage — parité MotoKey_Client.html (completed 2026-07-04, 15-09 gap closure — UAT Test 4)
-- [ ] **Phase 16: Push Wiring End-to-End** - Soft-ask, enregistrement token, push devis reçu, deep link
+- [x] **Phase 16: Push Wiring End-to-End** - Soft-ask, enregistrement token, push devis reçu, deep link (completed 2026-07-05, MPUSH-02/03 real-device token+delivery deferred to Phase 17 EAS setup — see Phase Details)
 - [ ] **Phase 17: Maintenance Alert Cron + App Store Submission** - Push rappel entretien + soumission stores
 
 ## Phase Details
@@ -135,7 +135,7 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
 - [x] 16-01-PLAN.md — Backend: Devis.envoyer() + POST /devis/:id/envoyer (brouillon->envoye + sendPush) + PUT lock-on-send guard + seed fixture + app.html devis list fix
 - [x] 16-02-PLAN.md — Mobile foundation: expo-notifications dependency + lib/softAsk.ts + lib/push.ts + hooks/useNotificationObserver.ts (all unit-tested pure logic)
 - [x] 16-03-PLAN.md — Mobile wiring: soft-ask screen + AuthContext logout unregister + root layout redirect gating + notification observer/retry-hook mounting + Compte tab entry point
-- [ ] 16-04-PLAN.md — Verification: backend curl smoke test + full mobile suite + human E2E checkpoint (real on-device push delivery explicitly deferred to Phase 17 EAS setup)
+- [x] 16-04-PLAN.md — Verification: backend curl smoke test + full mobile suite + human E2E checkpoint, all 8 steps confirmed on-device 2026-07-05 (real on-device push token/delivery explicitly deferred to Phase 17 EAS setup; found+fixed a real notification-trigger bug in compte.tsx mid-checkpoint)
 **UI hint**: yes
 
 ### Phase 17: Maintenance Alert Cron + App Store Submission
@@ -171,7 +171,7 @@ Phases exécutent en ordre numérique : 12 → 13 → 14 → 15 → 16 → 17
 | Phase 13 | v1.3 | 2/2 | ✅ Complete (SC-1 deferred) | 2026-07-02 |
 | Phase 14 | v1.3 | 1/4 | In Progress | - |
 | Phase 15 | v1.3 | 9/9 | ✅ Complete (15-09 gap closure — UAT Test 4 resolved) | 2026-07-04 |
-| Phase 16 | v1.3 | 3/4 | In Progress | - |
+| Phase 16 | v1.3 | 4/4 | Complete | 2026-07-05 |
 | Phase 17 | v1.3 | 0/TBD | Not started | - |
 
 ---

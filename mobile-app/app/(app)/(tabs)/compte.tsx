@@ -42,7 +42,10 @@ export default function CompteScreen() {
                   body: 'Test MPUSH-05 (notification locale)',
                   data: { type: 'devis_recu' },
                 },
-                trigger: { seconds: 2 } as any,
+                trigger: {
+                  type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+                  seconds: 2,
+                },
               })
             }
           />
