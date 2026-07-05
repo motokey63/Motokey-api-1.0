@@ -31,4 +31,22 @@ describe('mapNotificationDataToRoute (pure)', () => {
   it('Test 4: empty object maps to null', () => {
     expect(mapNotificationDataToRoute({})).toBeNull();
   });
+
+  it("Test 5: {type: 'moto_entretien', motoId} maps to the Fiche Moto route object", () => {
+    expect(mapNotificationDataToRoute({ type: 'moto_entretien', motoId: 'abc' })).toEqual({
+      pathname: '/(app)/(tabs)/motos/[id]',
+      params: { id: 'abc' },
+    });
+  });
+
+  it("Test 6: {type: 'moto_entretien'} with no motoId maps to null", () => {
+    expect(mapNotificationDataToRoute({ type: 'moto_entretien' })).toBeNull();
+  });
+
+  it('Test 7: a numeric motoId is coerced to a string in params.id', () => {
+    expect(mapNotificationDataToRoute({ type: 'moto_entretien', motoId: 42 })).toEqual({
+      pathname: '/(app)/(tabs)/motos/[id]',
+      params: { id: '42' },
+    });
+  });
 });
