@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "778721899430",
+    "project_id": "motokey-a66a3",
+    "storage_bucket": "motokey-a66a3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:778721899430:android:7e7a44858200f76ced1567",
+        "android_client_info": {
+          "package_name": "com.motokey.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBuGZohFdWhFIaK2tJaUoOMoNlg6efJRM8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
