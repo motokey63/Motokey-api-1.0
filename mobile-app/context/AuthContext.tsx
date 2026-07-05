@@ -13,6 +13,7 @@ import { AuthSession } from '../lib/types';
 import { createSessionRefresher } from '../lib/session';
 import { REFRESH_POLL_MS, NEAR_EXPIRY_SECS } from '../constants/config';
 import { showToast } from '../components/Toast';
+import { unregisterPushAsync } from '../lib/push';
 
 /**
  * Owns the client auth session end-to-end: cold-start restore (MAUTH-02),
@@ -158,6 +159,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     const s = sessionRef.current;
+    if (s?.accessToken) {
+      await unregisterPushAsync(s.accessToken).catch(() => {});
+    }
     if (s?.refreshToken) {
       await apiPost('/auth/client/logout', { refresh_token: s.refreshToken }).catch(() => {});
     }

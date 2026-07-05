@@ -14,6 +14,7 @@ import { ToastProvider } from '../components/Toast';
 import { AuthProvider } from '../context/AuthContext';
 import { useAuth } from '../hooks/useAuth';
 import { colors } from '../theme/colors';
+import { hasSeenSoftAsk } from '../lib/softAsk';
 
 /**
  * Root layout (D-06/D-01..D-05 delivery surface): loads Inter, mounts
@@ -58,7 +59,10 @@ function RootNav() {
     if (status === 'unauthenticated' && !inAuthGroup) {
       router.replace('/(auth)/login');
     } else if (status === 'authenticated' && inAuthGroup) {
-      router.replace('/(app)/(tabs)/motos');
+      (async () => {
+        const seen = await hasSeenSoftAsk();
+        router.replace(seen ? '/(app)/(tabs)/motos' : '/(app)/soft-ask');
+      })();
     }
   }, [status, segments, router]);
 
