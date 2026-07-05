@@ -147,7 +147,11 @@ See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md) for full details, [
   2. Taper sur la notification de rappel entretien ouvre directement la fiche de la moto concernée (réutilise le deep link de Phase 16)
   3. L'app inclut un Privacy Manifest (Apple) et un formulaire Data Safety (Google) complets pour la soumission (MSTORE-01)
   4. L'app a été validée via TestFlight et une piste de test interne Android avant toute soumission publique (MSTORE-02)
-**Plans**: TBD
+**Plans**: 4 plans (waves 1-2)
+- [ ] 17-01-PLAN.md — Backend cron: migration 18 tier-state columns + maintenanceAlertService.runMaintenanceAlertCron + secret-authed POST /cron/maintenance-alerts + GitHub Actions workflow + Wave 0 harness/seed (MPUSH-04)
+- [ ] 17-02-PLAN.md — Mobile deep link: extend mapNotificationDataToRoute for moto_entretien -> Fiche Moto {pathname, params} + tests (MPUSH-04)
+- [ ] 17-03-PLAN.md — Store-readiness config: com.motokey.app identifiers + ios.privacyManifests + eas.json + expo-dev-client + Apple/Google compliance content docs (MSTORE-01)
+- [ ] 17-04-PLAN.md — Checkpoint: EAS Android dev build + Firebase FCM V1 + live cron enablement + end-to-end on-device verification; MSTORE-02 submission PARKED (MPUSH-04, MSTORE-01, MSTORE-02)
 
 ## Progress
 
@@ -172,7 +176,7 @@ Phases exécutent en ordre numérique : 12 → 13 → 14 → 15 → 16 → 17
 | Phase 14 | v1.3 | 1/4 | In Progress | - |
 | Phase 15 | v1.3 | 9/9 | ✅ Complete (15-09 gap closure — UAT Test 4 resolved) | 2026-07-04 |
 | Phase 16 | v1.3 | 4/4 | Complete | 2026-07-05 |
-| Phase 17 | v1.3 | 0/TBD | Not started | - |
+| Phase 17 | v1.3 | 0/4 | Planned | - |
 
 ---
 *Roadmap updated: 2026-07-04 — Phase 15 complete (9/9 plans): 15-09 gap closure (refetch-on-focus for Motos + Devis tabs) confirmed on-device, closes UAT Test 4 stale-list-on-focus-return.*

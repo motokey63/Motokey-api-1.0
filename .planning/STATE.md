@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: App Client Mobile
 status: executing
-stopped_at: Phase 16 complete — 16-04 Task 2 human-verify checkpoint passed (all 8 on-device steps confirmed 2026-07-05), including a found+fixed notification-trigger bug in compte.tsx. Ready to plan Phase 17.
-last_updated: "2026-07-05T02:02:29.912Z"
-last_activity: 2026-07-05
+stopped_at: Phase 17 context gathered
+last_updated: "2026-07-05T17:13:33.935Z"
+last_activity: 2026-07-05 -- Phase 17 execution started
 progress:
   total_phases: 6
-  completed_phases: 5
-  total_plans: 21
+  completed_phases: 4
+  total_plans: 25
   completed_plans: 17
   percent: 81
 ---
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-01)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 17 — maintenance-alert-cron-app-store-submission (not yet planned)
+**Current focus:** Phase 17 — maintenance-alert-cron-app-store-submission
 
 ## Current Position
 
-Phase: 16 (push-wiring-end-to-end) — ✅ COMPLETE (2026-07-05)
-Plan: 4 of 4 — all done
-Status: Ready to plan Phase 17
-Last activity: 2026-07-05
+Phase: 17 (maintenance-alert-cron-app-store-submission) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 17
+Last activity: 2026-07-05 -- Phase 17 execution started
 
 Progress: [████████░░] 81%
 
@@ -133,6 +133,6 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 
 ## Session Continuity
 
-Last session: 2026-07-05T02:02:29.909Z
-Stopped at: Phase 16 complete — 16-04 Task 2 checkpoint passed (all 8 on-device steps), notification-trigger bug found and fixed in compte.tsx. Ready to plan Phase 17.
-Resume file: None
+Last session: 2026-07-05T10:44:00.202Z
+Stopped at: Phase 17 context gathered
+Resume file: .planning/phases/17-maintenance-alert-cron-app-store-submission/17-CONTEXT.md
