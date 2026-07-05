@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: App Client Mobile
-status: executing
+status: paused
 stopped_at: Phase 17 context gathered
-last_updated: "2026-07-05T18:21:20.791Z"
+last_updated: "2026-07-05T21:46:16.377Z"
 last_activity: 2026-07-05
 progress:
   total_phases: 6
@@ -111,6 +111,7 @@ Décisions complètes dans PROJECT.md Key Decisions. Récentes affectant v1.3 :
 - [Phase 16]: [Phase 16-03]: worktree mobile-app/node_modules was never installed after the master fast-forward merge (package.json/lock arrived via merge, npm install never run) -- ran npm install --legacy-peer-deps before tsc/jest verification could execute; left a cosmetic 3-line package-lock.json devOptional->dev flag diff unstaged
 - [Phase 16]: [Phase 16-04]: Discovered 51 local commits (all of 16-01/16-02/16-03) had never been pushed to origin/master -- Railway prod was serving pre-Phase-16 code, causing an initial 404 on POST /devis/:id/envoyer. Pushed origin master (commit 7f6dc86), waited for Railway redeploy, then confirmed full curl smoke test (envoyer transition, PUT lock, no-double-send) against live prod. Full mobile jest suite (121/121) and tsc --noEmit both clean.
 - [Phase 16]: [Phase 16-04]: Task 2 human-verify checkpoint passed on-device (all 8 steps) 2026-07-05, run over Expo Go via `npx expo start --tunnel`. Step 7 initially crashed with `TypeError: The trigger object you provided is invalid` — `compte.tsx`'s __DEV__ test-notification button used an untyped `trigger: { seconds: 2 } as any`, which masked a real SDK-54 breaking change: `NotificationTriggerInput` is now a discriminated union requiring an explicit `type` tag. Fixed to `{ type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 2 }` (shape confirmed from the installed package's own `Notifications.types.d.ts`, per mobile-app/AGENTS.md's "Expo HAS CHANGED" rule, not from memory). Re-verified tsc clean + jest 121/121 + step 7 passing after the fix. Phase 16 is now genuinely complete — MPUSH-01/05 fully proven on-device, MPUSH-02/03 real-device token/delivery explicitly deferred to Phase 17 EAS setup per the 2026-07-04 planning decision.
+- [Phase 17]: Fixed a genuine Unmatched Route bug on first real EAS dev-client cold launch: app/(auth)/_layout.tsx had no initialRouteName among its 4 files, and app/_layout.tsx's root Stack had no default for the bare / path either (no app/index.tsx existed). Added unstable_settings.initialRouteName='login' to (auth)/_layout.tsx (09a6bcd) plus a new app/index.tsx redirecting to /(auth)/login (a042055). Never caught before since all prior testing went through Expo Go, which never hit a truly blank cold-launch state.
 
 ### Pending Todos
 
