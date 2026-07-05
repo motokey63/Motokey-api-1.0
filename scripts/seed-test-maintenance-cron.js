@@ -43,6 +43,7 @@ const MOTOS = [
     plaque: 'MNT-WARN',
     marque: 'Yamaha',
     modele: 'MT-07',
+    annee: 2022,
     km: 9000,
     plan: { code_operation: 'vidange', nom: 'Vidange moteur', km_interval: 10000, km_derniere: 1000 } // since=8000, pct=80 -> warning
   },
@@ -52,6 +53,7 @@ const MOTOS = [
     plaque: 'MNT-URG',
     marque: 'Honda',
     modele: 'CB500',
+    annee: 2021,
     km: 12000,
     plan: { code_operation: 'vidange', nom: 'Vidange moteur', km_interval: 10000, km_derniere: 1000 } // since=11000, pct=100 (clamped) -> urgent
   }
@@ -108,6 +110,7 @@ async function main() {
           proprietaire_garage_id: null,
           marque: fixture.marque,
           modele: fixture.modele,
+          annee: fixture.annee,
           plaque: fixture.plaque,
           vin: fixture.vin,
           km: fixture.km
