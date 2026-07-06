@@ -14,6 +14,7 @@ Notifications.setNotificationHandler({
 
 export type NotificationRoute =
   | '/(app)/(tabs)/devis'
+  | { pathname: '/(app)/(tabs)/devis'; params: { highlightId: string } }
   | { pathname: '/(app)/(tabs)/motos/[id]'; params: { id: string } };
 
 /**
@@ -23,7 +24,11 @@ export type NotificationRoute =
  * to `router.push`).
  */
 export function mapNotificationDataToRoute(data: any): NotificationRoute | null {
-  if (data && data.type === 'devis_recu') return '/(app)/(tabs)/devis';
+  if (data && data.type === 'devis_recu') {
+    return data.devisId
+      ? { pathname: '/(app)/(tabs)/devis', params: { highlightId: String(data.devisId) } }
+      : '/(app)/(tabs)/devis';
+  }
   if (data && data.type === 'moto_entretien' && data.motoId) {
     return { pathname: '/(app)/(tabs)/motos/[id]', params: { id: String(data.motoId) } };
   }

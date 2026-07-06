@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, FlatList, RefreshControl, ActivityIndicator, Pressable, StyleSheet, Alert } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { apiGet, apiPost, errMsg } from '../../../../lib/api';
 import { useAuth } from '../../../../hooks/useAuth';
 import {
@@ -24,16 +24,21 @@ import { colors } from '../../../../theme/colors';
  * dialogs. Ports MotoKey_Client.html's loadClientDevis/acceptDevis/
  * refuseDevis (lines 943-1021). Per RESEARCH Open Question 2, stays a
  * flat list (no detail push) — each item already carries its full
- * line data server-side.
+ * line data server-side. A "devis reçu" push notification (MPUSH-05)
+ * deep-links here with a `highlightId` param so the concerned devis is
+ * scrolled to and visually highlighted instead of being left to hunt
+ * for in the list.
  */
 export default function DevisListScreen() {
   const { getValidAccessToken } = useAuth();
+  const { highlightId } = useLocalSearchParams<{ highlightId?: string }>();
   const [devis, setDevis] = useState<Devis[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [staleSince, setStaleSince] = useState<number | null>(null);
   const isFirstFocus = useRef(true);
+  const listRef = useRef<FlatList<Devis>>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -82,6 +87,23 @@ export default function DevisListScreen() {
     await load();
     setRefreshing(false);
   }, [load]);
+
+  // Deep-linked from a "devis reçu" push notification (MPUSH-05) — scroll to
+  // and highlight the concerned devis once it's present in the loaded list.
+  useEffect(() => {
+    if (!highlightId || devis.length === 0) return;
+    const index = devis.findIndex((d) => d.id === highlightId);
+    if (index < 0) return;
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.3 });
+    });
+  }, [highlightId, devis]);
+
+  const scrollToIndexFallback = useCallback((info: { index: number }) => {
+    setTimeout(() => {
+      listRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.3 });
+    }, 250);
+  }, []);
 
   const doAccept = useCallback(
     async (id: string) => {
@@ -143,10 +165,12 @@ export default function DevisListScreen() {
     <View style={styles.screen}>
       {staleSince != null ? <OfflineBanner updatedAt={staleSince} /> : null}
       <FlatList
+        ref={listRef}
         data={devis}
         keyExtractor={(item) => item.id}
         contentContainerStyle={devis.length === 0 ? styles.emptyContainer : styles.listContainer}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        onScrollToIndexFailed={scrollToIndexFallback}
         ListEmptyComponent={
           error ? (
             <View style={styles.center}>
@@ -161,7 +185,12 @@ export default function DevisListScreen() {
           )
         }
         renderItem={({ item }) => (
-          <DevisCard dv={item} onAccept={confirmAccept} onRefuse={confirmRefuse} />
+          <DevisCard
+            dv={item}
+            highlighted={item.id === highlightId}
+            onAccept={confirmAccept}
+            onRefuse={confirmRefuse}
+          />
         )}
       />
     </View>
@@ -170,10 +199,12 @@ export default function DevisListScreen() {
 
 function DevisCard({
   dv,
+  highlighted,
   onAccept,
   onRefuse,
 }: {
   dv: Devis;
+  highlighted?: boolean;
   onAccept: (id: string) => void;
   onRefuse: (id: string) => void;
 }) {
@@ -184,7 +215,7 @@ function DevisCard({
     : '—';
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, highlighted ? styles.cardHighlighted : null]}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.numero}>{dv.numero || dv.id}</Text>
@@ -257,6 +288,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  cardHighlighted: {
+    borderColor: colors.acc,
   },
   header: {
     flexDirection: 'row',
