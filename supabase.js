@@ -218,7 +218,7 @@ const Garages = {
     const parType = { vert: 0, bleu: 0, jaune: 0, rouge: 0 };
     intData.forEach(i => parType[i.type]++);
 
-    const dvValides = dvData.filter(d => d.statut === 'valide');
+    const dvValides = dvData.filter(d => d.statut === 'accepte');
     const caTTC     = dvValides.reduce((s, d) => s + (d.total_ttc || 0), 0);
 
     return {
@@ -584,11 +584,12 @@ const Devis = {
   async valider(id, garage_id) {
     const dv = await Devis.getById(id, garage_id);
     if (!dv) throw new Error('Devis non trouvé');
-    if (dv.statut === 'valide') throw new Error('Déjà validé');
+    if (dv.statut === 'accepte') throw new Error('Déjà validé');
     // Calculer les totaux (persistés — plus de calcul "on read")
     const totaux = Devis._calcTotaux(dv);
-    // Valider
-    await update('devis', id, { statut: 'valide', date_acceptation: new Date().toISOString(), total_ht: totaux.base_ht, total_tva: totaux.tva_montant, total_ttc: totaux.total_ttc });
+    // Valider — 'accepte' est la valeur acceptée par la contrainte CHECK devis_statut_check
+    // en prod (schema.sql liste 'valide', mais ne reflète pas le schéma réel appliqué en base).
+    await update('devis', id, { statut: 'accepte', date_acceptation: new Date().toISOString(), total_ht: totaux.base_ht, total_tva: totaux.tva_montant, total_ttc: totaux.total_ttc });
     // Créer l'intervention correspondante
     const result = await Interventions.create(garage_id, dv.moto_id, {
       type:        'bleu',

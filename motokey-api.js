@@ -1128,7 +1128,7 @@ const server = http.createServer(async function(req, res){
           const { data: motoIds } = await SBLayer.supabase.from('motos').select('id').eq('client_id', clientRow.id);
           if (!motoIds || motoIds.length === 0) return ok(res, { devis: [], total: 0 });
           const ids = motoIds.map(function(m){ return m.id; });
-          const { data: list } = await SBLayer.supabase.from('devis').select('*').in('moto_id', ids).neq('statut', 'brouillon');
+          const { data: list } = await SBLayer.supabase.from('devis').select('*, motos(marque, modele, plaque)').in('moto_id', ids).neq('statut', 'brouillon');
           return ok(res, { devis: list || [], total: (list || []).length });
         } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
       }
@@ -1329,7 +1329,7 @@ const server = http.createServer(async function(req, res){
       const motoC = DB.motos.find(function(x){ return x.id === dvR.moto_id && x.client_id === cli.id; });
       if (!motoC) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
       if (dvR.statut !== 'envoye') return fail(res, 'Ce devis ne peut pas être validé (statut: ' + dvR.statut + ')', 400, 'INVALID_STATUS');
-      DB.devis[ic].statut = 'valide'; DB.devis[ic].date_acceptation = nowISO(); DB.devis[ic].updated_at = nowISO();
+      DB.devis[ic].statut = 'accepte'; DB.devis[ic].date_acceptation = nowISO(); DB.devis[ic].updated_at = nowISO();
       const totC = calcDevis(DB.devis[ic]);
       const interC = {id:'int-'+uid(),moto_id:dvR.moto_id,garage_id:dvR.garage_id,type:'bleu',titre:'Facture '+dvR.numero,description:(dvR.lignes||[]).map(function(l){return l.desc||l.description||'';}).join(', '),km:motoC?motoC.km:0,date:todayFR(),score_confiance:96,montant_ht:totC.base_ht,devis_id:p.id,created_at:nowISO()};
       DB.interventions.push(interC);
@@ -1353,8 +1353,8 @@ const server = http.createServer(async function(req, res){
     // ── RAM fallback ──
     const i = DB.devis.findIndex(function(d){return d.id===p.id&&d.garage_id===garageId;});
     if(i<0) return fail(res,'Devis non trouvé',404,'NOT_FOUND');
-    if(DB.devis[i].statut==='valide') return fail(res,'Devis déjà validé');
-    DB.devis[i].statut='valide'; DB.devis[i].date_acceptation=nowISO(); DB.devis[i].updated_at=nowISO();
+    if(DB.devis[i].statut==='accepte') return fail(res,'Devis déjà validé');
+    DB.devis[i].statut='accepte'; DB.devis[i].date_acceptation=nowISO(); DB.devis[i].updated_at=nowISO();
     const tot = calcDevis(DB.devis[i]);
     const m   = DB.motos.find(function(x){return x.id===DB.devis[i].moto_id;});
     const inter = {id:'int-'+uid(),moto_id:DB.devis[i].moto_id,garage_id:garageId,type:'bleu',titre:'Facture '+DB.devis[i].numero,description:(DB.devis[i].lignes||[]).map(function(l){return l.desc||l.description||'';}).join(', '),km:m?m.km:0,date:todayFR(),score_confiance:96,montant_ht:tot.base_ht,devis_id:p.id,created_at:nowISO()};
@@ -1920,11 +1920,11 @@ const server = http.createServer(async function(req, res){
     ms.forEach(function(m){co[m.couleur_dossier]=(co[m.couleur_dossier]||0)+1;});
     const is  = DB.interventions.filter(function(i){return i.garage_id===garageId;});
     const dvs = DB.devis.filter(function(d){return d.garage_id===garageId;});
-    const ca  = dvs.filter(function(d){return d.statut==='valide';}).reduce(function(s,d){return s+calcDevis(d).total_ttc;},0);
+    const ca  = dvs.filter(function(d){return d.statut==='accepte';}).reduce(function(s,d){return s+calcDevis(d).total_ttc;},0);
     return ok(res,{
       motos:{total:ms.length,par_couleur:co},
       interventions:{total:is.length,par_type:{vert:is.filter(function(i){return i.type==='vert';}).length,bleu:is.filter(function(i){return i.type==='bleu';}).length,jaune:is.filter(function(i){return i.type==='jaune';}).length,rouge:is.filter(function(i){return i.type==='rouge';}).length}},
-      devis:{total:dvs.length,valides:dvs.filter(function(d){return d.statut==='valide';}).length,ca_ttc:+ca.toFixed(2),ca_ht:+(ca/1.2).toFixed(2)},
+      devis:{total:dvs.length,valides:dvs.filter(function(d){return d.statut==='accepte';}).length,ca_ttc:+ca.toFixed(2),ca_ht:+(ca/1.2).toFixed(2)},
       transferts:{total:DB.transferts.filter(function(t){return t.garage_id===garageId;}).length,finalises:DB.transferts.filter(function(t){return t.garage_id===garageId&&t.statut==='finalise';}).length},
       fraude:{total:DB.fraude_verifications.length,authentifiees:DB.fraude_verifications.filter(function(f){return f.verdict==='authentifie';}).length,suspectes:DB.fraude_verifications.filter(function(f){return f.verdict==='fraude_suspectee';}).length}
     });

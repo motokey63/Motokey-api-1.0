@@ -1210,8 +1210,8 @@ async function loadDevis() {
           ${liste.length ? `<table class="table"><thead><tr><th>Réf.</th><th>Date</th><th>Moto</th><th>Statut</th><th>Total TTC</th><th></th></tr></thead><tbody>
             ${liste.map(d=>{
               const motoLabel = d.motos ? [d.motos.marque,d.motos.modele,d.motos.plaque].filter(Boolean).join(' ') : (d.moto_label||d.moto_info||'—');
-              const statutBadge = {brouillon:'badge-jaune',envoye:'badge-bleu',valide:'badge-vert',refuse:'badge-rouge'}[d.statut]||'badge-jaune';
-              const statutLabel = {brouillon:'Brouillon',envoye:'Envoyé',valide:'Validé',refuse:'Refusé'}[d.statut]||d.statut;
+              const statutBadge = {brouillon:'badge-jaune',envoye:'badge-bleu',accepte:'badge-vert',refuse:'badge-rouge'}[d.statut]||'badge-jaune';
+              const statutLabel = {brouillon:'Brouillon',envoye:'Envoyé',accepte:'Validé',refuse:'Refusé'}[d.statut]||d.statut;
               const dateStr = d.created_at ? new Date(d.created_at).toLocaleDateString('fr-FR') : '—';
               const total = (d.total_ttc||0).toLocaleString('fr-FR',{minimumFractionDigits:2});
               return `<tr>

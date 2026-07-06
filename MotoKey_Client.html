@@ -940,8 +940,8 @@ document.getElementById('link-login-from-reset-confirm').addEventListener('click
 /* ═══════════════════════════════════════════════════════
    ÉCRAN 8 — MES DEVIS
 ═══════════════════════════════════════════════════════ */
-const STATUT_LABEL = { envoye: 'À valider', valide: 'Validé', refuse: 'Refusé', brouillon: 'Brouillon' };
-const STATUT_COLOR = { envoye: 'var(--or)', valide: 'var(--gn)', refuse: 'var(--rd)', brouillon: 'var(--tx3)' };
+const STATUT_LABEL = { envoye: 'À valider', accepte: 'Validé', refuse: 'Refusé', brouillon: 'Brouillon' };
+const STATUT_COLOR = { envoye: 'var(--or)', accepte: 'var(--gn)', refuse: 'var(--rd)', brouillon: 'var(--tx3)' };
 
 async function loadClientDevis() {
   const at = localStorage.getItem(LS_AT);
@@ -985,8 +985,8 @@ async function loadClientDevis() {
           '<button class="btn btn-primary btn-sm" onclick="acceptDevis(\'' + esc(dv.id) + '\')">Accepter</button>' +
           '<button class="btn btn-secondary btn-sm" onclick="refuseDevis(\'' + esc(dv.id) + '\')">Refuser</button>' +
         '</div>'
-      : (dv.valide_at || dv.refuse_at
-          ? '<p style="font-size:12px;color:var(--tx3);margin-top:10px">Décision le ' + esc(fmtDate(dv.valide_at || dv.refuse_at)) + '</p>'
+      : (dv.date_acceptation || dv.date_refus
+          ? '<p style="font-size:12px;color:var(--tx3);margin-top:10px">Décision le ' + esc(fmtDate(dv.date_acceptation || dv.date_refus)) + '</p>'
           : '');
 
     return '<div class="card" style="margin-bottom:16px">' +

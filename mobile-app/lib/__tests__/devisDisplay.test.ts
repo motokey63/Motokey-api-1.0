@@ -12,8 +12,8 @@ describe('devisStatutLabel', () => {
     expect(devisStatutLabel('envoye')).toBe('À valider');
   });
 
-  it('maps valide to Validé', () => {
-    expect(devisStatutLabel('valide')).toBe('Validé');
+  it('maps accepte to Validé', () => {
+    expect(devisStatutLabel('accepte')).toBe('Validé');
   });
 
   it('maps refuse to Refusé', () => {
@@ -34,8 +34,8 @@ describe('devisStatutColor', () => {
     expect(devisStatutColor('envoye')).toBe(colors.acc);
   });
 
-  it('maps valide to gn', () => {
-    expect(devisStatutColor('valide')).toBe(colors.gn);
+  it('maps accepte to gn', () => {
+    expect(devisStatutColor('accepte')).toBe(colors.gn);
   });
 
   it('maps refuse to rd', () => {

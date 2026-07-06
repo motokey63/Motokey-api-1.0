@@ -253,8 +253,8 @@ function DevisCard({
             <Text style={styles.refuseText}>Refuser</Text>
           </Pressable>
         </View>
-      ) : dv.valide_at || dv.refuse_at ? (
-        <Text style={styles.decision}>{`Décision le ${fmtDate(dv.valide_at || dv.refuse_at)}`}</Text>
+      ) : dv.date_acceptation || dv.date_refus ? (
+        <Text style={styles.decision}>{`Décision le ${fmtDate(dv.date_acceptation || dv.date_refus)}`}</Text>
       ) : null}
     </View>
   );

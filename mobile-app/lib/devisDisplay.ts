@@ -10,14 +10,14 @@ import { colors } from '../theme/colors';
 
 export const DEVIS_STATUT_LABEL: Record<string, string> = {
   envoye: 'À valider',
-  valide: 'Validé',
+  accepte: 'Validé',
   refuse: 'Refusé',
   brouillon: 'Brouillon',
 };
 
 export const DEVIS_STATUT_COLOR: Record<string, string> = {
   envoye: colors.acc,
-  valide: colors.gn,
+  accepte: colors.gn,
   refuse: colors.rd,
   brouillon: colors.tx3,
 };
@@ -65,8 +65,8 @@ export interface Devis {
   statut: string;
   total_ttc?: number;
   created_at?: string;
-  valide_at?: string;
-  refuse_at?: string;
+  date_acceptation?: string;
+  date_refus?: string;
   motos?: { marque?: string; modele?: string; plaque?: string };
   devis_lignes?: DevisLigne[];
   lignes?: DevisLigne[];
