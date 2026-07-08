@@ -1,6 +1,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiPost, apiFetch } from './api';
 
@@ -14,6 +15,22 @@ import { apiPost, apiFetch } from './api';
  * Both funnel into completeRegistration() once permission is confirmed.
  */
 export const PUSH_TOKEN_KEY = 'mk_push_token';
+
+/**
+ * Android (API 26+) requires every notification to be posted to an explicit channel —
+ * without one, the OS has no importance/visibility to display it as a heads-up banner,
+ * and it can be silently dropped outside the foreground. The backend never sets a
+ * channelId in the push payload (services/pushService.js), so Expo's push service
+ * defaults to channelId 'default' — this must exist with high importance before any
+ * push arrives. Idempotent (safe to call on every launch); no-op on iOS.
+ */
+export async function ensureAndroidNotificationChannelAsync(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync('default', {
+    name: 'Default',
+    importance: Notifications.AndroidImportance.MAX,
+  });
+}
 
 export async function getStoredPushToken(): Promise<string | null> {
   return AsyncStorage.getItem(PUSH_TOKEN_KEY);

@@ -19,6 +19,8 @@ jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest.fn(),
   requestPermissionsAsync: jest.fn(),
   getExpoPushTokenAsync: jest.fn(),
+  setNotificationChannelAsync: jest.fn(),
+  AndroidImportance: { MAX: 7 },
 }));
 
 jest.mock('expo-device', () => ({
@@ -44,6 +46,7 @@ jest.mock('../api', () => ({
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiPost, apiFetch } from '../api';
 import {
@@ -52,6 +55,7 @@ import {
   registerForPushAsync,
   retryRegistrationIfGranted,
   unregisterPushAsync,
+  ensureAndroidNotificationChannelAsync,
 } from '../push';
 
 beforeEach(() => {
@@ -158,5 +162,26 @@ describe('unregisterPushAsync', () => {
     await unregisterPushAsync('token-abc');
 
     expect(apiFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('ensureAndroidNotificationChannelAsync', () => {
+  it('Test 10: creates the "default" channel with MAX importance on Android', async () => {
+    (Platform as any).OS = 'android';
+
+    await ensureAndroidNotificationChannelAsync();
+
+    expect(Notifications.setNotificationChannelAsync).toHaveBeenCalledWith('default', {
+      name: 'Default',
+      importance: Notifications.AndroidImportance.MAX,
+    });
+  });
+
+  it('Test 11: no-ops on iOS (never calls setNotificationChannelAsync)', async () => {
+    (Platform as any).OS = 'ios';
+
+    await ensureAndroidNotificationChannelAsync();
+
+    expect(Notifications.setNotificationChannelAsync).not.toHaveBeenCalled();
   });
 });

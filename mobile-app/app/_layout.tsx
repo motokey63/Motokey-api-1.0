@@ -15,6 +15,7 @@ import { AuthProvider } from '../context/AuthContext';
 import { useAuth } from '../hooks/useAuth';
 import { colors } from '../theme/colors';
 import { hasSeenSoftAsk } from '../lib/softAsk';
+import { ensureAndroidNotificationChannelAsync } from '../lib/push';
 
 /**
  * Root layout (D-06/D-01..D-05 delivery surface): loads Inter, mounts
@@ -29,6 +30,10 @@ export default function RootLayout() {
     Inter_700Bold,
     Inter_900Black,
   });
+
+  useEffect(() => {
+    ensureAndroidNotificationChannelAsync();
+  }, []);
 
   if (!fontsLoaded) {
     return (
