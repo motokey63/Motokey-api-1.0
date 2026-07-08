@@ -6,6 +6,18 @@ const sb = createClient(
   process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_KEY
 );
 
+async function findAuthUserIdByEmail(email) {
+  const perPage = 200;
+  for (let page = 1; page <= 20; page++) {
+    const { data, error } = await sb.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    const u = data.users.find(function (x) { return x.email === email; });
+    if (u) return u.id;
+    if (data.users.length < perPage) return null;
+  }
+  return null;
+}
+
 async function main() {
   console.log('\n🚀 Configuration MotoKey Supabase...\n');
 
@@ -52,7 +64,8 @@ async function main() {
     });
     if (authErr && !authErr.message.includes('already registered')) throw authErr;
 
-    const userId = authData?.user?.id;
+    let userId = authData?.user?.id;
+    if (!userId) userId = await findAuthUserIdByEmail('garage@motokey.fr');
     if (userId) {
       const { data: garage } = await sb.from('garages').upsert({
         auth_user_id: userId,
@@ -65,7 +78,17 @@ async function main() {
       }, { onConflict: 'email' }).select().single();
 
       if (garage) {
+        const { data: cliAuthData, error: cliAuthErr } = await sb.auth.admin.createUser({
+          email: 'sophie@email.com',
+          password: 'client123',
+          email_confirm: true,
+        });
+        if (cliAuthErr && !cliAuthErr.message.includes('already registered')) throw cliAuthErr;
+        let clientUserId = cliAuthData?.user?.id;
+        if (!clientUserId) clientUserId = await findAuthUserIdByEmail('sophie@email.com');
+
         const { data: client } = await sb.from('clients').upsert({
+          auth_user_id: clientUserId,
           garage_id: garage.id,
           nom: 'Sophie Laurent', email: 'sophie@email.com', tel: '06 10 00 00 01',
         }, { onConflict: 'email,garage_id' }).select().single();
@@ -77,7 +100,7 @@ async function main() {
             plaque: 'EF-789-GH', vin: 'JYARN22E00A000002',
             km: 18650, couleur_dossier: 'bleu', score: 74,
           }, { onConflict: 'vin' });
-          console.log('  ✅ Garage + Client Sophie + Moto MT-07 créés');
+          console.log('  ✅ Garage + Client Sophie (auth liée) + Moto MT-07 créés');
         }
       }
     } else {
