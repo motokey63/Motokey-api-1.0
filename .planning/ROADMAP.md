@@ -6,6 +6,7 @@
 - ✅ **v1.1 L9 Stripe Billing** — Phases 3→7 (shipped 2026-06-16)
 - ✅ **v1.2 Pioneer Program & Production Go-Live** — Phases 8→11 (shipped 2026-07-01, Phase 8 parked as known gap — see MILESTONES.md)
 - ✅ **v1.3 App Client Mobile** — Phases 12→17 (shipped 2026-07-08, MSTORE-02 parked as known gap — see MILESTONES.md)
+- 🚧 **v1.4 Maintenance — CLIENT Fixture & Schema Drift** — Phases 18→19 (in progress, started 2026-07-08)
 
 ## Phases
 
@@ -63,14 +64,63 @@ See [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md) for full details, [
 
 </details>
 
+### 🚧 v1.4 Maintenance — CLIENT Fixture & Schema Drift (Phases 18–19) — IN PROGRESS
+
+**Milestone Goal:** Close the two carried-forward known gaps that are pure engineering debt with no external blocker, distinct from Phase 8/BILL-06 and MSTORE-02 which remain blocked on Mehdi's external account actions.
+
+- [x] **Phase 18: CLIENT Login Fixture Fix** - Fix `setup-supabase.js` so the `sophie@email.com` CLIENT fixture has a matching Supabase Auth user and can log in (completed 2026-07-08)
+- [ ] **Phase 19: Schema.sql Regeneration** - Regenerate `schema.sql` from live prod Supabase schema to reflect migrations 1–18
+
+## Phase Details
+
+### Phase 18: CLIENT Login Fixture Fix
+**Goal**: Developer/QA can log in as the CLIENT test fixture and receive a valid session, mirroring the existing garage account creation pattern.
+**Depends on**: Nothing (independent maintenance fix, isolated to `setup-supabase.js` / seed data)
+**Requirements**: CFIX-01
+**Success Criteria** (what must be TRUE):
+  1. Running `setup-supabase.js` creates (or confirms) a Supabase Auth user for `sophie@email.com`, mirroring the existing garage account creation pattern.
+  2. The `clients` table row for `sophie@email.com` has `auth_user_id` populated and correctly linked to that Supabase Auth user.
+  3. `POST /auth/client/login` with `sophie@email.com` / `client123` returns 200 with a valid session token (no longer 401).
+  4. `test-api.js` (and any other script depending on this fixture) no longer fails on the CLIENT login step.
+**Plans**: 1 plan
+- [x] 18-01-PLAN.md — Create Sophie's Supabase Auth user + link `auth_user_id` in `setup-supabase.js`, verify CLIENT login returns 200
+
+### Phase 19: Schema.sql Regeneration
+**Goal**: A developer can bootstrap a fresh Supabase project from `schema.sql` and get a schema matching prod, with no manual patching required.
+**Depends on**: Nothing (independent maintenance fix, isolated to `schema.sql`, touches no runtime code)
+**Requirements**: SCHEMA-01
+**Success Criteria** (what must be TRUE):
+  1. `schema.sql` includes `CREATE TABLE` statements for `client_device_tokens`, `push_send_log`, and `garage_users` (currently entirely absent).
+  2. `schema.sql` includes the moto maintenance-tier columns added by migration 18.
+  3. `schema.sql`'s `statut_devis` constraint documents the live CHECK constraint values (`accepte`/`refuse`/`expire`/`converti`), replacing the stale `valide`/`annule` ENUM documentation.
+  4. Executing `schema.sql` against a fresh Supabase project produces tables/columns matching prod for all objects introduced by migrations 1–18, with no errors.
+**Plans**: TBD
+
 ## Progress
 
-| Milestone | Phases | Status | Shipped |
-|-----------|--------|--------|---------|
-| v1.0 | L1–L8 | ✅ Complete | 2026-05-29 |
-| v1.1 | 3–7 | ✅ Complete | 2026-06-16 |
-| v1.2 | 8–11 | ✅ Complete (Phase 8 parked) | 2026-07-01 |
-| v1.3 | 12–17 | ✅ Complete (MSTORE-02 parked) | 2026-07-08 |
+**Execution Order:**
+Phases execute in numeric order: 18 → 19 (no dependency between them — independent files, can also run in either order or in parallel)
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| L1–L8 | v1.0 | — | ✅ Complete | 2026-05-29 |
+| Phase 3 | v1.1 | — | ✅ Complete | 2026-06-16 |
+| Phase 4 | v1.1 | — | ✅ Complete | 2026-06-16 |
+| Phase 5 | v1.1 | — | ✅ Complete | 2026-06-16 |
+| Phase 6 | v1.1 | — | ✅ Complete | 2026-06-16 |
+| Phase 7 | v1.1 | — | ✅ Complete | 2026-06-16 |
+| Phase 8 | v1.2 | 1/2 | ⏸️ Parked (known gap) | - |
+| Phase 9 | v1.2 | 1/1 | ✅ Complete | 2026-06-30 |
+| Phase 10 | v1.2 | 2/2 | ✅ Complete | 2026-06-29 |
+| Phase 11 | v1.2 | 2/2 | ✅ Complete | 2026-06-30 |
+| Phase 12 | v1.3 | 2/2 | ✅ Complete | 2026-07-01 |
+| Phase 13 | v1.3 | 2/2 | ✅ Complete | 2026-07-02 |
+| Phase 14 | v1.3 | 4/4 | ✅ Complete | 2026-07-03 |
+| Phase 15 | v1.3 | 9/9 | ✅ Complete | 2026-07-04 |
+| Phase 16 | v1.3 | 4/4 | ✅ Complete | 2026-07-05 |
+| Phase 17 | v1.3 | 4/4 | ✅ Complete (MSTORE-02 parked, known gap) | 2026-07-06 |
+| Phase 18 | v1.4 | 1/1 | ✅ Complete | 2026-07-08 |
+| Phase 19 | v1.4 | 0/TBD | Not started | - |
 
 ---
-*Roadmap updated: 2026-07-08 — v1.3 App Client Mobile shipped, archived to milestones/v1.3-ROADMAP.md.*
+*Roadmap updated: 2026-07-08 — Phase 18 (CLIENT login fixture fix) complete, CFIX-01 satisfied.*
