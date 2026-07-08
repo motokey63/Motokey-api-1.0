@@ -6,6 +6,10 @@ const sb = createClient(
   process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_KEY
 );
 
+function isAlreadyRegisteredError(err) {
+  return !!err && /already.*registered/i.test(err.message || '');
+}
+
 async function findAuthUserIdByEmail(email) {
   const perPage = 200;
   for (let page = 1; page <= 20; page++) {
@@ -62,7 +66,7 @@ async function main() {
       password: 'motokey2026',
       email_confirm: true,
     });
-    if (authErr && !authErr.message.includes('already registered')) throw authErr;
+    if (authErr && !isAlreadyRegisteredError(authErr)) throw authErr;
 
     let userId = authData?.user?.id;
     if (!userId) userId = await findAuthUserIdByEmail('garage@motokey.fr');
@@ -83,7 +87,7 @@ async function main() {
           password: 'client123',
           email_confirm: true,
         });
-        if (cliAuthErr && !cliAuthErr.message.includes('already registered')) throw cliAuthErr;
+        if (cliAuthErr && !isAlreadyRegisteredError(cliAuthErr)) throw cliAuthErr;
         let clientUserId = cliAuthData?.user?.id;
         if (!clientUserId) clientUserId = await findAuthUserIdByEmail('sophie@email.com');
 
