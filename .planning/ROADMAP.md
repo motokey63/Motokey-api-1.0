@@ -97,7 +97,7 @@ See [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md) for full phase deta
   3. Les 4 tables citées dans les Known Gaps (`garages`, `clients`, `interventions`, `devis`) sont toutes couvertes — aucune omise
   4. Les résultats sont capturés dans un artefact durable (notes de recherche / sortie de plan) que la Phase 21 peut consommer sans reproduire la découverte
 **Plans**: 2 plans
-  - [ ] 20-01-PLAN.md — Baseline OpenAPI + legacy-migration cross-reference (clients résolu) + balayage git-log-S d'origine pour toutes les colonnes non documentées (SCHEMA-02 partiel, SCHEMA-03)
+  - [x] 20-01-PLAN.md — Baseline OpenAPI + legacy-migration cross-reference (clients résolu) + balayage git-log-S d'origine pour toutes les colonnes non documentées (SCHEMA-02 partiel, SCHEMA-03)
   - [ ] 20-02-PLAN.md — Métadonnées exactes information_schema/pg_constraint + confirmation Mehdi des 9 colonnes fantômes (SCHEMA-02 exact, SCHEMA-03 clôture)
 
 ### Phase 21: Migrations Rétroactives & Mise à Jour schema.sql
