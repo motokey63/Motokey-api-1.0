@@ -69,7 +69,7 @@ See [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md) for full details, [
 **Milestone Goal:** Close the two carried-forward known gaps that are pure engineering debt with no external blocker, distinct from Phase 8/BILL-06 and MSTORE-02 which remain blocked on Mehdi's external account actions.
 
 - [x] **Phase 18: CLIENT Login Fixture Fix** - Fix `setup-supabase.js` so the `sophie@email.com` CLIENT fixture has a matching Supabase Auth user and can log in (completed 2026-07-08)
-- [ ] **Phase 19: Schema.sql Regeneration** - Regenerate `schema.sql` from live prod Supabase schema to reflect migrations 1–18
+- [x] **Phase 19: Schema.sql Regeneration** - Regenerate `schema.sql` from live prod Supabase schema to reflect migrations 1–19 (narrowed scope — full 38-table parity deferred, see REQUIREMENTS.md) (completed 2026-07-09)
 
 ## Phase Details
 
@@ -86,15 +86,19 @@ See [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md) for full details, [
 - [x] 18-01-PLAN.md — Create Sophie's Supabase Auth user + link `auth_user_id` in `setup-supabase.js`, verify CLIENT login returns 200
 
 ### Phase 19: Schema.sql Regeneration
-**Goal**: A developer can bootstrap a fresh Supabase project from `schema.sql` and get a schema matching prod, with no manual patching required.
+**Goal**: A developer can bootstrap a fresh Supabase project from `schema.sql` and get a schema matching prod **for the known-tracked drift** (migrations 1–19), with no manual patching required. Full 38-table parity is explicitly out of scope for v1.4 — see REQUIREMENTS.md Out of Scope (narrowed 2026-07-08 after 19-RESEARCH.md found ~19 additional untracked live tables).
 **Depends on**: Nothing (independent maintenance fix, isolated to `schema.sql`, touches no runtime code)
 **Requirements**: SCHEMA-01
 **Success Criteria** (what must be TRUE):
   1. `schema.sql` includes `CREATE TABLE` statements for `client_device_tokens`, `push_send_log`, and `garage_users` (currently entirely absent).
-  2. `schema.sql` includes the moto maintenance-tier columns added by migration 18.
-  3. `schema.sql`'s `statut_devis` constraint documents the live CHECK constraint values (`accepte`/`refuse`/`expire`/`converti`), replacing the stale `valide`/`annule` ENUM documentation.
-  4. Executing `schema.sql` against a fresh Supabase project produces tables/columns matching prod for all objects introduced by migrations 1–18, with no errors.
-**Plans**: TBD
+  2. `schema.sql` includes the moto maintenance-tier columns added by migration 18, and the `clients` `UNIQUE(email, garage_id)` constraint added by migration 19.
+  3. `schema.sql`'s devis status constraint documents the exact live CHECK constraint values (confirmed via `pg_get_constraintdef`, not guessed from application code), replacing the stale `statut_devis` ENUM (`brouillon`/`envoye`/`valide`/`annule`) documentation.
+  4. `schema.sql`'s header comment explicitly documents that it is a known-partial bootstrap (does not cover the ~19 untracked live tables — repair orders, billing/invoicing, parts catalogue, separate client-auth system).
+  5. Executing `schema.sql` against a fresh Supabase project produces tables/columns matching prod for all objects introduced by migrations 1–19, with no errors (verified via manual bootstrap — no local Postgres/CLI available in this environment).
+**Plans**: 3 plans
+- [x] 19-01-PLAN.md — Capture ground truth: introspection script + verbatim devis.statut CHECK constraint + RLS state of the 3 new tables (Dashboard query)
+- [x] 19-02-PLAN.md — Regenerate schema.sql: add garage_users/client_device_tokens/push_send_log, motos mig-18 columns, clients mig-19 UNIQUE, devis.statut ENUM→CHECK, partial-bootstrap header
+- [x] 19-03-PLAN.md — Verify bootstrap: run schema.sql in a fresh Supabase project (human) + automated in-scope diff vs prod
 
 ## Progress
 
@@ -120,7 +124,7 @@ Phases execute in numeric order: 18 → 19 (no dependency between them — indep
 | Phase 16 | v1.3 | 4/4 | ✅ Complete | 2026-07-05 |
 | Phase 17 | v1.3 | 4/4 | ✅ Complete (MSTORE-02 parked, known gap) | 2026-07-06 |
 | Phase 18 | v1.4 | 1/1 | ✅ Complete | 2026-07-08 |
-| Phase 19 | v1.4 | 0/TBD | Not started | - |
+| Phase 19 | v1.4 | 3/3 | ✅ Complete | 2026-07-09 |
 
 ---
-*Roadmap updated: 2026-07-08 — Phase 18 (CLIENT login fixture fix) complete, CFIX-01 satisfied.*
+*Roadmap updated: 2026-07-09 — Phase 19 complete, SCHEMA-01 satisfied (5/5 must-haves verified). v1.4 milestone complete.*
