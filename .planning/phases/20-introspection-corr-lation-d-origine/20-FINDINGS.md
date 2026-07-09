@@ -57,11 +57,17 @@ CHECK (
 
 | column | type (OpenAPI) | nullable | default | FK | EXACT (pg catalog — plan 02) | origin (plan 01 Task 2) |
 |---|---|---|---|---|---|---|
-| `ville` | text | nullable | none | — | TBD | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
-| `cp` | text | nullable | none | — | TBD | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
-| `type` | text | NOT NULL | `'pro'` | — | TBD | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
-| `marque_officielle` | text | nullable | none | — | TBD | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
-| `actif` | boolean | NOT NULL | `true` | — | TBD | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
+| `ville` | text | nullable | none | — | `TEXT`, nullable, default none (confirmé `information_schema.columns`) | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
+| `cp` | text | nullable | none | — | `TEXT`, nullable, default none (confirmé `information_schema.columns`) | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
+| `type` | text | NOT NULL | `'pro'` | — | `TEXT`, NOT NULL, default `'pro'::text` (confirmé `information_schema.columns`) | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
+| `marque_officielle` | text | nullable | none | — | `TEXT`, nullable, default none (confirmé `information_schema.columns`) | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
+| `actif` | boolean | NOT NULL | `true` | — | `BOOLEAN`, NOT NULL, default `true` (confirmé `information_schema.columns`) | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
+
+**Contraintes (pg_constraint, Requête 2) — `garages`, 5 colonnes cibles :** aucune contrainte explicite (confirmé `pg_constraint`) sur `ville`/`cp`/`type`/`marque_officielle`/`actif` — les seules contraintes existantes sur `garages` (`garages_auth_user_id_fkey`, `garages_auth_user_id_key`, `garages_email_key`, `garages_mecano_session_timeout_minutes_check`, `garages_pkey`) ne touchent aucune de ces 5 colonnes.
+
+**Requête 3 — valeurs distinctes en prod (indice d'origine/intention) :**
+- `SELECT DISTINCT type, marque_officielle, actif FROM garages;` → une seule ligne sur l'ensemble des garages prod : `type='pro'`, `marque_officielle=null`, `actif=true`. Aucune ligne ne dévie du défaut de colonne — zéro signal d'usage réel pour ces 3 colonnes.
+- `SELECT DISTINCT ville, cp FROM garages WHERE ville IS NOT NULL OR cp IS NOT NULL;` → une seule ligne : `ville='Clermont-Ferrand'`, `cp='63000'`. **Important** : contrairement à `type`/`marque_officielle`/`actif`, ces deux colonnes ne sont PAS vides en prod — un garage (très probablement le garage Motolab réel, en production) a ces champs renseignés avec des données réelles et cohérentes, presque certainement saisies manuellement via le Dashboard Supabase (aucun chemin de code ne lit ni n'écrit `ville`/`cp` — confirmé plan 20-01, `Garages.update()` allowlist `supabase.js` L186). Cela ne change pas le verdict "ghost column" (qui porte sur l'accès code, inchangé) mais distingue `ville`/`cp` (données réelles intentionnelles, saisie manuelle hors code) de `type`/`marque_officielle`/`actif` (jamais divergées du défaut, aucun signal d'usage réel) — nuance à présenter à Mehdi en Task 2.
 
 **Disambiguation detail per column** (recipe: `git log --oneline -S"<col>" -- . | tail -1`, then `git show <sha>` to open the diff and confirm/reject the target table):
 - `ville` — pickaxe hit `b29d4f5` ("rewrite Devis data-access layer against real live devis schema"). Diff opened: the hit is inside a code comment listing `devis`'s real columns (`client_adresse/cp/ville/email/tel/siret/tva`) — i.e. `client_ville`, NOT `garages.ville`. Rejected as false positive. Zero real hits for `garages.ville` in any file, any commit.
@@ -82,10 +88,15 @@ None of `ville`/`cp`/`type`/`marque_officielle`/`actif` appear in this list — 
 
 | column | type (OpenAPI) | nullable | default | FK | EXACT (pg catalog — plan 02) | origin (plan 01 Task 2) |
 |---|---|---|---|---|---|---|
-| `niveau_preuve` | text | nullable | `'declare'` | — | TBD | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
-| `facture_id` | uuid | nullable | none | → `factures_scannees.id` | TBD | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
-| `operation_code` | text | nullable | none | — | TBD | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
-| `photo_url` | text | nullable | none | — | TBD | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
+| `niveau_preuve` | text | nullable | `'declare'` | — | `TEXT`, nullable, default `'declare'::text` (confirmé `information_schema.columns`) | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
+| `facture_id` | uuid | nullable | none | → `factures_scannees.id` | `UUID`, nullable, default none (confirmé `information_schema.columns`) | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
+| `operation_code` | text | nullable | none | — | `TEXT`, nullable, default none (confirmé `information_schema.columns`) | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
+| `photo_url` | text | nullable | none | — | `TEXT`, nullable, default none (confirmé `information_schema.columns`) | **ghost column** — no code trail (verified via git log -S + allowlist inspection) |
+
+**Contraintes (pg_constraint, Requête 2) — `interventions`, 4 colonnes cibles :**
+- `niveau_preuve` → `CHECK interventions_niveau_preuve_check`: `CHECK ((niveau_preuve = ANY (ARRAY['facture'::text, 'visuel'::text, 'declare'::text])))` — verbatim `pg_get_constraintdef`.
+- `facture_id` → `FOREIGN KEY interventions_facture_id_fkey`: `FOREIGN KEY (facture_id) REFERENCES factures_scannees(id) ON DELETE SET NULL` — verbatim `pg_get_constraintdef`.
+- `operation_code`, `photo_url` → aucune contrainte explicite (confirmé `pg_constraint`) — les autres contraintes de `interventions` (`interventions_garage_id_fkey`, `interventions_moto_id_fkey`, `interventions_pkey`, `interventions_score_confiance_check`, `interventions_technicien_id_fkey`) ne touchent ni l'une ni l'autre.
 
 **Disambiguation detail per column:**
 - `niveau_preuve` — `git log -S"niveau_preuve"` returns zero hits across the full 302-commit history, in any file. Its default `'declare'` matches the anti-fraude vocabulary (`facture`=1.0/`visuel`=0.6/`declare`=0.3, per CLAUDE.md) but no code path — including the scoring trigger — ever reads or writes it.
@@ -118,31 +129,37 @@ All 25 columns fall into the **code-catch-up** pattern (Pitfall 2, 20-RESEARCH.m
 
 | column | type (OpenAPI) | nullable | default | FK | EXACT (pg catalog — plan 02) | origin (plan 01 Task 2) |
 |---|---|---|---|---|---|---|
-| `client_adresse` | text | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `client_cp` | text | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `client_email` | text | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `client_id` | uuid | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) — earlier pickaxe hit `10096b6` rejected as generic-token noise (`client_id` used across many unrelated tables since v1.0) |
-| `client_nom` | text | NOT NULL | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `client_siret` | text | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `client_tel` | text | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `client_tva` | text | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `client_ville` | text | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `cree_par` | text | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) — earlier pickaxe hit `2df75a7` (L8, "migration SQL 13") opened and rejected: that diff's `cree_par` is `liaisons_client_garage.cree_par`, a different table |
-| `date_acceptation` | timestamptz | nullable | none | — | TBD | code awareness: `f2d7d9a` (2026-05-11, "fix(devis): aligner noms colonnes backend sur schema base (refuse_at->date_refus, valide_at->date_acceptation)"); true DB origin earlier/unknown (undocumented Dashboard ALTER) — commit message itself confirms this is a rename-to-match-reality fix, not an origin |
-| `date_creation` | timestamptz | NOT NULL | `now()` | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `date_envoi` | timestamptz | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `date_refus` | timestamptz | nullable | none | — | TBD | code awareness: `f2d7d9a` (2026-05-11, same rename-fix commit as `date_acceptation`); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `date_validite` | date | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `entite_facturation_id` | uuid | NOT NULL | none | → `entites_facturation.id` | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) — note: the FK *target table* `entites_facturation` itself dates back to `13d4e2d` (2026-04-12, Phase 3), but the `devis.entite_facturation_id` FK *column* is not referenced in code before `b29d4f5` |
-| `lignes` | jsonb | NOT NULL | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) — replaces the dropped `devis_lignes` table per that commit's own message |
-| `moto_km` | integer | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) — earlier pickaxe hit `10096b6` rejected as generic-token noise |
-| `moto_label` | text | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `moto_vin` | text | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `notes` | text | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) — earlier pickaxe hit `10096b6` rejected as generic-token noise (`notes` used across many unrelated tables since v1.0) |
-| `or_id` | uuid | nullable | none | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) — earlier pickaxe hit `7344b0a` (L3a, "add ordres_reparation migration") opened and rejected: that diff's `or_id` is `or_taches.or_id`/`or_pieces.or_id`, different tables |
-| `remise_montant` | numeric | nullable | `0` | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `total_ht` | numeric | NOT NULL | `0` | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
-| `total_tva` | numeric | NOT NULL | `0` | — | TBD | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `client_adresse` | text | nullable | none | — | `TEXT`, nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `client_cp` | text | nullable | none | — | `TEXT`, nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `client_email` | text | nullable | none | — | `TEXT`, nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `client_id` | uuid | nullable | none | — | `UUID`, nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) — earlier pickaxe hit `10096b6` rejected as generic-token noise (`client_id` used across many unrelated tables since v1.0) |
+| `client_nom` | text | NOT NULL | none | — | `TEXT`, NOT NULL, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `client_siret` | text | nullable | none | — | `TEXT`, nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `client_tel` | text | nullable | none | — | `TEXT`, nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `client_tva` | text | nullable | none | — | `TEXT`, nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `client_ville` | text | nullable | none | — | `TEXT`, nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `cree_par` | text | nullable | none | — | `TEXT`, nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) — earlier pickaxe hit `2df75a7` (L8, "migration SQL 13") opened and rejected: that diff's `cree_par` is `liaisons_client_garage.cree_par`, a different table |
+| `date_acceptation` | timestamptz | nullable | none | — | `TIMESTAMP WITH TIME ZONE`, nullable, default none | code awareness: `f2d7d9a` (2026-05-11, "fix(devis): aligner noms colonnes backend sur schema base (refuse_at->date_refus, valide_at->date_acceptation)"); true DB origin earlier/unknown (undocumented Dashboard ALTER) — commit message itself confirms this is a rename-to-match-reality fix, not an origin |
+| `date_creation` | timestamptz | NOT NULL | `now()` | — | `TIMESTAMP WITH TIME ZONE`, NOT NULL, default `now()` | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `date_envoi` | timestamptz | nullable | none | — | `TIMESTAMP WITH TIME ZONE`, nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `date_refus` | timestamptz | nullable | none | — | `TIMESTAMP WITH TIME ZONE`, nullable, default none | code awareness: `f2d7d9a` (2026-05-11, same rename-fix commit as `date_acceptation`); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `date_validite` | date | nullable | none | — | `DATE`, nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `entite_facturation_id` | uuid | NOT NULL | none | → `entites_facturation.id` | `UUID`, NOT NULL, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) — note: the FK *target table* `entites_facturation` itself dates back to `13d4e2d` (2026-04-12, Phase 3), but the `devis.entite_facturation_id` FK *column* is not referenced in code before `b29d4f5` |
+| `lignes` | jsonb | NOT NULL | none | — | `JSONB`, NOT NULL, default `'[]'::jsonb` | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) — replaces the dropped `devis_lignes` table per that commit's own message |
+| `moto_km` | integer | nullable | none | — | `INTEGER` (numeric_precision 32, scale 0), nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) — earlier pickaxe hit `10096b6` rejected as generic-token noise |
+| `moto_label` | text | nullable | none | — | `TEXT`, nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `moto_vin` | text | nullable | none | — | `TEXT`, nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `notes` | text | nullable | none | — | `TEXT`, nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) — earlier pickaxe hit `10096b6` rejected as generic-token noise (`notes` used across many unrelated tables since v1.0) |
+| `or_id` | uuid | nullable | none | — | `UUID`, nullable, default none | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) — earlier pickaxe hit `7344b0a` (L3a, "add ordres_reparation migration") opened and rejected: that diff's `or_id` is `or_taches.or_id`/`or_pieces.or_id`, different tables |
+| `remise_montant` | numeric | nullable | `0` | — | `NUMERIC(12,2)`, nullable, default `0` | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `total_ht` | numeric | NOT NULL | `0` | — | `NUMERIC(12,2)`, NOT NULL, default `0` | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+| `total_tva` | numeric | NOT NULL | `0` | — | `NUMERIC(12,2)`, NOT NULL, default `0` | code awareness: `b29d4f5` (2026-07-04); true DB origin earlier/unknown (undocumented Dashboard ALTER) |
+
+**Contraintes (pg_constraint, Requête 2) — `devis`, 25 colonnes cibles :**
+- `entite_facturation_id` → `FOREIGN KEY devis_entite_facturation_id_fkey`: `FOREIGN KEY (entite_facturation_id) REFERENCES entites_facturation(id)` — verbatim `pg_get_constraintdef`. Pas de clause `ON DELETE` explicite (défaut `NO ACTION`/`RESTRICT`).
+- Les 24 autres colonnes cibles (`client_adresse`, `client_cp`, `client_email`, `client_id`, `client_nom`, `client_siret`, `client_tel`, `client_tva`, `client_ville`, `cree_par`, `date_acceptation`, `date_creation`, `date_envoi`, `date_refus`, `date_validite`, `lignes`, `moto_km`, `moto_label`, `moto_vin`, `notes`, `or_id`, `remise_montant`, `total_ht`, `total_tva`) → aucune contrainte explicite (confirmé `pg_constraint`) au-delà de la NOT NULL/default déjà capturée ci-dessus. Les autres contraintes de `devis` (`devis_garage_id_fkey`, `devis_moto_id_fkey`, `devis_numero_key`, `devis_pkey`, `devis_statut_check`) portent sur des colonnes hors périmètre (déjà documentées).
+
+**Récapitulatif Requête 2 — hors devis/garages/interventions ci-dessus :** aucune autre contrainte CHECK/UNIQUE/FK ne porte sur une colonne cible des 34 colonnes non documentées de `garages`/`interventions`/`devis` (confirmé exhaustivement contre la liste complète `pg_constraint` des 4 tables retournée par Requête 2 — absence de ligne = absence de contrainte, pas une donnée manquante).
 
 ⚠️ Rappel (per plan `<interfaces>`) : `total_ttc`, `remise_pct`, `remise_type`, `remise_note` sont déjà documentées dans `schema.sql` (baseline v1.0) — elles ne figurent PAS dans ce tableau et ne doivent pas être re-signalées comme non documentées. Seules `total_ht`, `total_tva`, `remise_montant` sont nouvelles.
 
