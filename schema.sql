@@ -12,6 +12,9 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- ══════════════════════════════════════════════════════════
 -- NETTOYAGE
 -- ══════════════════════════════════════════════════════════
+DROP TABLE IF EXISTS push_send_log          CASCADE;
+DROP TABLE IF EXISTS client_device_tokens   CASCADE;
+DROP TABLE IF EXISTS garage_users           CASCADE;
 DROP TABLE IF EXISTS transfert_steps        CASCADE;
 DROP TABLE IF EXISTS transferts             CASCADE;
 DROP TABLE IF EXISTS fraude_verifications   CASCADE;
@@ -99,6 +102,64 @@ CREATE TABLE clients (
   created_at       TIMESTAMPTZ DEFAULT NOW(),
   updated_at       TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- ══════════════════════════════════════════════════════════
+-- TABLE : garage_users
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE garage_users (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  auth_user_id UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  garage_id    UUID        NOT NULL REFERENCES garages(id)    ON DELETE CASCADE,
+  role         TEXT        NOT NULL CHECK (role IN ('PRO', 'MECANO')),
+  actif        BOOLEAN     DEFAULT true,
+  created_at   TIMESTAMPTZ DEFAULT now(),
+  created_by   UUID        REFERENCES auth.users(id),
+  UNIQUE (auth_user_id, garage_id)
+);
+
+CREATE INDEX idx_garage_users_garage ON garage_users(garage_id) WHERE actif = true;
+CREATE INDEX idx_garage_users_auth   ON garage_users(auth_user_id) WHERE actif = true;
+
+COMMENT ON TABLE garage_users IS 'Liaison comptes auth.users ↔ garages avec rôle (PRO ou MECANO). Permet de lier un mécano employé à son garage employeur.';
+COMMENT ON COLUMN garage_users.role IS 'PRO = gérant/technicien senior, MECANO = technicien atelier. Ne contient pas CONCESSION/ADMIN/CLIENT (ces rôles sont gérés ailleurs).';
+
+-- ══════════════════════════════════════════════════════════
+-- TABLE : client_device_tokens
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE client_device_tokens (
+  id           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id    UUID        NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  token        TEXT        NOT NULL UNIQUE,
+  platform     TEXT        NOT NULL CHECK (platform IN ('ios', 'android')),
+  last_used_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_client_device_tokens_client ON client_device_tokens(client_id);
+
+COMMENT ON TABLE client_device_tokens IS 'Jetons push Expo (mobile) liés à un client. Un client peut avoir plusieurs devices actifs (multi-appareil, D-01). UNIQUE(token) permet la réassignation upsert (D-02) si un device change de propriétaire.';
+
+-- ══════════════════════════════════════════════════════════
+-- TABLE : push_send_log
+-- ══════════════════════════════════════════════════════════
+-- NOTE (2026-07-02): client_id is intentionally a plain UUID, NOT a foreign key to clients(id).
+-- The original REFERENCES clients(id) ON DELETE SET NULL clause caused the multi-column
+-- ALTER TABLE application to fail/rollback in the live Supabase project (root cause not
+-- identified; clients.id confirmed present and UUID-shaped). Dropping the FK unblocked it.
+-- Not required by any current code path: client_id is nullable, used only for debugging
+-- per CONTEXT.md's discretion note, and never enforced/joined by pushService.js.
+CREATE TABLE push_send_log (
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  idempotency_key TEXT        NOT NULL UNIQUE,
+  client_id       UUID,
+  token           TEXT,
+  sent_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_push_send_log_client ON push_send_log(client_id);
+
+COMMENT ON TABLE push_send_log IS 'Garde d''idempotency des envois push. UNIQUE(idempotency_key) : un INSERT en doublon (code 23505) signale "déjà envoyé" et court-circuite le renvoi (pattern billing_events). client_id/token nullable : sendToToken en test manuel n''a pas de client_id.';
 
 -- ══════════════════════════════════════════════════════════
 -- TABLE : motos
@@ -411,6 +472,12 @@ ALTER TABLE devis_lignes         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fraude_verifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transferts           ENABLE ROW LEVEL SECURITY;
 ALTER TABLE transfert_steps      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE garage_users             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE client_device_tokens     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE push_send_log            ENABLE ROW LEVEL SECURITY;
+-- garage_users / client_device_tokens / push_send_log : RLS enabled with NO explicit
+-- policies (confirmed via pg_policies/pg_class.relrowsecurity, plan 19-01) — default-deny
+-- for anon/authenticated; only service_role (used by supabase.js) can read/write these tables.
 
 -- Helpers
 CREATE OR REPLACE FUNCTION my_garage_id()
