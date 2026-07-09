@@ -1,5 +1,18 @@
 # MotoKey — Milestones
 
+## v1.4 Maintenance — CLIENT Fixture & Schema Drift (Shipped: 2026-07-09)
+
+**Phases completed:** 2 phases, 4 plans, 9 tasks
+
+**Key accomplishments:**
+
+- Fixed `setup-supabase.js` to create and link a Supabase Auth user for the `sophie@email.com` CLIENT fixture, and applied a missing `UNIQUE(email, garage_id)` constraint on `clients` that was silently blocking the seed upsert — CLIENT login now returns 200 end-to-end.
+- PostgREST OpenAPI introspection script plus verbatim `pg_get_constraintdef`/`pg_policies` capture resolving the devis.statut CHECK constraint and RLS state of 3 untracked tables, unblocking schema.sql regeneration in plan 02.
+- schema.sql now includes the 3 previously-absent tables (garage_users, client_device_tokens, push_send_log), migration-18/19 columns/constraints, a TEXT+CHECK devis.statut matching the live 7-value constraint, and an honest known-partial-bootstrap header — closing the narrow-scope drift identified in Phase 19.
+- schema.sql now bootstraps a genuinely empty Supabase project with no SQL error and matches prod for every migration 1–19 object except a newly-discovered, explicitly-deferred category of undocumented drift
+
+---
+
 ## v1.3 App Client Mobile (Shipped: 2026-07-08)
 
 **Phases completed:** 6 phases (12→17), 25 plans, 54 tasks

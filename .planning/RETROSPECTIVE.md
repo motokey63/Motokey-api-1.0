@@ -140,6 +140,50 @@
 
 ---
 
+## Milestone: v1.4 — Maintenance — CLIENT Fixture & Schema Drift
+
+**Shipped:** 2026-07-09
+**Phases:** 2 (18→19) | **Plans:** 4 | **Commits:** 10 | **Files:** 10 (+811/-39) | **Timeline:** 2 jours (2026-07-08 → 2026-07-09)
+
+### What Was Built
+
+1. CLIENT login fixture fixed (Phase 18) — `setup-supabase.js` creates/links a Supabase Auth user for `sophie@email.com`, closing a `401` that had been silently pre-existing and breaking `test-api.js`
+2. Discovered and fixed a missing `clients` `UNIQUE(email, garage_id)` constraint (migration 19) while fixing the fixture — the seed upsert had been silently no-op'ing on conflict for an unknown period
+3. `schema.sql` regenerated for migrations 1–19 (Phase 19) — 3 previously-absent tables, migration-18/19 columns/constraints, `devis.statut` CHECK matching the live 7-value constraint (captured via verbatim `pg_get_constraintdef`, not guessed)
+4. Bootstrap verified for real against a genuinely empty, throwaway Supabase project (not simulated) — this closed exactly the "schema.sql drift" inefficiency flagged in v1.3's retrospective
+5. Mid-verification, found and fixed a real regression in this phase's own work (migrations 10/13/15 columns never ported by plan 19-02) — plus discovered and deliberately deferred a second, larger category of undocumented drift (no migration file anywhere) on `garages`/`clients`/`interventions`/`devis`
+
+### What Worked
+
+- **Direct `pg` (node-postgres) connection as a fallback verification method**: the Supabase Dashboard SQL Editor truncated the pasted `schema.sql` at 3 different random points across 3 attempts (a genuine browser/clipboard reliability issue, confirmed by re-checking the source each time). Pivoting to `npm install pg --no-save` + a throwaway connection string bypassed the browser entirely and gave a reliable, repeatable bootstrap test — worth reaching for immediately next time a Dashboard paste misbehaves, rather than retrying the same paste.
+- **Automated compare-mode diffing (`introspect-schema.js --compare`) caught real drift a human reading migration files would likely have missed** — it found that tracked migrations 10/13/15 (within the phase's own declared 1–19 scope) had never been applied to `schema.sql`, a genuine bug in this phase's own regeneration work, not just the anticipated ~19-untracked-tables gap.
+- **Stopping to ask before expanding scope mid-execution**: when the compare surfaced two categories of drift (in-scope-but-missed vs. genuinely undocumented), pausing to get an explicit human decision ("fix A now, defer B") kept the phase bounded instead of silently ballooning into a full schema-parity project.
+
+### What Was Inefficient
+
+- **`schema.sql`'s own regeneration (plan 19-02) missed 3 tracked migration files (10, 13, 15)** despite the phase explicitly scoping itself to "migrations 1–19" — the original research (19-01) apparently didn't cross-check every numbered file in `sql/migrations/` against `schema.sql`'s table definitions, only the ones motivating the phase (12/16/17/18/19). A systematic file-by-file diff at research time would have caught this before execution instead of during verification.
+- **~45 minutes lost to Dashboard SQL Editor paste truncation** (3 failed attempts, different failure point each time) before pivoting to a direct Postgres connection — the pivot should probably be the default for any `schema.sql`-sized paste in this environment now, not a last resort.
+- **User-facing checkpoint messages initially in English mid-milestone** — Mehdi asked mid-session to switch to French for all conversational replies; noted as a standing preference now, but cost a small amount of back-and-forth to establish.
+
+### Patterns Established
+
+- When a Supabase Dashboard SQL Editor paste truncates unpredictably, don't retry the same paste — reach for `npm install pg --no-save` + a direct Postgres connection string (Project Settings → Database) and execute via the simple query protocol, which handles multi-statement SQL natively.
+- Compare-mode schema diffing against prod (not just reading migration files) is the correct way to verify a hand-maintained `schema.sql` tracks reality — file-reading research alone missed real drift that only surfaced once actually diffed against a live introspection.
+- When automated verification surfaces drift beyond the plan's anticipated scope, stop and get an explicit scope decision from the human rather than either silently fixing everything (scope creep) or silently ignoring it (incomplete fix) — document the deferred portion in the artifact itself (schema.sql's header) so it isn't lost.
+
+### Key Lessons
+
+- A phase that narrows its own scope ("migrations 1–19 only") still needs to verify it achieved that narrowed scope completely — "in scope" and "actually implemented" can diverge even within a deliberately small phase, as the missed migrations 10/13/15 columns showed.
+- Browser-based paste of large SQL scripts is not reliable infrastructure to depend on for verification — prefer a scriptable path (direct DB connection, CLI) as the primary method when the environment allows installing one ad hoc, even for a "one-off human action" step.
+- Undocumented, no-migration-file schema drift is apparently an ongoing pattern in this project (ad-hoc Dashboard `ALTER TABLE`s during other livraisons) — not unique to this milestone. Worth flagging as a durable process gap (migrations should be the *only* way schema changes reach prod) rather than something to keep rediscovering milestone after milestone.
+
+### Cost Observations
+
+- Sessions: 1 (2026-07-08 Phase 18, continued 2026-07-09 through Phase 19 execution, verification, and milestone completion in the same extended session)
+- Notable: Phase 19's Wave 3 (bootstrap verification) took ~90 of the milestone's ~probably-150 total minutes — almost entirely interactive troubleshooting (paste failures, credential round-trips, the scope-decision conversation) rather than actual schema work, which itself took under 20 minutes across two patches
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Sessions | Shipped |
@@ -148,3 +192,4 @@
 | v1.1 Stripe Billing | 5 (3→7) | ~2 | 2026-06-16 |
 | v1.2 Pioneer Program & Go-Live | 4 (8→11), 3/4 complete | ~4 | 2026-07-01 (Phase 8 known gap) |
 | v1.3 App Client Mobile | 6 (12→17) | ~7 | 2026-07-08 (MSTORE-02 known gap) |
+| v1.4 Maintenance | 2 (18→19) | 1 | 2026-07-09 (undocumented schema drift known gap) |
