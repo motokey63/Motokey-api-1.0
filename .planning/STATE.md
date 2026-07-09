@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.4
-milestone_name: Maintenance — CLIENT Fixture & Schema Drift
-status: shipped
-stopped_at: v1.4 milestone complete — archived, tagged, ready for next milestone
-last_updated: "2026-07-09T14:30:00.000Z"
+milestone: v1.5
+milestone_name: Résolution dérive schema.sql
+status: executing
+stopped_at: Completed 20-01-PLAN.md
+last_updated: "2026-07-09T16:25:00.676Z"
 last_activity: 2026-07-09
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 4
-  completed_plans: 4
+  total_phases: 3
+  completed_phases: 0
+  total_plans: 2
+  completed_plans: 1
 ---
 
 # MotoKey API — Project State
@@ -20,13 +20,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-09)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Planning next milestone (v1.4 shipped)
+**Current focus:** Phase 20 — introspection-corr-lation-d-origine
 
 ## Current Position
 
-Phase: — (milestone complete)
-Plan: —
-Status: v1.4 shipped 2026-07-09 — awaiting next milestone scoping
+Phase: 20 (introspection-corr-lation-d-origine) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-07-09
 
 ```
@@ -35,6 +35,7 @@ v1.1 ████████████ SHIPPED
 v1.2 [█████████░] SHIPPED 2026-07-01 (86%, Phase 8 known gap — carried forward)
 v1.3 ████████████ SHIPPED 2026-07-08 (MSTORE-02 known gap — carried forward)
 v1.4 ████████████ SHIPPED 2026-07-09 (undocumented schema drift known gap — carried forward)
+v1.5 [░░░░░░░░░░] 0% (Phases 20-22 not started)
 ```
 
 ## Performance Metrics
@@ -42,8 +43,9 @@ v1.4 ████████████ SHIPPED 2026-07-09 (undocumented schem
 | Metric | Value |
 |--------|-------|
 | Milestones shipped | 5 (v1.0 + v1.1 + v1.2 + v1.3 + v1.4) |
-| Known gaps carried forward | Phase 8/BILL-06 (Stripe live mode, since v1.2), MSTORE-02 (store submission, since v1.3), undocumented schema drift on garages/clients/interventions/devis (since v1.4) — first two blocked on Mehdi's external account/dashboard actions; the third needs a dedicated research phase |
-| Next action | `/gsd:new-milestone` |
+| Known gaps carried forward | Phase 8/BILL-06 (Stripe live mode, since v1.2), MSTORE-02 (store submission, since v1.3) — both blocked on Mehdi's external account/dashboard actions, not addressed by v1.5 |
+| Next action | `/gsd:plan-phase 20` |
+| Phase 20 P01 | 20min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -51,17 +53,22 @@ v1.4 ████████████ SHIPPED 2026-07-09 (undocumented schem
 
 Décisions complètes et à jour dans `.planning/PROJECT.md` (Key Decisions table) — historique détaillé de v1.4 archivé dans `.planning/milestones/v1.4-phases/` et `.planning/RETROSPECTIVE.md`.
 
+v1.5 phase split rationale: Phase 20 (SCHEMA-02/03, investigation — must precede any migration writing), Phase 21 (SCHEMA-04/05/06, retroactive migrations for Gap A + trivial Gap B addition from existing migration 13/15 DDL), Phase 22 (SCHEMA-07, bootstrap verification + header cleanup, mirrors Phase 19's closing verification step).
+
+- [Phase 20-01]: clients cluster fully resolved via migrations/04-rbac-migration.sql @ c66ad69, no further Postgres/git work needed
+- [Phase 20-01]: 9 garages/interventions columns confirmed ghost columns (zero code trail + architecturally unreachable via allowlist/payload) — awaiting Mehdi confirmation in plan 02
+- [Phase 20-01]: 25 devis columns classified as code-catch-up (b29d4f5/f2d7d9a) not true origin — true DB origin flagged earlier/unknown, undocumented Dashboard ALTER
+
 ### Pending Todos
 
 - **MSTORE-02** — soumission TestFlight/Play Store réelle, bloquée sur création de comptes développeur payants par Mehdi. Voir `.planning/PROJECT.md` Known Gaps.
 - **Phase 8 / BILL-06** — Stripe live mode, bloqué sur action humaine Stripe Dashboard.
-- **Dérive schema.sql non documentée** — colonnes sur garages/clients/interventions/devis sans fichier de migration, découvertes en Phase 19. Nécessite une recherche dédiée avant d'être comblée. Voir `.planning/PROJECT.md` Known Gaps.
 
 ### Blockers/Concerns
 
-- Aucun blocage actif sur le code. Les known gaps historiques (Phase 8, MSTORE-02, dérive schema.sql) attendent soit une action externe de Mehdi soit une phase de recherche dédiée — pas de travail bloqué en cours.
+- Aucun blocage actif sur le code v1.5. Phase 8 et MSTORE-02 restent des known gaps externes non touchés par ce milestone (pure dette d'ingénierie schema.sql).
 
 ## Session Continuity
 
-Last session: 2026-07-09T14:30:00.000Z
-Stopped at: v1.4 milestone complete — archived, tagged, ready for next milestone
+Last session: 2026-07-09T16:25:00.673Z
+Stopped at: Completed 20-01-PLAN.md
