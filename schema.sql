@@ -3,7 +3,7 @@
 -- ║         Corrigé : RLS avec EXISTS au lieu de IN          ║
 -- ╚══════════════════════════════════════════════════════════╝
 
--- ⚠️ BOOTSTRAP PARTIEL CONNU (Phase 19 v1.4 — 2026-07-08)
+-- ⚠️ BOOTSTRAP PARTIEL CONNU (Phase 19 v1.4 — 2026-07-08, patché 2026-07-09)
 -- Ce fichier reflète le schéma prod pour les objets des migrations 1–19 UNIQUEMENT.
 -- Il NE couvre PAS ~19 tables/vues qui existent en prod sans fichier de migration :
 --   • Ordres de réparation : ordres_reparation, or_taches, or_pieces, or_historique
@@ -16,6 +16,28 @@
 --   • Vues                    : v_factures_pdp, v_users_client_stats
 -- Un projet bootstrappé ici obtient le socle garage (migrations 1–19), PAS ces sous-systèmes.
 -- Parité complète 38 tables : différée (voir REQUIREMENTS.md Out of Scope, narrowed 2026-07-08).
+--
+-- GAP CONNU SUPPLÉMENTAIRE — objets des migrations 1–19 encore absents de ce fichier
+-- (trouvés le 2026-07-09 via node scripts/introspect-schema.js --compare, non corrigés
+-- car hors du périmètre convenu pour cette passe — colonnes uniquement) :
+--   • Migration 15 (billing) : table billing_events (audit trail Stripe) non créée ici.
+--   • Migration 13 (L8)      : tables motos_proprietaires_historique, liaisons_client_garage,
+--                              reclamations_moto, et la vue v_motos_avec_proprietaire non créées ici.
+--     (Les colonnes motos/clients de la migration 13 elle-même SONT incluses ci-dessous.)
+--
+-- DÉRIVE NON DOCUMENTÉE DÉCOUVERTE — colonnes prod sans AUCUN fichier de migration
+-- correspondant dans sql/migrations/ (probablement des ALTER TABLE faits à la main via
+-- le Dashboard pendant d'autres livraisons — OR, facturation, restructuration devis) :
+--   • garages       : ville, cp, type, marque_officielle, actif
+--   • clients       : client_type, raison_sociale, siret, tva_intracom, adresse_facturation
+--   • interventions : niveau_preuve, facture_id, photo_url, operation_code
+--   • devis         : entite_facturation_id, client_id, or_id, client_nom, client_adresse,
+--                      client_cp, client_ville, client_email, client_tel, client_siret,
+--                      client_tva, moto_label, moto_vin, moto_km, lignes, total_ht, total_tva,
+--                      remise_montant, date_creation, date_validite, date_envoi,
+--                      date_acceptation, date_refus, notes, cree_par
+-- Non couvert ici — nécessiterait une recherche dédiée (type plan 19-01) pour capturer les
+-- types/contraintes exacts avant de les ajouter. À traiter dans une phase future.
 
 -- ══════════════════════════════════════════════════════════
 -- EXTENSIONS
@@ -47,6 +69,7 @@ DROP TYPE  IF EXISTS verdict_fraude         CASCADE;
 DROP TYPE  IF EXISTS plan_abonnement        CASCADE;
 DROP TYPE  IF EXISTS type_ligne_devis       CASCADE;
 DROP TYPE  IF EXISTS statut_operation       CASCADE;
+DROP TYPE  IF EXISTS proprietaire_type_enum CASCADE;
 
 -- ══════════════════════════════════════════════════════════
 -- TYPES ENUM
@@ -58,6 +81,7 @@ CREATE TYPE verdict_fraude        AS ENUM ('authentifie','partiel','fraude_suspe
 CREATE TYPE plan_abonnement       AS ENUM ('starter','pro','expert');
 CREATE TYPE type_ligne_devis      AS ENUM ('mo','piece','pneu','fluide','libre');
 CREATE TYPE statut_operation      AS ENUM ('urgent','warning','due','ok','future');
+CREATE TYPE proprietaire_type_enum AS ENUM ('client', 'garage', 'inconnu');
 
 -- ══════════════════════════════════════════════════════════
 -- TABLE : garages
@@ -78,9 +102,24 @@ CREATE TABLE garages (
   plan_expire_at  TIMESTAMPTZ,
   sms_active      BOOLEAN DEFAULT false,
   qr_prefix       TEXT DEFAULT 'MK',
+  mecano_session_timeout_minutes INTEGER DEFAULT 60 CHECK (mecano_session_timeout_minutes IN (15, 60, 480)),
+  stripe_customer_id              TEXT,
+  stripe_subscription_id          TEXT,
+  plan_code                       TEXT,
+  subscription_status             TEXT,
+  subscription_current_period_end TIMESTAMPTZ,
+  grace_period_ends_at            TIMESTAMPTZ,
+  motos_limit                     INTEGER,
+  users_limit                     INTEGER,
   created_at      TIMESTAMPTZ DEFAULT NOW(),
   updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
+
+COMMENT ON COLUMN garages.mecano_session_timeout_minutes IS
+  'Politique de timeout session MÉCANO en minutes. 15=strict, 60=modéré, 480=souple. Configurable par PRO+.';
+COMMENT ON COLUMN garages.subscription_status IS 'Valeurs attendues : NULL (pas de billing actif), trialing, active, grace, blocked, canceled.';
+COMMENT ON COLUMN garages.motos_limit IS 'NULL = illimite (Concession ou pas de billing actif). INTEGER = quota plan Solo/Atelier.';
+COMMENT ON COLUMN garages.users_limit IS 'NULL = illimite (Concession ou pas de billing actif). INTEGER = quota plan Solo/Atelier.';
 
 -- ══════════════════════════════════════════════════════════
 -- TABLE : techniciens
@@ -111,6 +150,8 @@ CREATE TABLE clients (
   nb_interventions INTEGER DEFAULT 0,
   client_depuis    TIMESTAMPTZ DEFAULT NOW(),
   notes            TEXT,
+  is_pro                  BOOLEAN NOT NULL DEFAULT FALSE,
+  limite_motos_gratuites  INT NOT NULL DEFAULT 3,
   created_at       TIMESTAMPTZ DEFAULT NOW(),
   updated_at       TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT clients_email_garage_id_key UNIQUE (email, garage_id)
@@ -200,8 +241,18 @@ CREATE TABLE motos (
   locked_reason    TEXT,
   last_maintenance_tier_notified    TEXT CHECK (last_maintenance_tier_notified IN ('warning', 'urgent') OR last_maintenance_tier_notified IS NULL),
   last_maintenance_tier_notified_at TIMESTAMPTZ,
+  proprietaire_type       proprietaire_type_enum NOT NULL DEFAULT 'client',
+  proprietaire_garage_id   UUID NULL REFERENCES garages(id) ON DELETE RESTRICT,
+  proprio_libre            TEXT NULL,
+  statut_moto              TEXT NULL DEFAULT 'actif',
+  carte_grise_photo_url    TEXT NULL,
   created_at       TIMESTAMPTZ DEFAULT NOW(),
-  updated_at       TIMESTAMPTZ DEFAULT NOW()
+  updated_at       TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT moto_proprietaire_coherence CHECK (
+    (proprietaire_type = 'client'  AND client_id IS NOT NULL AND proprietaire_garage_id IS NULL) OR
+    (proprietaire_type = 'garage'  AND proprietaire_garage_id IS NOT NULL AND client_id IS NULL) OR
+    (proprietaire_type = 'inconnu' AND client_id IS NULL AND proprietaire_garage_id IS NULL)
+  )
 );
 
 COMMENT ON COLUMN motos.last_maintenance_tier_notified IS
