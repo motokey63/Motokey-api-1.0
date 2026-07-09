@@ -9,7 +9,7 @@ Requirements for milestone v1.5 (Résolution dérive schema.sql). Each maps to r
 
 ### Dérive non documentée (Gap A)
 
-- [ ] **SCHEMA-02**: Chaque colonne non documentée sur `garages`/`clients`/`interventions`/`devis` (dérive sans fichier de migration correspondant) est identifiée avec son type exact, ses contraintes et sa nullabilité via introspection Postgres
+- [x] **SCHEMA-02**: Chaque colonne non documentée sur `garages`/`clients`/`interventions`/`devis` (dérive sans fichier de migration correspondant) est identifiée avec son type exact, ses contraintes et sa nullabilité via introspection Postgres
 - [x] **SCHEMA-03**: Chaque colonne découverte est corrélée à la livraison/fonctionnalité qui l'a introduite, via l'historique git (commits, messages, fichiers modifiés à la période probable)
 - [ ] **SCHEMA-04**: Un ou plusieurs fichiers de migration rétroactifs numérotés (20+) documentent chaque colonne découverte, avec un commentaire d'origine expliquant sa provenance
 - [ ] **SCHEMA-05**: `schema.sql` est mis à jour pour inclure ces colonnes sur `garages`/`clients`/`interventions`/`devis`, avec les mêmes contraintes qu'en prod

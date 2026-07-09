@@ -81,7 +81,7 @@ See [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md) for full phase deta
 
 **Milestone Goal:** Combler la dérive non documentée découverte en Phase 19 (colonnes/contraintes en prod sur `garages`/`clients`/`interventions`/`devis` sans fichier de migration correspondant), en identifiant l'origine de chaque ajout, avant tout nouveau feature. Dette d'ingénierie pure — aucune fonctionnalité utilisateur dans ce milestone.
 
-- [ ] **Phase 20: Introspection & Corrélation d'Origine** - Chaque colonne non documentée est identifiée (type/contraintes exacts) et corrélée à sa livraison d'origine via git
+- [x] **Phase 20: Introspection & Corrélation d'Origine** - Chaque colonne non documentée est identifiée (type/contraintes exacts) et corrélée à sa livraison d'origine via git (completed 2026-07-09)
 - [ ] **Phase 21: Migrations Rétroactives & Mise à Jour schema.sql** - Migrations numérotées 20+ documentent Gap A ; Gap B (tables migration 13/15) ajouté à schema.sql
 - [ ] **Phase 22: Vérification Bootstrap & Nettoyage Header** - Bootstrap propre contre un projet Supabase neuf, header known-partial-bootstrap mis à jour
 
@@ -98,7 +98,7 @@ See [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md) for full phase deta
   4. Les résultats sont capturés dans un artefact durable (notes de recherche / sortie de plan) que la Phase 21 peut consommer sans reproduire la découverte
 **Plans**: 2 plans
   - [x] 20-01-PLAN.md — Baseline OpenAPI + legacy-migration cross-reference (clients résolu) + balayage git-log-S d'origine pour toutes les colonnes non documentées (SCHEMA-02 partiel, SCHEMA-03)
-  - [ ] 20-02-PLAN.md — Métadonnées exactes information_schema/pg_constraint + confirmation Mehdi des 9 colonnes fantômes (SCHEMA-02 exact, SCHEMA-03 clôture)
+  - [x] 20-02-PLAN.md — Métadonnées exactes information_schema/pg_constraint + confirmation Mehdi des 9 colonnes fantômes (SCHEMA-02 exact, SCHEMA-03 clôture)
 
 ### Phase 21: Migrations Rétroactives & Mise à Jour schema.sql
 **Goal**: `schema.sql` reflète l'état complet de prod pour Gap A (dérive non documentée) et Gap B (tables/vue des migrations 13/15 jamais reportées), chaque ajout de Gap A étant tracé par un fichier de migration rétroactif numéroté.

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Résolution dérive schema.sql
 status: executing
-stopped_at: Completed 20-01-PLAN.md — Wave 2 (20-02, checkpoints) next
-last_updated: "2026-07-09T16:25:00.676Z"
+stopped_at: Completed 20-02-PLAN.md
+last_updated: "2026-07-09T18:13:37.024Z"
 last_activity: 2026-07-09
 progress:
   total_phases: 3
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # MotoKey API — Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-07-09)
 ## Current Position
 
 Phase: 20 (introspection-corr-lation-d-origine) — EXECUTING
-Plan: 1 of 2 complete — 20-02 (Wave 2, checkpoints) next
-Status: Executing Phase 20
-Last activity: 2026-07-09 -- Phase 20 plan 20-01 completed
+Plan: 2 of 2 complete — 20-02 (Wave 2, checkpoints) next
+Status: Ready to execute
+Last activity: 2026-07-09
 
 ```
 v1.0 ████████████ SHIPPED
@@ -46,6 +46,7 @@ v1.5 [░░░░░░░░░░] 0% (Phases 20-22 not started)
 | Known gaps carried forward | Phase 8/BILL-06 (Stripe live mode, since v1.2), MSTORE-02 (store submission, since v1.3) — both blocked on Mehdi's external account/dashboard actions, not addressed by v1.5 |
 | Next action | `/gsd:execute-phase 20` (Wave 2: plan 20-02) |
 | Phase 20 P01 | 20min | 2 tasks | 2 files |
+| Phase 20 P02 | 15min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -58,6 +59,7 @@ v1.5 phase split rationale: Phase 20 (SCHEMA-02/03, investigation — must prece
 - [Phase 20-01]: clients cluster fully resolved via migrations/04-rbac-migration.sql @ c66ad69, no further Postgres/git work needed
 - [Phase 20-01]: 9 garages/interventions columns confirmed ghost columns (zero code trail + architecturally unreachable via allowlist/payload) — awaiting Mehdi confirmation in plan 02
 - [Phase 20-01]: 25 devis columns classified as code-catch-up (b29d4f5/f2d7d9a) not true origin — true DB origin flagged earlier/unknown, undocumented Dashboard ALTER
+- [Phase 20]: ville/cp CONFIRMED as unwired address-split feature (real prod data + Mehdi confirmation); 7 remaining ghost columns terminal INCONNU/OUBLIÉ verdict — origin exhausted via git (20-01) and Mehdi (20-02), not to be re-questioned
 
 ### Pending Todos
 
@@ -70,5 +72,5 @@ v1.5 phase split rationale: Phase 20 (SCHEMA-02/03, investigation — must prece
 
 ## Session Continuity
 
-Last session: 2026-07-09T16:25:00.673Z
-Stopped at: Completed 20-01-PLAN.md — Wave 2 (20-02, checkpoints) next
+Last session: 2026-07-09T18:13:37.020Z
+Stopped at: Completed 20-02-PLAN.md
