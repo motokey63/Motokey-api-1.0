@@ -8,13 +8,16 @@ MotoKey est un système de gestion de garage moto (DMS) pour Garage Motolab. Con
 
 Le score d'intégrité anti-fraude (pondération 1.0/0.6/0.3 selon la preuve) — sans lui, MotoKey est un simple DMS ; avec lui, c'est une preuve de valeur vérifiable à la revente.
 
-## Current Milestone: v1.4 Maintenance — CLIENT Fixture & Schema Drift
+## Current Milestone: v1.5 Résolution dérive schema.sql
 
-**Goal:** Close the two carried-forward known gaps that are pure engineering debt with no external blocker, distinct from Phase 8/BILL-06 and MSTORE-02 which remain blocked on Mehdi's external account actions.
+**Goal:** Combler la dérive non documentée découverte en Phase 19 (colonnes/contraintes en prod sur `garages`/`clients`/`interventions`/`devis` sans fichier de migration correspondant), en identifiant l'origine de chaque ajout, avant tout nouveau feature.
 
 **Target features:**
-- Fix CLIENT login fixture — create a matching Supabase Auth user for `sophie@email.com` in `setup-supabase.js`, mirroring the existing garage account pattern, linked via `clients.auth_user_id`
-- Fix schema.sql drift — regenerate `schema.sql` from the live prod Supabase schema so it reflects migrations 1–18 (missing tables, corrected `statut_devis` ENUM)
+- Recherche dédiée : introspection Postgres exhaustive des colonnes/contraintes de `garages`/`clients`/`interventions`/`devis` absentes des migrations 1–19
+- Corrélation avec l'historique git pour attribuer chaque colonne découverte à la livraison qui l'a introduite
+- Migrations rétroactives numérotées (20+) documentant chaque ajout, avec commentaire d'origine
+- Mise à jour de `schema.sql` pour refléter l'état complet — retrait du header "known-partial-bootstrap"
+- Vérification bootstrap propre contre un projet Supabase neuf
 
 ## Current State (after v1.3 — 2026-07-08)
 
@@ -162,4 +165,4 @@ This document evolves at phase transitions and milestone boundaries.
 5. Key Decisions log updated
 
 ---
-*Last updated: 2026-07-09 — v1.4 Phase 19 (SCHEMA-01) complete — milestone v1.4 fully delivered*
+*Last updated: 2026-07-09 — milestone v1.5 started (dérive schema.sql non documentée)*
