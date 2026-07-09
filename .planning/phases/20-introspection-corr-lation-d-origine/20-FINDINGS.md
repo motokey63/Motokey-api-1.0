@@ -179,3 +179,30 @@ Exactly 9 columns have **zero code trail** across the full git history (302 comm
 **`interventions` (4):** `niveau_preuve`, `facture_id`, `operation_code`, `photo_url` — none appear in `Interventions.create()`'s literal insert payload (`supabase.js` L397-408), and no caller anywhere sends these field names to `Interventions.update()` either.
 
 These 9 columns have no recoverable origin via git correlation (SCHEMA-03 is honestly "undetermined" for them, per 20-RESEARCH.md's Open Questions). Plan 02's checkpoint should present this exact list to Mehdi and ask whether each is (a) an abandoned/never-finished feature, (b) a feature scaffolded ahead of code that was later built differently, or (c) truly accidental/forgotten — the LOW-confidence semantic inferences already captured in 20-RESEARCH.md's Preliminary Findings tables can be offered as a starting point for his answer, not asserted as fact.
+
+---
+
+## SCHEMA-03 — origine confirmée par Mehdi
+
+Réponse verbatim de Mehdi au checkpoint des 9 colonnes fantômes (2026-07-09) : *"ville et cp confirmé, le reste inconnu"*.
+
+**`garages` (5) :**
+- `ville` — **CONFIRMÉ** : découpage d'adresse structuré, préparé mais jamais câblé dans l'app.
+- `cp` — **CONFIRMÉ** : découpage d'adresse structuré, préparé mais jamais câblé dans l'app.
+- `type` — **INCONNU/OUBLIÉ** : origine indéterminée, colonne non utilisée par le code actuel.
+- `marque_officielle` — **INCONNU/OUBLIÉ** : origine indéterminée, colonne non utilisée par le code actuel.
+- `actif` — **INCONNU/OUBLIÉ** : origine indéterminée, colonne non utilisée par le code actuel.
+
+**`interventions` (4) :**
+- `niveau_preuve` — **INCONNU/OUBLIÉ** : origine indéterminée, colonne non utilisée par le code actuel.
+- `facture_id` — **INCONNU/OUBLIÉ** : origine indéterminée, colonne non utilisée par le code actuel.
+- `photo_url` — **INCONNU/OUBLIÉ** : origine indéterminée, colonne non utilisée par le code actuel.
+- `operation_code` — **INCONNU/OUBLIÉ** : origine indéterminée, colonne non utilisée par le code actuel.
+
+**Verdict terminal pour les 7 colonnes INCONNU/OUBLIÉ** : leur origine/intention n'a pu être déterminée ni par l'historique git (Phase 20-01 — ghost columns, zéro trace de code, inaccessibles architecturalement via toute allowlist/payload d'écriture existant) ni par confirmation de Mehdi (Phase 20-02 — réponse explicite "le reste inconnu"). Ceci est l'état **final et permanent** pour ces 7 colonnes dans le cadre de cette phase — elles ne seront pas re-questionnées. "Inconnu, non confirmé" est un verdict terminal acceptable (per 20-RESEARCH.md, State-of-the-Art row 3). La Phase 21 décidera comment documenter ces colonnes d'origine ambiguë dans les migrations rétroactives — recommandation : commentaire honnête `-- origine indéterminée, colonne non utilisée par le code actuel` dans le DDL, plutôt qu'une intention inventée.
+
+**Nuance sur `ville`/`cp`** : contrairement aux 7 autres colonnes, `ville`/`cp` ne sont pas seulement "ghost" au sens code (zéro accès applicatif) — Mehdi confirme leur intention réelle (découpage d'adresse structuré) et Requête 3 (Task 1) montre des données réelles en prod (`ville='Clermont-Ferrand'`, `cp='63000'` sur un garage), cohérent avec une saisie manuelle anticipant une fonctionnalité jamais terminée. Phase 21 peut documenter ces deux colonnes avec un commentaire d'intention réelle (`-- découpage d'adresse structuré, préparé mais jamais câblé`) plutôt que "origine indéterminée".
+
+### Completeness gate
+
+Toutes les colonnes non documentées des 4 tables (`garages` 5, `clients` 5 — résolu Task 1 plan 01, `interventions` 4, `devis` 25 — total 39) ont maintenant à la fois : (1) une métadonnée EXACT du catalogue Postgres (`information_schema.columns` + `pg_constraint`, capturée Task 1 de ce plan), et (2) un verdict d'origine (résolu par migration legacy pour `clients` ; code-catch-up avec origine DB antérieure/inconnue pour `devis` ; CONFIRMÉ ou INCONNU/OUBLIÉ par Mehdi pour les 9 colonnes fantômes `garages`/`interventions` ci-dessus). Aucune cellule à déterminer ne subsiste dans ce document — toutes les métadonnées EXACT et tous les verdicts d'origine sont renseignés. SCHEMA-02 et SCHEMA-03 sont satisfaits à un niveau de fidélité permettant à la Phase 21 d'écrire les migrations rétroactives sans re-découverte, re-requête prod, ni re-exécution git.
