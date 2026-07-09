@@ -3,6 +3,20 @@
 -- ║         Corrigé : RLS avec EXISTS au lieu de IN          ║
 -- ╚══════════════════════════════════════════════════════════╝
 
+-- ⚠️ BOOTSTRAP PARTIEL CONNU (Phase 19 v1.4 — 2026-07-08)
+-- Ce fichier reflète le schéma prod pour les objets des migrations 1–19 UNIQUEMENT.
+-- Il NE couvre PAS ~19 tables/vues qui existent en prod sans fichier de migration :
+--   • Ordres de réparation : ordres_reparation, or_taches, or_pieces, or_historique
+--   • Facturation/billing   : entites_facturation, factures, factures_scannees, compteurs_documents
+--   • E-invoicing (PDP)      : pdp_queue, pdp_transmissions
+--   • Catalogue pièces       : catalogue_pieces
+--   • Plans constructeur     : plans_constructeur
+--   • Propriété moto          : moto_proprietaires
+--   • Auth client séparée     : users_client, users_client_sessions, email_verifications, password_resets, auth_logs
+--   • Vues                    : v_factures_pdp, v_users_client_stats
+-- Un projet bootstrappé ici obtient le socle garage (migrations 1–19), PAS ces sous-systèmes.
+-- Parité complète 38 tables : différée (voir REQUIREMENTS.md Out of Scope, narrowed 2026-07-08).
+
 -- ══════════════════════════════════════════════════════════
 -- EXTENSIONS
 -- ══════════════════════════════════════════════════════════
@@ -28,7 +42,6 @@ DROP TABLE IF EXISTS techniciens            CASCADE;
 DROP TABLE IF EXISTS garages                CASCADE;
 DROP TYPE  IF EXISTS couleur_dossier_type   CASCADE;
 DROP TYPE  IF EXISTS type_intervention      CASCADE;
-DROP TYPE  IF EXISTS statut_devis           CASCADE;
 DROP TYPE  IF EXISTS statut_transfert       CASCADE;
 DROP TYPE  IF EXISTS verdict_fraude         CASCADE;
 DROP TYPE  IF EXISTS plan_abonnement        CASCADE;
@@ -40,7 +53,6 @@ DROP TYPE  IF EXISTS statut_operation       CASCADE;
 -- ══════════════════════════════════════════════════════════
 CREATE TYPE couleur_dossier_type AS ENUM ('vert','bleu','jaune','rouge');
 CREATE TYPE type_intervention     AS ENUM ('vert','bleu','jaune','rouge');
-CREATE TYPE statut_devis          AS ENUM ('brouillon','envoye','valide','annule');
 CREATE TYPE statut_transfert      AS ENUM ('initie','vendeur_confirme','acheteur_consulte','finalise','expire','annule');
 CREATE TYPE verdict_fraude        AS ENUM ('authentifie','partiel','fraude_suspectee');
 CREATE TYPE plan_abonnement       AS ENUM ('starter','pro','expert');
@@ -100,7 +112,8 @@ CREATE TABLE clients (
   client_depuis    TIMESTAMPTZ DEFAULT NOW(),
   notes            TEXT,
   created_at       TIMESTAMPTZ DEFAULT NOW(),
-  updated_at       TIMESTAMPTZ DEFAULT NOW()
+  updated_at       TIMESTAMPTZ DEFAULT NOW(),
+  CONSTRAINT clients_email_garage_id_key UNIQUE (email, garage_id)
 );
 
 -- ══════════════════════════════════════════════════════════
@@ -185,9 +198,16 @@ CREATE TABLE motos (
   qr_code_url      TEXT,
   locked           BOOLEAN DEFAULT false,
   locked_reason    TEXT,
+  last_maintenance_tier_notified    TEXT CHECK (last_maintenance_tier_notified IN ('warning', 'urgent') OR last_maintenance_tier_notified IS NULL),
+  last_maintenance_tier_notified_at TIMESTAMPTZ,
   created_at       TIMESTAMPTZ DEFAULT NOW(),
   updated_at       TIMESTAMPTZ DEFAULT NOW()
 );
+
+COMMENT ON COLUMN motos.last_maintenance_tier_notified IS
+  'Palier d''entretien le plus sévère déjà notifié au client (NULL/warning/urgent). Mis à jour par le cron
+   /cron/maintenance-alerts, à la hausse (déclenche un push) comme à la baisse (silencieux, après entretien
+   effectué) — source de vérité pour la règle "une notification par franchissement de palier" (D-04).';
 
 -- ══════════════════════════════════════════════════════════
 -- TABLE : interventions
@@ -247,7 +267,7 @@ CREATE TABLE devis (
   garage_id       UUID NOT NULL REFERENCES garages(id) ON DELETE CASCADE,
   technicien_id   UUID REFERENCES techniciens(id) ON DELETE SET NULL,
   numero          TEXT NOT NULL,
-  statut          statut_devis NOT NULL DEFAULT 'brouillon',
+  statut          TEXT NOT NULL DEFAULT 'brouillon' CHECK (statut IN ('brouillon', 'envoye', 'accepte', 'refuse', 'expire', 'converti', 'annule')),
   remise_type     TEXT DEFAULT 'aucun',
   remise_pct      NUMERIC(5,2) DEFAULT 0,
   remise_note     TEXT,
