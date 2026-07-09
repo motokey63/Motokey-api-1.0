@@ -4,7 +4,7 @@ milestone: v1.5
 milestone_name: Résolution dérive schema.sql
 status: executing
 stopped_at: Completed 20-02-PLAN.md
-last_updated: "2026-07-09T18:13:37.024Z"
+last_updated: "2026-07-09T18:39:35.244Z"
 last_activity: 2026-07-09
 progress:
   total_phases: 3
@@ -24,8 +24,8 @@ See: .planning/PROJECT.md (updated 2026-07-09)
 
 ## Current Position
 
-Phase: 20 (introspection-corr-lation-d-origine) — EXECUTING
-Plan: 2 of 2 complete — 20-02 (Wave 2, checkpoints) next
+Phase: 21
+Plan: Not started
 Status: Ready to execute
 Last activity: 2026-07-09
 

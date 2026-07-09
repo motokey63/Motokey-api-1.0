@@ -42,7 +42,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCHEMA-02 | Phase 20 | In Progress (baseline done, exact pg-catalog metadata deferred to plan 20-02) |
+| SCHEMA-02 | Phase 20 | Complete |
 | SCHEMA-03 | Phase 20 | Complete |
 | SCHEMA-04 | Phase 21 | Pending |
 | SCHEMA-05 | Phase 21 | Pending |
