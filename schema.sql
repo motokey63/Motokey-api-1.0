@@ -70,6 +70,7 @@ DROP TYPE  IF EXISTS plan_abonnement        CASCADE;
 DROP TYPE  IF EXISTS type_ligne_devis       CASCADE;
 DROP TYPE  IF EXISTS statut_operation       CASCADE;
 DROP TYPE  IF EXISTS proprietaire_type_enum CASCADE;
+DROP TYPE  IF EXISTS client_type_enum       CASCADE;
 
 -- ══════════════════════════════════════════════════════════
 -- TYPES ENUM
@@ -82,6 +83,7 @@ CREATE TYPE plan_abonnement       AS ENUM ('starter','pro','expert');
 CREATE TYPE type_ligne_devis      AS ENUM ('mo','piece','pneu','fluide','libre');
 CREATE TYPE statut_operation      AS ENUM ('urgent','warning','due','ok','future');
 CREATE TYPE proprietaire_type_enum AS ENUM ('client', 'garage', 'inconnu');
+CREATE TYPE client_type_enum      AS ENUM ('particulier','pro');
 
 -- ══════════════════════════════════════════════════════════
 -- TABLE : garages
@@ -156,11 +158,21 @@ CREATE TABLE clients (
   nb_interventions INTEGER DEFAULT 0,
   client_depuis    TIMESTAMPTZ DEFAULT NOW(),
   notes            TEXT,
+  -- Gap A (Phase 21, SCHEMA-05) — porté depuis migrations/04-rbac-migration.sql @ c66ad69 (RBAC L4, origine documentée, pas une dérive)
+  client_type          client_type_enum NOT NULL DEFAULT 'particulier',
+  raison_sociale       TEXT,
+  siret                TEXT,
+  tva_intracom         TEXT,
+  adresse_facturation  TEXT,
   is_pro                  BOOLEAN NOT NULL DEFAULT FALSE,
   limite_motos_gratuites  INT NOT NULL DEFAULT 3,
   created_at       TIMESTAMPTZ DEFAULT NOW(),
   updated_at       TIMESTAMPTZ DEFAULT NOW(),
-  CONSTRAINT clients_email_garage_id_key UNIQUE (email, garage_id)
+  CONSTRAINT clients_email_garage_id_key UNIQUE (email, garage_id),
+  CONSTRAINT clients_pro_requirements CHECK (
+    client_type = 'particulier'
+    OR (client_type = 'pro' AND raison_sociale IS NOT NULL AND siret IS NOT NULL)
+  )
 );
 
 -- ══════════════════════════════════════════════════════════
@@ -539,6 +551,13 @@ CREATE INDEX idx_transferts_code    ON transferts(code);
 CREATE INDEX idx_transferts_statut  ON transferts(statut);
 CREATE INDEX idx_fraude_garage      ON fraude_verifications(garage_id);
 CREATE INDEX idx_clients_garage     ON clients(garage_id);
+CREATE UNIQUE INDEX idx_clients_siret ON clients(siret) WHERE siret IS NOT NULL;
+
+COMMENT ON COLUMN clients.client_type IS 'Type légal du client : particulier (TVA incluse) ou pro (TVA intracom/SIRET requis). Distinction comptable obligatoire France.';
+COMMENT ON COLUMN clients.siret IS 'SIRET 14 chiffres, requis si client_type = ''pro''';
+COMMENT ON COLUMN clients.tva_intracom IS 'N° TVA intracommunautaire, optionnel si client UE';
+COMMENT ON COLUMN clients.raison_sociale IS 'Dénomination sociale officielle, requise si client_type = ''pro''';
+COMMENT ON COLUMN clients.adresse_facturation IS 'Adresse de facturation (peut différer de l''adresse de contact)';
 
 -- ══════════════════════════════════════════════════════════
 -- ROW LEVEL SECURITY
