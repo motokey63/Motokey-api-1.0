@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Résolution dérive schema.sql
-status: executing
+status: verifying
 stopped_at: Session resumed, proceeding to execute Phase 21 (4 plans, waves 1-3)
-last_updated: "2026-07-10T13:15:16.127Z"
+last_updated: "2026-07-10T17:03:07.743Z"
 last_activity: 2026-07-10
 progress:
   total_phases: 3
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # MotoKey API — Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-09)
 
 Phase: 21 (migrations-r-troactives-mise-jour-schema-sql) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-10
 
 ```

@@ -113,7 +113,7 @@ See [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md) for full phase deta
   - [x] 21-01-PLAN.md — Fichiers de migration rétroactifs Gap A (20/21/22 : garages, interventions, devis) avec commentaires d'origine (SCHEMA-04)
   - [x] 21-02-PLAN.md — schema.sql : colonnes Gap A sur garages/clients/interventions/devis (port clients RBAC, FK hors-scope omises, nettoyage 10 colonnes devis obsolètes) (SCHEMA-05)
   - [x] 21-03-PLAN.md — schema.sql : tables/vue Gap B (billing_events + tables L8 migration 13) + enum + NETTOYAGE + sonde RLS prod (SCHEMA-06)
-  - [ ] 21-04-PLAN.md — Vérification finale : complétude Gap A/Gap B, aucun objet non documenté restant (SCHEMA-05/06)
+  - [x] 21-04-PLAN.md — Vérification finale : complétude Gap A/Gap B, aucun objet non documenté restant (SCHEMA-05/06)
 
 ### Phase 22: Vérification Bootstrap & Nettoyage Header
 **Goal**: `schema.sql` est prouvé bootstrappable proprement contre un projet Supabase neuf et ne revendique plus de statut "known-partial-bootstrap" pour Gap A/Gap B.
