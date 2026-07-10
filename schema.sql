@@ -699,6 +699,17 @@ ALTER TABLE push_send_log            ENABLE ROW LEVEL SECURITY;
 -- policies (confirmed via pg_policies/pg_class.relrowsecurity, plan 19-01) — default-deny
 -- for anon/authenticated; only service_role (used by supabase.js) can read/write these tables.
 
+ALTER TABLE billing_events                 ENABLE ROW LEVEL SECURITY;
+ALTER TABLE motos_proprietaires_historique ENABLE ROW LEVEL SECURITY;
+ALTER TABLE liaisons_client_garage         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reclamations_moto              ENABLE ROW LEVEL SECURITY;
+-- Gap B (Phase 21) : RLS enabled with NO explicit policies (default-deny for anon/authenticated;
+-- only service_role, utilisé par supabase.js, peut lire/écrire) — même état confirmé qu'en Phase 19
+-- pour garage_users/client_device_tokens/push_send_log. Confirmé live (sonde REST anon-equivalent,
+-- publishable key, Phase 21 plan 03) : calibration garages -> HTTP 200 [] ; les 4 tables Gap B,
+-- y compris les 2 backfillées (liaisons_client_garage, motos_proprietaires_historique qui contiennent
+-- des lignes en prod) -> HTTP 200 [] également = signal default-deny, pas "table vide".
+
 -- Helpers
 CREATE OR REPLACE FUNCTION my_garage_id()
 RETURNS UUID AS $$
