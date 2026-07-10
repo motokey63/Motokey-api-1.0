@@ -4,7 +4,7 @@ milestone: v1.5
 milestone_name: Résolution dérive schema.sql
 status: verifying
 stopped_at: Session resumed, proceeding to execute Phase 21 (4 plans, waves 1-3)
-last_updated: "2026-07-10T17:03:07.743Z"
+last_updated: "2026-07-10T17:14:52.869Z"
 last_activity: 2026-07-10
 progress:
   total_phases: 3
@@ -24,8 +24,8 @@ See: .planning/PROJECT.md (updated 2026-07-09)
 
 ## Current Position
 
-Phase: 21 (migrations-r-troactives-mise-jour-schema-sql) — EXECUTING
-Plan: 4 of 4
+Phase: 22
+Plan: Not started
 Status: Phase complete — ready for verification
 Last activity: 2026-07-10
 

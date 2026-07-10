@@ -82,7 +82,7 @@ See [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md) for full phase deta
 **Milestone Goal:** Combler la dérive non documentée découverte en Phase 19 (colonnes/contraintes en prod sur `garages`/`clients`/`interventions`/`devis` sans fichier de migration correspondant), en identifiant l'origine de chaque ajout, avant tout nouveau feature. Dette d'ingénierie pure — aucune fonctionnalité utilisateur dans ce milestone.
 
 - [x] **Phase 20: Introspection & Corrélation d'Origine** - Chaque colonne non documentée est identifiée (type/contraintes exacts) et corrélée à sa livraison d'origine via git (completed 2026-07-09)
-- [ ] **Phase 21: Migrations Rétroactives & Mise à Jour schema.sql** - Migrations numérotées 20+ documentent Gap A ; Gap B (tables migration 13/15) ajouté à schema.sql
+- [x] **Phase 21: Migrations Rétroactives & Mise à Jour schema.sql** - Migrations numérotées 20+ documentent Gap A ; Gap B (tables migration 13/15) ajouté à schema.sql (completed 2026-07-10)
 - [ ] **Phase 22: Vérification Bootstrap & Nettoyage Header** - Bootstrap propre contre un projet Supabase neuf, header known-partial-bootstrap mis à jour
 
 ## Phase Details
