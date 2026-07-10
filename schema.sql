@@ -483,6 +483,97 @@ CREATE TABLE transfert_steps (
 );
 
 -- ══════════════════════════════════════════════════════════
+-- TABLES GAP B — objets migrations 13/15 jamais portés (Phase 21, SCHEMA-06)
+-- ══════════════════════════════════════════════════════════
+
+-- billing_events — source : sql/migrations/15_billing_foundation.sql
+CREATE TABLE billing_events (
+  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  stripe_event_id  TEXT        NOT NULL UNIQUE,
+  event_type       TEXT        NOT NULL,
+  garage_id        UUID        REFERENCES garages(id) ON DELETE SET NULL,
+  payload          JSONB,
+  processed_at     TIMESTAMPTZ DEFAULT now()
+);
+CREATE INDEX idx_billing_events_garage ON billing_events(garage_id);
+COMMENT ON TABLE  billing_events IS 'Audit trail des evenements Stripe recus. stripe_event_id UNIQUE = guard idempotency (rejeu webhook securise).';
+COMMENT ON COLUMN billing_events.payload IS 'Corps complet de l''evenement Stripe — permet de rejouer ou auditer sans appeler l''API Stripe.';
+
+-- motos_proprietaires_historique — source : sql/migrations/13_liaison_client_moto.sql (backfill INSERT exclu)
+CREATE TABLE motos_proprietaires_historique (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  moto_id UUID NOT NULL REFERENCES motos(id) ON DELETE CASCADE,
+  proprietaire_type proprietaire_type_enum NOT NULL,
+  proprietaire_client_id UUID NULL REFERENCES clients(id) ON DELETE SET NULL,
+  proprietaire_garage_id UUID NULL REFERENCES garages(id) ON DELETE SET NULL,
+  proprio_libre TEXT NULL,
+  date_debut DATE NOT NULL,
+  date_fin DATE NULL,
+  mode_acquisition mode_acquisition_enum NOT NULL,
+  note TEXT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_by UUID NULL,
+  CONSTRAINT historique_coherence CHECK (
+    (proprietaire_type = 'client'  AND proprietaire_client_id IS NOT NULL) OR
+    (proprietaire_type = 'garage'  AND proprietaire_garage_id IS NOT NULL) OR
+    (proprietaire_type = 'inconnu')
+  )
+);
+CREATE INDEX idx_mph_moto ON motos_proprietaires_historique(moto_id);
+CREATE INDEX idx_mph_client ON motos_proprietaires_historique(proprietaire_client_id) WHERE proprietaire_client_id IS NOT NULL;
+CREATE INDEX idx_mph_garage ON motos_proprietaires_historique(proprietaire_garage_id) WHERE proprietaire_garage_id IS NOT NULL;
+CREATE INDEX idx_mph_actif ON motos_proprietaires_historique(moto_id) WHERE date_fin IS NULL;
+
+-- liaisons_client_garage — source : sql/migrations/13_liaison_client_moto.sql (backfill INSERT exclu)
+CREATE TABLE liaisons_client_garage (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  garage_id UUID NOT NULL REFERENCES garages(id) ON DELETE CASCADE,
+  statut TEXT NOT NULL DEFAULT 'actif',
+  date_creation TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  date_revocation TIMESTAMPTZ NULL,
+  motif_revocation TEXT NULL,
+  cree_par TEXT NOT NULL DEFAULT 'garage',
+  UNIQUE(client_id, garage_id)
+);
+CREATE INDEX idx_lcg_client_actif ON liaisons_client_garage(client_id) WHERE statut = 'actif';
+CREATE INDEX idx_lcg_garage_actif ON liaisons_client_garage(garage_id) WHERE statut = 'actif';
+
+-- reclamations_moto — source : sql/migrations/13_liaison_client_moto.sql
+CREATE TABLE reclamations_moto (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  moto_id UUID NOT NULL REFERENCES motos(id) ON DELETE CASCADE,
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  statut TEXT NOT NULL DEFAULT 'en_attente',
+  vin_fourni TEXT NOT NULL,
+  plaque_fournie TEXT NOT NULL,
+  carte_grise_photo_url TEXT NOT NULL,
+  date_creation TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  date_resolution TIMESTAMPTZ NULL,
+  resolu_par UUID NULL,
+  motif_refus TEXT NULL
+);
+CREATE INDEX idx_rec_moto ON reclamations_moto(moto_id);
+CREATE INDEX idx_rec_client ON reclamations_moto(client_id);
+CREATE INDEX idx_rec_attente ON reclamations_moto(statut) WHERE statut = 'en_attente';
+
+-- v_motos_avec_proprietaire — source : sql/migrations/13_liaison_client_moto.sql
+CREATE OR REPLACE VIEW v_motos_avec_proprietaire AS
+SELECT m.*,
+  CASE
+    WHEN m.proprietaire_type = 'client'  THEN c.nom
+    WHEN m.proprietaire_type = 'garage'  THEN g.nom || ' (stock)'
+    WHEN m.proprietaire_type = 'inconnu' THEN COALESCE(m.proprio_libre, 'Proprietaire inconnu')
+  END AS proprietaire_nom_resolu,
+  CASE
+    WHEN m.proprietaire_type = 'client' THEN c.email
+    ELSE NULL
+  END AS proprietaire_email_resolu
+FROM motos m
+LEFT JOIN clients c ON c.id = m.client_id
+LEFT JOIN garages g ON g.id = m.proprietaire_garage_id;
+
+-- ══════════════════════════════════════════════════════════
 -- TRIGGERS : updated_at automatique
 -- ══════════════════════════════════════════════════════════
 CREATE OR REPLACE FUNCTION update_updated_at()
