@@ -48,6 +48,11 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- ══════════════════════════════════════════════════════════
 -- NETTOYAGE
 -- ══════════════════════════════════════════════════════════
+DROP VIEW  IF EXISTS v_motos_avec_proprietaire     CASCADE;
+DROP TABLE IF EXISTS reclamations_moto             CASCADE;
+DROP TABLE IF EXISTS liaisons_client_garage        CASCADE;
+DROP TABLE IF EXISTS motos_proprietaires_historique CASCADE;
+DROP TABLE IF EXISTS billing_events                CASCADE;
 DROP TABLE IF EXISTS push_send_log          CASCADE;
 DROP TABLE IF EXISTS client_device_tokens   CASCADE;
 DROP TABLE IF EXISTS garage_users           CASCADE;
@@ -71,6 +76,7 @@ DROP TYPE  IF EXISTS type_ligne_devis       CASCADE;
 DROP TYPE  IF EXISTS statut_operation       CASCADE;
 DROP TYPE  IF EXISTS proprietaire_type_enum CASCADE;
 DROP TYPE  IF EXISTS client_type_enum       CASCADE;
+DROP TYPE  IF EXISTS mode_acquisition_enum     CASCADE;
 
 -- ══════════════════════════════════════════════════════════
 -- TYPES ENUM
@@ -84,6 +90,7 @@ CREATE TYPE type_ligne_devis      AS ENUM ('mo','piece','pneu','fluide','libre')
 CREATE TYPE statut_operation      AS ENUM ('urgent','warning','due','ok','future');
 CREATE TYPE proprietaire_type_enum AS ENUM ('client', 'garage', 'inconnu');
 CREATE TYPE client_type_enum      AS ENUM ('particulier','pro');
+CREATE TYPE mode_acquisition_enum AS ENUM ('achat_neuf','achat_occasion','reprise_garage','cession_perso','mise_en_stock','inconnu','don','heritage');
 
 -- ══════════════════════════════════════════════════════════
 -- TABLE : garages
