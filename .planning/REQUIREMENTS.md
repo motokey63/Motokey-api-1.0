@@ -16,7 +16,7 @@ Requirements for milestone v1.5 (Résolution dérive schema.sql). Each maps to r
 
 ### Objets migration 13/15 manquants (Gap B)
 
-- [ ] **SCHEMA-06**: La table `billing_events` (migration 15) et les tables `motos_proprietaires_historique`/`liaisons_client_garage`/`reclamations_moto` + la vue `v_motos_avec_proprietaire` (migration 13) sont ajoutées à `schema.sql`, à partir du DDL déjà présent dans `sql/migrations/13_*.sql` et `sql/migrations/15_*.sql`
+- [x] **SCHEMA-06**: La table `billing_events` (migration 15) et les tables `motos_proprietaires_historique`/`liaisons_client_garage`/`reclamations_moto` + la vue `v_motos_avec_proprietaire` (migration 13) sont ajoutées à `schema.sql`, à partir du DDL déjà présent dans `sql/migrations/13_*.sql` et `sql/migrations/15_*.sql`
 
 ### Vérification
 
@@ -46,7 +46,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCHEMA-03 | Phase 20 | Complete |
 | SCHEMA-04 | Phase 21 | Complete |
 | SCHEMA-05 | Phase 21 | Complete |
-| SCHEMA-06 | Phase 21 | Pending |
+| SCHEMA-06 | Phase 21 | Complete |
 | SCHEMA-07 | Phase 22 | Pending |
 
 **Coverage:**

@@ -4,13 +4,13 @@ milestone: v1.5
 milestone_name: Résolution dérive schema.sql
 status: executing
 stopped_at: Session resumed, proceeding to execute Phase 21 (4 plans, waves 1-3)
-last_updated: "2026-07-10T09:00:48.977Z"
+last_updated: "2026-07-10T13:15:16.127Z"
 last_activity: 2026-07-10
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
 ---
 
 # MotoKey API — Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-07-09)
 ## Current Position
 
 Phase: 21 (migrations-r-troactives-mise-jour-schema-sql) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-07-10
 
