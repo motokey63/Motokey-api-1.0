@@ -109,7 +109,11 @@ See [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md) for full phase deta
   2. `schema.sql` inclut chaque colonne de Gap A sur `garages`/`clients`/`interventions`/`devis`, avec les mêmes contraintes et nullabilité qu'en prod
   3. `schema.sql` inclut la table `billing_events` (migration 15) et les tables `motos_proprietaires_historique`/`liaisons_client_garage`/`reclamations_moto` + la vue `v_motos_avec_proprietaire` (migration 13), reprises depuis le DDL déjà présent dans `sql/migrations/13_*.sql` et `sql/migrations/15_*.sql`
   4. Une comparaison automatique de `schema.sql` contre l'introspection prod (Phase 20) ne montre plus aucune colonne ou objet non documenté pour Gap A et Gap B
-**Plans**: TBD
+**Plans**: 4 plans
+  - [x] 21-01-PLAN.md — Fichiers de migration rétroactifs Gap A (20/21/22 : garages, interventions, devis) avec commentaires d'origine (SCHEMA-04)
+  - [x] 21-02-PLAN.md — schema.sql : colonnes Gap A sur garages/clients/interventions/devis (port clients RBAC, FK hors-scope omises, nettoyage 10 colonnes devis obsolètes) (SCHEMA-05)
+  - [ ] 21-03-PLAN.md — schema.sql : tables/vue Gap B (billing_events + tables L8 migration 13) + enum + NETTOYAGE + sonde RLS prod (SCHEMA-06)
+  - [ ] 21-04-PLAN.md — Vérification finale : complétude Gap A/Gap B, aucun objet non documenté restant (SCHEMA-05/06)
 
 ### Phase 22: Vérification Bootstrap & Nettoyage Header
 **Goal**: `schema.sql` est prouvé bootstrappable proprement contre un projet Supabase neuf et ne revendique plus de statut "known-partial-bootstrap" pour Gap A/Gap B.
@@ -152,4 +156,4 @@ Phases execute in numeric order: 18 → 19 → 20 → 21 → 22 (20→21→22 ar
 | Phase 22 | v1.5 | 0/TBD | Not started | - |
 
 ---
-*Roadmap updated: 2026-07-09 — Phase 20 planned (2 plans, waves 1-2).*
+*Roadmap updated: 2026-07-09 — Phase 21 planned (4 plans, waves 1-3).*

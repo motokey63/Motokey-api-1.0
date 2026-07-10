@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Résolution dérive schema.sql
 status: executing
-stopped_at: Completed 20-02-PLAN.md
-last_updated: "2026-07-09T18:39:35.244Z"
-last_activity: 2026-07-09
+stopped_at: Session resumed, proceeding to execute Phase 21 (4 plans, waves 1-3)
+last_updated: "2026-07-10T09:00:48.977Z"
+last_activity: 2026-07-10
 progress:
   total_phases: 3
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  total_plans: 6
+  completed_plans: 4
 ---
 
 # MotoKey API — Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-09)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 20 — introspection-corr-lation-d-origine
+**Current focus:** Phase 21 — migrations-r-troactives-mise-jour-schema-sql
 
 ## Current Position
 
-Phase: 21
-Plan: Not started
+Phase: 21 (migrations-r-troactives-mise-jour-schema-sql) — EXECUTING
+Plan: 3 of 4
 Status: Ready to execute
-Last activity: 2026-07-09
+Last activity: 2026-07-10
 
 ```
 v1.0 ████████████ SHIPPED
@@ -72,5 +72,5 @@ v1.5 phase split rationale: Phase 20 (SCHEMA-02/03, investigation — must prece
 
 ## Session Continuity
 
-Last session: 2026-07-09T18:13:37.020Z
-Stopped at: Completed 20-02-PLAN.md
+Last session: 2026-07-10
+Stopped at: Session resumed, proceeding to execute Phase 21 (4 plans, waves 1-3)
