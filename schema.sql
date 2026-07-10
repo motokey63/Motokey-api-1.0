@@ -111,6 +111,12 @@ CREATE TABLE garages (
   grace_period_ends_at            TIMESTAMPTZ,
   motos_limit                     INTEGER,
   users_limit                     INTEGER,
+  -- Gap A (Phase 21, SCHEMA-05) — colonnes prod sans fichier de migration (voir sql/migrations/20)
+  ville             TEXT,                          -- découpage d'adresse structuré, préparé mais jamais câblé (confirmé Mehdi 2026-07-09)
+  cp                TEXT,                          -- découpage d'adresse structuré, préparé mais jamais câblé (confirmé Mehdi 2026-07-09)
+  type              TEXT NOT NULL DEFAULT 'pro',   -- origine indéterminée, non utilisée par le code actuel (verdict terminal Phase 20)
+  marque_officielle TEXT,                          -- origine indéterminée, non utilisée par le code actuel (verdict terminal Phase 20)
+  actif             BOOLEAN NOT NULL DEFAULT true, -- origine indéterminée, non utilisée par le code actuel (verdict terminal Phase 20)
   created_at      TIMESTAMPTZ DEFAULT NOW(),
   updated_at      TIMESTAMPTZ DEFAULT NOW()
 );
@@ -283,6 +289,11 @@ CREATE TABLE interventions (
   facture_ocr       JSONB,
   notifie_client    BOOLEAN DEFAULT false,
   notifie_at        TIMESTAMPTZ,
+  -- Gap A (Phase 21, SCHEMA-05) — colonnes prod sans fichier de migration (voir sql/migrations/21)
+  niveau_preuve   TEXT DEFAULT 'declare' CHECK (niveau_preuve IN ('facture','visuel','declare')),  -- origine indéterminée (terminal Phase 20)
+  facture_id      UUID,           -- origine indéterminée (terminal Phase 20). FK prod : factures_scannees(id) ON DELETE SET NULL — table hors périmètre schema.sql (voir header), FK volontairement omise pour bootstrap propre
+  operation_code  TEXT,           -- origine indéterminée (terminal Phase 20)
+  photo_url       TEXT,           -- origine indéterminée (terminal Phase 20)
   created_at        TIMESTAMPTZ DEFAULT NOW(),
   updated_at        TIMESTAMPTZ DEFAULT NOW()
 );
