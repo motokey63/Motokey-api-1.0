@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Résolution dérive schema.sql
-status: verifying
-stopped_at: "Phase 22 plan 01 complete — verification tooling ready, plan 22-02 needs Mehdi's human-action checkpoint (fresh Supabase project)"
-last_updated: "2026-07-11T09:59:58.000Z"
+status: executing
+stopped_at: Completed 22-02-PLAN.md — bootstrap SCHEMA_BOOTSTRAP_OK, fresh-vs-prod compare PASS (18/18), billing_events.created_at drift fixed
+last_updated: "2026-07-11T20:48:25.439Z"
 last_activity: 2026-07-11
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 7
-  completed_plans: 7
+  total_plans: 9
+  completed_plans: 8
 ---
 
 # MotoKey API — Project State
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-07-09)
 ## Current Position
 
 Phase: 22
-Plan: 1 of 3 in current phase
-Status: Plan 22-01 complete — 22-02 next (human-action checkpoint: fresh Supabase project)
+Plan: 2 of 3 in current phase
+Status: Ready to execute
 Last activity: 2026-07-11
 
 ```
@@ -48,6 +48,7 @@ v1.5 [░░░░░░░░░░] 0% (Phases 20-22 not started)
 | Phase 20 P01 | 20min | 2 tasks | 2 files |
 | Phase 20 P02 | 15min | 2 tasks | 1 files |
 | Phase 22 P01 | 15min | 2 tasks | 2 files |
+| Phase 22 P02 | 20min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -62,6 +63,8 @@ v1.5 phase split rationale: Phase 20 (SCHEMA-02/03, investigation — must prece
 - [Phase 20-01]: 25 devis columns classified as code-catch-up (b29d4f5/f2d7d9a) not true origin — true DB origin flagged earlier/unknown, undocumented Dashboard ALTER
 - [Phase 20]: ville/cp CONFIRMED as unwired address-split feature (real prod data + Mehdi confirmation); 7 remaining ghost columns terminal INCONNU/OUBLIÉ verdict — origin exhausted via git (20-01) and Mehdi (20-02), not to be re-questioned
 - [Phase 22-01]: introspect-schema.js EXPECTED_TABLES extended to 18 entries (5 Gap B objects added) and a committed scripts/bootstrap-fresh-schema.js authored — both prerequisites for 22-02's human-gated fresh-project bootstrap verification (SCHEMA-07)
+- [Phase 22]: [Phase 22-02]: introspect-schema.js --compare could not reach the fresh Supabase project (new sb_publishable_/sb_secret_ key format blocks PostgREST root OpenAPI discovery for non-secret keys) — worked around with a throwaway direct-pg/information_schema comparison, fresh bootstrap confirmed to match prod on all 18 expected tables/objects
+- [Phase 22]: [Phase 22-02]: Fixed real schema drift found during bootstrap verification — prod's billing_events had a created_at column absent from schema.sql/migration 15 with no git trace; added to schema.sql documented as origine indéterminée, matching Phase 20/21 convention
 
 ### Pending Todos
 
@@ -74,5 +77,5 @@ v1.5 phase split rationale: Phase 20 (SCHEMA-02/03, investigation — must prece
 
 ## Session Continuity
 
-Last session: 2026-07-11
-Stopped at: Completed 22-01-PLAN.md
+Last session: 2026-07-11T20:48:25.436Z
+Stopped at: Completed 22-02-PLAN.md — bootstrap SCHEMA_BOOTSTRAP_OK, fresh-vs-prod compare PASS (18/18), billing_events.created_at drift fixed

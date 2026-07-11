@@ -20,7 +20,7 @@ Requirements for milestone v1.5 (Résolution dérive schema.sql). Each maps to r
 
 ### Vérification
 
-- [ ] **SCHEMA-07**: Bootstrap vérifié propre (aucune erreur SQL) contre un projet Supabase neuf, comme en Phase 19 ; le header "known-partial-bootstrap" de `schema.sql` est mis à jour pour ne plus lister les Gaps A et B comme non résolus
+- [x] **SCHEMA-07**: Bootstrap vérifié propre (aucune erreur SQL) contre un projet Supabase neuf, comme en Phase 19 ; le header "known-partial-bootstrap" de `schema.sql` est mis à jour pour ne plus lister les Gaps A et B comme non résolus
 
 ## v2 Requirements
 
@@ -47,7 +47,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCHEMA-04 | Phase 21 | Complete |
 | SCHEMA-05 | Phase 21 | Complete |
 | SCHEMA-06 | Phase 21 | Complete |
-| SCHEMA-07 | Phase 22 | Pending |
+| SCHEMA-07 | Phase 22 | Complete |
 
 **Coverage:**
 - v1 requirements: 6 total
