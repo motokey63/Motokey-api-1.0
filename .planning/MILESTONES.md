@@ -1,5 +1,18 @@
 # MotoKey — Milestones
 
+## v1.5 Résolution dérive schema.sql (Shipped: 2026-07-11)
+
+**Phases completed:** 3 phases, 9 plans, 20 tasks
+
+**Key accomplishments:**
+
+- Finalized 20-FINDINGS.md with pg-catalog EXACT metadata (information_schema.columns + pg_constraint) for all 39 undocumented columns and Mehdi's terminal ghost-column verdicts: ville/cp CONFIRMED as an unwired address-split feature, the other 7 columns (garages.type/marque_officielle/actif, interventions.niveau_preuve/facture_id/photo_url/operation_code) permanently INCONNU/OUBLIÉ.
+- Ported 4 tables + 1 view + 1 enum from migrations 13/15 into schema.sql verbatim, wired idempotent NETTOYAGE drops, and resolved RLS state for all 4 tables via a live anon-equivalent REST probe (RLS ON, default-deny — not a guess).
+- Real fresh-Postgres bootstrap of schema.sql confirmed clean (SCHEMA_BOOTSTRAP_OK), and a genuine drift found+fixed along the way: prod's billing_events had a created_at column missing from schema.sql that no prior phase had caught.
+- schema.sql's stale "known-partial-bootstrap" header no longer frames Gap A/Gap B as unresolved — both are now marked RÉSOLU with pointers to their Phase 21 retroactive migrations, while the genuinely-still-true ~19-table out-of-scope boundary is untouched; PROJECT.md's Known Gaps closes the matching bullet.
+
+---
+
 ## v1.4 Maintenance — CLIENT Fixture & Schema Drift (Shipped: 2026-07-09)
 
 **Phases completed:** 2 phases, 4 plans, 9 tasks
