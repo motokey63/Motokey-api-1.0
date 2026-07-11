@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.5
 milestone_name: Résolution dérive schema.sql
 status: verifying
-stopped_at: Session resumed, proceeding to execute Phase 21 (4 plans, waves 1-3)
-last_updated: "2026-07-10T17:14:52.869Z"
-last_activity: 2026-07-10
+stopped_at: "Phase 22 plan 01 complete — verification tooling ready, plan 22-02 needs Mehdi's human-action checkpoint (fresh Supabase project)"
+last_updated: "2026-07-11T09:59:58.000Z"
+last_activity: 2026-07-11
 progress:
   total_phases: 3
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 7
+  completed_plans: 7
 ---
 
 # MotoKey API — Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-09)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 21 — migrations-r-troactives-mise-jour-schema-sql
+**Current focus:** Phase 22 — v-rification-bootstrap-nettoyage-header
 
 ## Current Position
 
 Phase: 22
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-07-10
+Plan: 1 of 3 in current phase
+Status: Plan 22-01 complete — 22-02 next (human-action checkpoint: fresh Supabase project)
+Last activity: 2026-07-11
 
 ```
 v1.0 ████████████ SHIPPED
@@ -44,9 +44,10 @@ v1.5 [░░░░░░░░░░] 0% (Phases 20-22 not started)
 |--------|-------|
 | Milestones shipped | 5 (v1.0 + v1.1 + v1.2 + v1.3 + v1.4) |
 | Known gaps carried forward | Phase 8/BILL-06 (Stripe live mode, since v1.2), MSTORE-02 (store submission, since v1.3) — both blocked on Mehdi's external account/dashboard actions, not addressed by v1.5 |
-| Next action | `/gsd:execute-phase 20` (Wave 2: plan 20-02) |
+| Next action | `/gsd:execute-phase 22` (Wave 2: plan 22-02, human-action checkpoint) |
 | Phase 20 P01 | 20min | 2 tasks | 2 files |
 | Phase 20 P02 | 15min | 2 tasks | 1 files |
+| Phase 22 P01 | 15min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -60,6 +61,7 @@ v1.5 phase split rationale: Phase 20 (SCHEMA-02/03, investigation — must prece
 - [Phase 20-01]: 9 garages/interventions columns confirmed ghost columns (zero code trail + architecturally unreachable via allowlist/payload) — awaiting Mehdi confirmation in plan 02
 - [Phase 20-01]: 25 devis columns classified as code-catch-up (b29d4f5/f2d7d9a) not true origin — true DB origin flagged earlier/unknown, undocumented Dashboard ALTER
 - [Phase 20]: ville/cp CONFIRMED as unwired address-split feature (real prod data + Mehdi confirmation); 7 remaining ghost columns terminal INCONNU/OUBLIÉ verdict — origin exhausted via git (20-01) and Mehdi (20-02), not to be re-questioned
+- [Phase 22-01]: introspect-schema.js EXPECTED_TABLES extended to 18 entries (5 Gap B objects added) and a committed scripts/bootstrap-fresh-schema.js authored — both prerequisites for 22-02's human-gated fresh-project bootstrap verification (SCHEMA-07)
 
 ### Pending Todos
 
@@ -72,5 +74,5 @@ v1.5 phase split rationale: Phase 20 (SCHEMA-02/03, investigation — must prece
 
 ## Session Continuity
 
-Last session: 2026-07-10
-Stopped at: Session resumed, proceeding to execute Phase 21 (4 plans, waves 1-3)
+Last session: 2026-07-11
+Stopped at: Completed 22-01-PLAN.md

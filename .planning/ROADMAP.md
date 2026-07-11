@@ -124,7 +124,7 @@ See [milestones/v1.4-ROADMAP.md](milestones/v1.4-ROADMAP.md) for full phase deta
   2. Une comparaison automatique (`introspect-schema.js --compare` ou équivalent) confirme que le bootstrap neuf correspond à prod pour tous les objets Gap A/Gap B
   3. L'en-tête de `schema.sql` ne liste plus Gap A ni Gap B comme non résolus/known-partial
   4. `PROJECT.md` Known Gaps reflète la fermeture de la dérive non documentée
-**Plans**: TBD
+**Plans**: 1/3 plans executed (22-01 done — verification tooling; 22-02 human-action checkpoint next; 22-03 header rewrite)
 
 ## Progress
 
@@ -153,7 +153,7 @@ Phases execute in numeric order: 18 → 19 → 20 → 21 → 22 (20→21→22 ar
 | Phase 19 | v1.4 | 3/3 | ✅ Complete | 2026-07-09 |
 | Phase 20 | v1.5 | 0/2 | Not started | - |
 | Phase 21 | v1.5 | 0/TBD | Not started | - |
-| Phase 22 | v1.5 | 0/TBD | Not started | - |
+| Phase 22 | v1.5 | 1/3 | In Progress  | - |
 
 ---
 *Roadmap updated: 2026-07-09 — Phase 21 planned (4 plans, waves 1-3).*
