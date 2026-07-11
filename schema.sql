@@ -3,7 +3,7 @@
 -- ║         Corrigé : RLS avec EXISTS au lieu de IN          ║
 -- ╚══════════════════════════════════════════════════════════╝
 
--- ⚠️ BOOTSTRAP PARTIEL CONNU (Phase 19 v1.4 — 2026-07-08, patché 2026-07-09)
+-- ⚠️ BOOTSTRAP PARTIEL CONNU (Phase 19 v1.4 — 2026-07-08 ; Gap A + Gap B résolus et vérifiés Phases 21-22 v1.5 — 2026-07-10)
 -- Ce fichier reflète le schéma prod pour les objets des migrations 1–19 UNIQUEMENT.
 -- Il NE couvre PAS ~19 tables/vues qui existent en prod sans fichier de migration :
 --   • Ordres de réparation : ordres_reparation, or_taches, or_pieces, or_historique
@@ -17,27 +17,17 @@
 -- Un projet bootstrappé ici obtient le socle garage (migrations 1–19), PAS ces sous-systèmes.
 -- Parité complète 38 tables : différée (voir REQUIREMENTS.md Out of Scope, narrowed 2026-07-08).
 --
--- GAP CONNU SUPPLÉMENTAIRE — objets des migrations 1–19 encore absents de ce fichier
--- (trouvés le 2026-07-09 via node scripts/introspect-schema.js --compare, non corrigés
--- car hors du périmètre convenu pour cette passe — colonnes uniquement) :
---   • Migration 15 (billing) : table billing_events (audit trail Stripe) non créée ici.
---   • Migration 13 (L8)      : tables motos_proprietaires_historique, liaisons_client_garage,
---                              reclamations_moto, et la vue v_motos_avec_proprietaire non créées ici.
---     (Les colonnes motos/clients de la migration 13 elle-même SONT incluses ci-dessous.)
+-- Gap B (objets des migrations 13/15) — RÉSOLU en Phase 21 (SCHEMA-06), vérifié par bootstrap
+-- propre + comparaison automatique vs prod en Phase 22 (SCHEMA-07) :
+--   • billing_events (migration 15) + motos_proprietaires_historique, liaisons_client_garage,
+--     reclamations_moto et la vue v_motos_avec_proprietaire (migration 13) sont créés ci-dessous.
 --
--- DÉRIVE NON DOCUMENTÉE DÉCOUVERTE — colonnes prod sans AUCUN fichier de migration
--- correspondant dans sql/migrations/ (probablement des ALTER TABLE faits à la main via
--- le Dashboard pendant d'autres livraisons — OR, facturation, restructuration devis) :
---   • garages       : ville, cp, type, marque_officielle, actif
---   • clients       : client_type, raison_sociale, siret, tva_intracom, adresse_facturation
---   • interventions : niveau_preuve, facture_id, photo_url, operation_code
---   • devis         : entite_facturation_id, client_id, or_id, client_nom, client_adresse,
---                      client_cp, client_ville, client_email, client_tel, client_siret,
---                      client_tva, moto_label, moto_vin, moto_km, lignes, total_ht, total_tva,
---                      remise_montant, date_creation, date_validite, date_envoi,
---                      date_acceptation, date_refus, notes, cree_par
--- Non couvert ici — nécessiterait une recherche dédiée (type plan 19-01) pour capturer les
--- types/contraintes exacts avant de les ajouter. À traiter dans une phase future.
+-- Gap A (39 colonnes prod sans fichier de migration, sur garages/clients/interventions/devis) —
+-- RÉSOLU en Phase 21 (SCHEMA-04/05), vérifié bootstrap Phase 22 (SCHEMA-07) :
+--   • Chaque colonne porte un commentaire d'origine inline dans son bloc CREATE TABLE ci-dessous.
+--   • Détail origine/verdict : sql/migrations/20_garages_undocumented_columns.sql,
+--     sql/migrations/21_interventions_undocumented_columns.sql,
+--     sql/migrations/22_devis_undocumented_columns.sql (+ .planning .../20-FINDINGS.md).
 
 -- ══════════════════════════════════════════════════════════
 -- EXTENSIONS
