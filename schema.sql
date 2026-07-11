@@ -493,7 +493,8 @@ CREATE TABLE billing_events (
   event_type       TEXT        NOT NULL,
   garage_id        UUID        REFERENCES garages(id) ON DELETE SET NULL,
   payload          JSONB,
-  processed_at     TIMESTAMPTZ DEFAULT now()
+  processed_at     TIMESTAMPTZ DEFAULT now(),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now() -- origine indéterminée, découverte lors de la vérification bootstrap Phase 22 (SCHEMA-07) : absente de sql/migrations/15_billing_foundation.sql et de tout git log ; présente en prod (probablement ajoutée hors migration versionnée)
 );
 CREATE INDEX idx_billing_events_garage ON billing_events(garage_id);
 COMMENT ON TABLE  billing_events IS 'Audit trail des evenements Stripe recus. stripe_event_id UNIQUE = guard idempotency (rejeu webhook securise).';
