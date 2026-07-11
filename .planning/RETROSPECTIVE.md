@@ -184,6 +184,51 @@
 
 ---
 
+## Milestone: v1.5 — Résolution dérive schema.sql
+
+**Shipped:** 2026-07-11
+**Phases:** 3 (20→22) | **Plans:** 9 | **Commits:** 35 | **Files:** 24 (+2405/-166) | **Timeline:** 3 jours (2026-07-09 → 2026-07-11)
+
+### What Was Built
+
+1. 39 undocumented prod columns (Gap A) across `garages`/`clients`/`interventions`/`devis` fully catalogued with exact type/constraints/nullability and origin (git-correlated or Mehdi-confirmed), zero unresolved cells (Phase 20)
+2. 3 retroactive numbered migrations (`sql/migrations/20-22`) created, each column carrying an inline origin comment, feeding a `schema.sql` update matching prod exactly for all 39 columns (Phase 21)
+3. Gap B closed — 4 tables + 1 view + enum ported verbatim from migrations 13/15, RLS state resolved via a live REST probe rather than assumed (Phase 21)
+4. Real fresh-Postgres bootstrap of `schema.sql` proven clean end-to-end via a new committed verification script (`bootstrap-fresh-schema.js`) — a genuine, previously-undetected drift (`billing_events.created_at`) was caught and fixed along the way (Phase 22)
+5. `schema.sql`'s stale "known-partial-bootstrap" header rewritten — Gap A/B marked RÉSOLU, while the still-real ~19-table out-of-scope boundary stays intact (Phase 22)
+
+### What Worked
+
+- **Retroactive migrations sourced verbatim from a durable findings artifact** (`20-FINDINGS.md`): Phase 21 became a pure mechanical port with zero re-discovery, because Phase 20 had already resolved every column's exact type/constraints/origin. The integration checker later confirmed 39/39 columns traced with no drift.
+- **Accepting a terminal "INCONNU/OUBLIÉ" verdict for undeterminable ghost columns** (7 of them, Phase 20) avoided an open-ended research loop — consistent with v1.3's lesson about isolating unbounded-effort work rather than letting it silently expand a phase.
+- **Live re-execution during the verification pass itself, not just reading SUMMARY claims** — re-running the bootstrap during `22-VERIFICATION.md`'s own pass reproduced `SCHEMA_BOOTSTRAP_OK` independently, and it was this live-first posture (established in `22-02`) that caught the fresh project's new `sb_publishable_`/`sb_secret_` key format rejecting the existing PostgREST-based compare tooling — leading directly to discovering the `billing_events.created_at` drift via an `information_schema` fallback.
+
+### What Was Inefficient
+
+- **Two files document a constraint/column in a comment without applying it in their own DDL**: `sql/migrations/21_interventions_undocumented_columns.sql`'s `niveau_preuve` CHECK, and `sql/migrations/15_billing_foundation.sql` never backported with `billing_events.created_at`. Only `schema.sql` itself is authoritative — a future reader relying on either migration file standalone would get an incomplete picture.
+- **New Supabase projects' `sb_publishable_`/`sb_secret_` key format broke the existing PostgREST-based `--compare` tooling** (`401 Secret API key required`) — worked around ad hoc with a throwaway `information_schema` script mid-session, but `introspect-schema.js` itself wasn't updated to handle both key formats for future re-use.
+- **No README/.env.example created for the new fresh-project bootstrap verification chain** this milestone introduced — a repo-wide pre-existing gap, extended rather than closed.
+- **A live database password was pasted directly into chat** during Phase 22's human checkpoint (`FRESH_DB_URL`), despite the plan's own text explicitly warning "jamais dans le chat" — required a follow-up project deletion to fully close the exposure.
+
+### Patterns Established
+
+- Committed, re-runnable verification scripts (`bootstrap-fresh-schema.js`) instead of ad-hoc scratchpad scripts (Phase 19's equivalent was never committed) — makes "prove it still bootstraps clean" cheap to re-run in any future phase.
+- Undocumented prod drift workflow, now proven end-to-end: introspect → durable findings artifact with per-column origin verdicts (git-correlated or human-confirmed terminal) → retroactive numbered migration with inline origin comment → `schema.sql` update → live bootstrap+compare verification → header cleanup.
+- When a human-action checkpoint explicitly warns against pasting a secret in chat and the user does it anyway, the agent needs its own detection/response step (flag the exposure, recommend rotation or deletion) rather than relying solely on the plan text to prevent it.
+
+### Key Lessons
+
+- A verification tool built against one Supabase project's API key convention (legacy JWT-style `anon`/`service_role`) can silently break against a newer project using the new `sb_publishable_`/`sb_secret_` format — external-platform API conventions should be treated as a moving target to re-check, not something queried once and assumed stable going forward.
+- "Prove it live" during the verification pass itself — not just reading artifacts/SUMMARYs — is what actually caught a real drift (`billing_events.created_at`) that three prior phases' grep/diff-based checks had all missed.
+- Even an explicit "never paste secrets in chat" instruction embedded in the plan text does not reliably prevent a user from doing it anyway under checkpoint pressure — treat any credential that appears in the transcript as compromised regardless of whether a warning existed, and proactively recommend rotation/deletion.
+
+### Cost Observations
+
+- Sessions: ~2 (2026-07-09/10 Phases 20-21, 2026-07-11 Phase 22 + audit + completion)
+- Notable: Phase 22's single human checkpoint (create + supply credentials for + later delete a throwaway Supabase project) accounted for a disproportionate share of the phase's interactive back-and-forth relative to its 3 plans / 7 tasks — consistent with v1.4's observation that Dashboard-dependent checkpoints are the main friction point in an otherwise fast-moving milestone.
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Sessions | Shipped |
@@ -193,3 +238,4 @@
 | v1.2 Pioneer Program & Go-Live | 4 (8→11), 3/4 complete | ~4 | 2026-07-01 (Phase 8 known gap) |
 | v1.3 App Client Mobile | 6 (12→17) | ~7 | 2026-07-08 (MSTORE-02 known gap) |
 | v1.4 Maintenance | 2 (18→19) | 1 | 2026-07-09 (undocumented schema drift known gap) |
+| v1.5 Résolution dérive schema.sql | 3 (20→22) | ~2 | 2026-07-11 |
