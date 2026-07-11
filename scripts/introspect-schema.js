@@ -26,6 +26,7 @@ require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') }
 // Narrow scope (per 19-01-PLAN.md): baseline tables already in schema.sql
 // (devis_lignes intentionally excluded — dropped from prod, replaced by
 // devis.lignes JSONB) plus the 3 tables added by tracked migrations 12/16/17.
+// Plus les 5 objets Gap B (migrations 13/15) ajoutés à schema.sql en Phase 21 : billing_events, motos_proprietaires_historique, liaisons_client_garage, reclamations_moto, et la vue v_motos_avec_proprietaire.
 const EXPECTED_TABLES = [
   'garages',
   'techniciens',
@@ -39,7 +40,12 @@ const EXPECTED_TABLES = [
   'transfert_steps',
   'garage_users',
   'client_device_tokens',
-  'push_send_log'
+  'push_send_log',
+  'billing_events',
+  'motos_proprietaires_historique',
+  'liaisons_client_garage',
+  'reclamations_moto',
+  'v_motos_avec_proprietaire'
 ];
 
 const NARROW_SCOPE_TABLES = ['garage_users', 'client_device_tokens', 'push_send_log'];
