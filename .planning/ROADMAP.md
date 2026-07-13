@@ -8,6 +8,7 @@
 - ✅ **v1.3 App Client Mobile** — Phases 12→17 (shipped 2026-07-08, MSTORE-02 parked as known gap — see MILESTONES.md)
 - ✅ **v1.4 Maintenance — CLIENT Fixture & Schema Drift** — Phases 18→19 (shipped 2026-07-09)
 - ✅ **v1.5 Résolution dérive schema.sql** — Phases 20→22 (shipped 2026-07-11)
+- 🚧 **v1.6 Suivi usure consommables + anti-fraude km** — Phases 23→28 (in progress)
 
 ## Phases
 
@@ -90,10 +91,92 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
 
 </details>
 
+### 🚧 v1.6 Suivi usure consommables + anti-fraude km (Phases 23–28, In Progress)
+
+**Milestone Goal:** Donner à MotoKey le suivi d'usure des consommables moto (pneus, chaîne, plaquettes, disques, huile, liquide de frein) par photo + analyse IA (stub), avec anti-fraude stricte sur le kilométrage — cœur produit différenciateur, attaché au passeport moto transmissible à la revente.
+
+- [ ] **Phase 23: Schéma + Anti-Fraude km au niveau DB** - `releves_km` devient la source de vérité du km, croissance monotone stricte imposée par trigger DB, les 3 chemins d'écriture existants sont fermés
+- [ ] **Phase 24: Helpers supabase.js + Contrat Stub Vision** - Helpers CRUD des 3 nouvelles tables + `visionAnalysisService.js` flag-gated dont le contrat de réponse est verrouillé avant tout consommateur
+- [ ] **Phase 25: Endpoints Backend (km, photos, remplacement compteur, Cloudinary)** - Relevé km, changement de compteur PRO+, saisie consommables, upload photo avec stockage Cloudinary réel
+- [ ] **Phase 26: Cron de Rappel + Push/Badge** - Rappel photo 3000km OU 6 mois, idempotent, avec équivalent badge garage pour motos non réclamées
+- [ ] **Phase 27: UI Web Garage + Client (jauges, retrait Pneus legacy)** - Jauges % par consommable + jauge générale maillon faible, migration et retrait de la section Pneus historique
+- [ ] **Phase 28: UI Mobile Client (jauges, lecture seule)** - Écran jauges consommables sur l'app mobile native + deep link depuis la notification de rappel photo
+
+## Phase Details
+
+### Phase 23: Schéma + Anti-Fraude km au niveau DB
+**Goal**: Le kilométrage moto ne peut plus être modifié que via une source de vérité unique (`releves_km`), protégée contre toute régression par un trigger DB, avec les 3 chemins d'écriture existants fermés ; le schéma consommables est posé de façon extensible.
+**Depends on**: Nothing (first phase of v1.6 milestone; builds on v1.5's schema.sql discipline)
+**Requirements**: KM-01, KM-04, CONSO-02
+**Success Criteria** (what must be TRUE):
+  1. Toute tentative d'insertion d'un relevé km inférieur au maximum historique de la moto est rejetée par un trigger `BEFORE INSERT` en base de données et journalisée de façon visible pour le garage (table de rejet consultable)
+  2. `motos.km` est recalculé/dérivé automatiquement depuis `releves_km` à chaque relevé validé — `releves_km` est la seule source de vérité du kilométrage
+  3. Les 3 chemins d'écriture existants (`Motos.update()`, `Interventions.create()`, `OrdresReparation.cloturer()`) passent tous par la même fonction de validation partagée — aucun bypass restant, vérifiable en lisant chaque fonction
+  4. Le schéma `consommables` permet d'ajouter un nouveau type de consommable plus tard sans migration lourde (conception vérifiée en revue de schéma, pas seulement les 9 types v1 codés en dur)
+  5. `scripts/bootstrap-fresh-schema.js` confirme un bootstrap propre incluant les nouvelles tables (`consommables`, `photos_consommables`, `releves_km`) et leurs policies RLS écrites dans la même migration que leur `CREATE TABLE`
+**Plans**: TBD
+
+### Phase 24: Helpers supabase.js + Contrat Stub Vision
+**Goal**: Le contrat de réponse d'analyse IA (stub aujourd'hui, réel plus tard) est verrouillé et consommé identiquement par tous les futurs endpoints/jauges ; les helpers CRUD des 3 nouvelles tables existent comme unique point d'accès DB.
+**Depends on**: Phase 23
+**Requirements**: VISION-01, VISION-02
+**Success Criteria** (what must be TRUE):
+  1. `services/visionAnalysisService.js` expose `analyzePhoto()`, flag-gated par `VISION_ENABLED` (même convention que `EMAIL_ENABLED`/`PUSH_ENABLED`), qui renvoie une fausse analyse structurée tant que la clé Anthropic n'est pas configurée
+  2. La réponse suit un contrat fixe et stable : `% usure`, `état`, `confiance`, `analyse_status` (ok/incertain/echec), `engine` (stub/anthropic-vision-v1) — identique que ce soit le stub ou une future analyse réelle
+  3. Un appel direct à `analyzePhoto()` avec une URL factice renvoie une réponse conforme au contrat, vérifiable indépendamment de tout endpoint HTTP (test isolé, sans upload réel)
+  4. `Consommables`, `PhotosConsommables`, `RelevesKm` existent comme helpers CRUD minces dans `supabase.js`, seul point d'accès DB pour les 3 nouvelles tables
+**Plans**: TBD
+
+### Phase 25: Endpoints Backend (km, photos, remplacement compteur, Cloudinary)
+**Goal**: Les garages et clients peuvent soumettre des relevés km et des photos de consommables via l'API ; le mécano peut saisir les données de montage ; l'upload stocke réellement l'image sur Cloudinary.
+**Depends on**: Phase 24
+**Requirements**: KM-02, KM-03, CONSO-01, CONSO-03, CLOUD-01
+**Success Criteria** (what must be TRUE):
+  1. Un client ou un membre du garage peut soumettre un relevé km normal (photo optionnelle) via l'API, sans déclencher de changement de compteur
+  2. Un compte PRO/CONCESSION/ADMIN peut déclarer un changement de compteur via un endpoint dédié (archive l'ancien relevé, démarre un nouveau compteur signé) ; un compte MECANO ou CLIENT reçoit un refus (403)
+  3. Le mécano peut saisir/mettre à jour km_montage, date_montage et référence pour chacun des 9 types de consommables d'une moto via l'API
+  4. Un client ou un membre du garage peut uploader une photo de consommable ; l'upload déclenche l'analyse (stub) et l'historise avec sa date et son résultat d'analyse
+  5. L'upload de photo (compteur ou consommable) stocke réellement l'image sur Cloudinary et renvoie une URL exploitable — plus aucun placeholder
+**Plans**: TBD
+
+### Phase 26: Cron de Rappel + Push/Badge
+**Goal**: Les clients et les garages sont alertés automatiquement quand une photo de consommable devient nécessaire, sans spam et sans angle mort pour les motos garage non réclamées.
+**Depends on**: Phase 25
+**Requirements**: GAUGE-03, GAUGE-04
+**Success Criteria** (what must be TRUE):
+  1. Un client reçoit une notification push quand le km parcouru depuis la dernière photo d'un consommable atteint 3000 km OU que 6 mois se sont écoulés, le premier des deux déclenchant l'alerte
+  2. Le cron ne renvoie pas de notification en double pour le même franchissement de seuil (idempotence, même pattern de persistance que `services/maintenanceAlertService.js`)
+  3. Le garage voit un badge/indicateur équivalent au rappel sur les motos garage/non réclamées (sans compte client à notifier)
+**Plans**: TBD
+
+### Phase 27: UI Web Garage + Client (jauges, retrait Pneus legacy)
+**Goal**: Le garage et le client voient l'état d'usure de chaque consommable et l'état général de la moto (maillon le plus faible), et la section Pneus historique n'existe plus en doublon contradictoire.
+**Depends on**: Phase 25, Phase 26
+**Requirements**: GAUGE-01, GAUGE-02, CONSO-04
+**Success Criteria** (what must be TRUE):
+  1. Le garage voit, sur la fiche moto dans `app.html`, une jauge % par consommable (9 types) reflétant les dernières données/analyses disponibles
+  2. Le client voit, dans `MotoKey_Client.html`, la même jauge % par consommable pour ses motos
+  3. Le garage et le client voient une jauge générale égale au consommable en plus mauvais état (maillon le plus faible), jamais une moyenne
+  4. Les données `pneu_av`/`pneu_ar`/`pneu_km_montage` existantes ont été migrées vers les nouvelles lignes `consommables`, et la section Pneus legacy n'apparaît plus dans la navigation garage
+  5. `CLAUDE.md` est corrigé pour refléter l'état réel (retrait Pneus effectif) — plus de contradiction entre la doc et le code
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 28: UI Mobile Client (jauges, lecture seule)
+**Goal**: Le client voit, sur l'app mobile native, les mêmes jauges d'usure consommables que sur le web, et un tap sur la notification de rappel photo l'amène directement sur cet écran.
+**Depends on**: Phase 25 (endpoints gauges), Phase 26 (payload de notification de rappel)
+**Requirements**: GAUGE-05, GAUGE-06
+**Success Criteria** (what must be TRUE):
+  1. Le client voit, dans l'app mobile, une jauge % par consommable pour chacune de ses motos (même source de données que Phase 27, lecture seule — pas de capture photo depuis mobile ce milestone)
+  2. Le client voit une jauge générale égale au consommable en plus mauvais état (maillon le plus faible), cohérente avec ce qu'affiche le web
+  3. Un tap sur la notification push de rappel photo (Phase 26) navigue directement vers l'écran jauges de la moto concernée, via `mapNotificationDataToRoute()`
+**Plans**: TBD
+**UI hint**: yes
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 18 → 19 → 20 → 21 → 22 (20→21→22 are sequential — each depends on the prior phase's output)
+Phases execute in numeric order: 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26 → 27 → 28 (23→28 are sequential — each depends on the prior phase's output; Phase 27 depends on both 25 and 26; Phase 28 depends on 25 and 26, can run in parallel with 27)
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -118,6 +201,12 @@ Phases execute in numeric order: 18 → 19 → 20 → 21 → 22 (20→21→22 ar
 | Phase 20 | v1.5 | 2/2 | ✅ Complete | 2026-07-09 |
 | Phase 21 | v1.5 | 4/4 | ✅ Complete | 2026-07-10 |
 | Phase 22 | v1.5 | 3/3 | ✅ Complete | 2026-07-11 |
+| Phase 23 | v1.6 | 0/TBD | Not started | - |
+| Phase 24 | v1.6 | 0/TBD | Not started | - |
+| Phase 25 | v1.6 | 0/TBD | Not started | - |
+| Phase 26 | v1.6 | 0/TBD | Not started | - |
+| Phase 27 | v1.6 | 0/TBD | Not started | - |
+| Phase 28 | v1.6 | 0/TBD | Not started | - |
 
 ---
-*Roadmap updated: 2026-07-11 — v1.5 milestone archived (shipped). Next: /gsd:new-milestone.*
+*Roadmap updated: 2026-07-14 — v1.6 roadmap created (Phases 23–28, 17/17 requirements mapped, Phase 28 added after confirming mobile gauges were in scope per original request). Next: /gsd:plan-phase 23.*

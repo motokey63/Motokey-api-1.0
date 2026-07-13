@@ -36,6 +36,8 @@ Requirements for milestone v1.6 (Suivi usure consommables + anti-fraude km). Eac
 - [ ] **GAUGE-02**: Le garage et le client voient une jauge générale égale au consommable en plus mauvais état (maillon le plus faible), jamais une moyenne
 - [ ] **GAUGE-03**: Un client reçoit une notification push de rappel photo quand le km parcouru depuis la dernière photo d'un consommable atteint 3000 km OU que 6 mois se sont écoulés (le premier des deux déclenche)
 - [ ] **GAUGE-04**: Le garage voit un badge/indicateur équivalent au rappel pour les motos garage/non réclamées (sans compte client à notifier)
+- [ ] **GAUGE-05**: Un client voit sur l'app mobile native une jauge % par consommable pour sa moto (lecture seule — pas de capture photo depuis mobile ce milestone)
+- [ ] **GAUGE-06**: Un client voit sur l'app mobile native une jauge générale égale au consommable en plus mauvais état (maillon le plus faible), et un tap sur la notification de rappel photo (GAUGE-03) navigue vers cet écran
 
 ## v2 Requirements
 
@@ -52,6 +54,7 @@ Aucune requirement explicitement reportée à v2 — voir Out of Scope pour les 
 | ML prédictif de tendance d'usure | Aucune donnée longitudinale réelle n'existe encore contre un stub |
 | Ledger blockchain/hash-chained | Complexité inutile — écritures role-gated + RLS + log d'audit suffisent |
 | Sync OBD-II/télématique complète | Hors scope déjà acté dans PROJECT.md |
+| Capture photo consommable depuis l'app mobile native | Demande initiale = jauges + rappel sur mobile, pas upload — l'upload photo reste web (garage/client web) ce milestone ; capture caméra native différée si confirmée nécessaire |
 
 ## Traceability
 
@@ -59,27 +62,29 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| KM-01 | TBD | Pending |
-| KM-02 | TBD | Pending |
-| KM-03 | TBD | Pending |
-| KM-04 | TBD | Pending |
-| CONSO-01 | TBD | Pending |
-| CONSO-02 | TBD | Pending |
-| CONSO-03 | TBD | Pending |
-| CONSO-04 | TBD | Pending |
-| VISION-01 | TBD | Pending |
-| VISION-02 | TBD | Pending |
-| CLOUD-01 | TBD | Pending |
-| GAUGE-01 | TBD | Pending |
-| GAUGE-02 | TBD | Pending |
-| GAUGE-03 | TBD | Pending |
-| GAUGE-04 | TBD | Pending |
+| KM-01 | Phase 23 | Pending |
+| KM-02 | Phase 25 | Pending |
+| KM-03 | Phase 25 | Pending |
+| KM-04 | Phase 23 | Pending |
+| CONSO-01 | Phase 25 | Pending |
+| CONSO-02 | Phase 23 | Pending |
+| CONSO-03 | Phase 25 | Pending |
+| CONSO-04 | Phase 27 | Pending |
+| VISION-01 | Phase 24 | Pending |
+| VISION-02 | Phase 24 | Pending |
+| CLOUD-01 | Phase 25 | Pending |
+| GAUGE-01 | Phase 27 | Pending |
+| GAUGE-02 | Phase 27 | Pending |
+| GAUGE-03 | Phase 26 | Pending |
+| GAUGE-04 | Phase 26 | Pending |
+| GAUGE-05 | Phase 28 | Pending |
+| GAUGE-06 | Phase 28 | Pending |
 
 **Coverage:**
-- v1 requirements: 15 total
-- Mapped to phases: 0 (pending roadmap creation)
-- Unmapped: 15 ⚠️ (expected — roadmapper fills this in next)
+- v1 requirements: 17 total
+- Mapped to phases: 17/17 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-07-14*
-*Last updated: 2026-07-14 after initial definition*
+*Last updated: 2026-07-14 after adding mobile gauge phase (Phase 28, GAUGE-05/06) — corrected an earlier requirements-drafting gap that dropped the explicitly-requested mobile screens*
