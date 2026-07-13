@@ -114,7 +114,11 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
   3. Les 3 chemins d'écriture existants (`Motos.update()`, `Interventions.create()`, `OrdresReparation.cloturer()`) passent tous par la même fonction de validation partagée — aucun bypass restant, vérifiable en lisant chaque fonction
   4. Le schéma `consommables` permet d'ajouter un nouveau type de consommable plus tard sans migration lourde (conception vérifiée en revue de schéma, pas seulement les 9 types v1 codés en dur)
   5. `scripts/bootstrap-fresh-schema.js` confirme un bootstrap propre incluant les nouvelles tables (`consommables`, `photos_consommables`, `releves_km`) et leurs policies RLS écrites dans la même migration que leur `CREATE TABLE`
-**Plans**: TBD
+**Plans**: 4 plans (2 waves autonomes + gate)
+  - [ ] 23-01-PLAN.md — Schéma: 4 tables + triggers km (monotone/sync) + suppression trg_update_km + RLS documenté (migration + schema.sql même commit)
+  - [ ] 23-02-PLAN.md — Infra test Wave 0 (script pg trigger) + checkpoint FRESH_DB_URL
+  - [ ] 23-03-PLAN.md — supabase.js: RelevesKm.enregistrer() + fermeture des 3 chemins d écriture km (KM-04)
+  - [ ] 23-04-PLAN.md — Gate: bootstrap propre + test trigger vert + revue RLS/parité schema.sql
 
 ### Phase 24: Helpers supabase.js + Contrat Stub Vision
 **Goal**: Le contrat de réponse d'analyse IA (stub aujourd'hui, réel plus tard) est verrouillé et consommé identiquement par tous les futurs endpoints/jauges ; les helpers CRUD des 3 nouvelles tables existent comme unique point d'accès DB.
@@ -201,7 +205,7 @@ Phases execute in numeric order: 18 → 19 → 20 → 21 → 22 → 23 → 24 �
 | Phase 20 | v1.5 | 2/2 | ✅ Complete | 2026-07-09 |
 | Phase 21 | v1.5 | 4/4 | ✅ Complete | 2026-07-10 |
 | Phase 22 | v1.5 | 3/3 | ✅ Complete | 2026-07-11 |
-| Phase 23 | v1.6 | 0/TBD | Not started | - |
+| Phase 23 | v1.6 | 0/4 | Not started | - |
 | Phase 24 | v1.6 | 0/TBD | Not started | - |
 | Phase 25 | v1.6 | 0/TBD | Not started | - |
 | Phase 26 | v1.6 | 0/TBD | Not started | - |
