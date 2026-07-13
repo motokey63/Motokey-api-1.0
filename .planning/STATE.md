@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
-status: idle
-stopped_at: v1.6 roadmap created (Phases 23-28) — ready to plan Phase 23
-last_updated: "2026-07-14T00:00:00.000Z"
-last_activity: 2026-07-14
+status: planning
+stopped_at: Phase 23 context gathered
+last_updated: "2026-07-13T23:12:57.520Z"
+last_activity: 2026-07-14 — ROADMAP.md created, 17/17 requirements mapped across Phases 23-28 (Phase 28 mobile gauges added after correcting an initial scoping gap)
 progress:
   total_phases: 6
   completed_phases: 0
@@ -54,6 +54,7 @@ v1.6 [░░░░░░░░░░] IN PROGRESS — Phase 23 ready to plan
 Décisions complètes et à jour dans `.planning/PROJECT.md` (Key Decisions table) — historique détaillé de v1.5 archivé dans `.planning/milestones/v1.5-ROADMAP.md`, `.planning/milestones/v1.5-MILESTONE-AUDIT.md`, et `.planning/RETROSPECTIVE.md`.
 
 v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + research + roadmap):
+
 - Schéma consommables/photos_consommables/releves_km conçu extensible mais liste v1 = 9 types donnés (pneu_av/ar, chaîne, plaquettes_av/ar, disque_av/ar, huile_moteur, liquide_frein)
 - `releves_km` devient LA source de vérité du km — `motos.km` devient une colonne dérivée/cache, recalculée automatiquement
 - Changement de compteur (nouveau totaliseur) réservé PRO+ (PRO/CONCESSION/ADMIN) — jamais MECANO, jamais CLIENT
@@ -80,5 +81,5 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ## Session Continuity
 
-Last session: 2026-07-14T00:00:00.000Z
-Stopped at: v1.6 ROADMAP.md created (Phases 23-28, 17/17 requirements mapped, coverage validated) — REQUIREMENTS.md traceability updated, mobile gauge phase added after correcting scoping gap
+Last session: 2026-07-13T23:12:57.518Z
+Stopped at: Phase 23 context gathered
