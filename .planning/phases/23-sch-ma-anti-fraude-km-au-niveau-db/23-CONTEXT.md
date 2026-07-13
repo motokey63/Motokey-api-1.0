@@ -6,7 +6,7 @@
 <domain>
 ## Phase Boundary
 
-Le kilométrage moto ne peut plus être modifié que via une source de vérité unique (`releves_km`), protégée contre toute régression par un trigger DB, avec les 3 chemins d'écriture existants (`Motos.update()`, `Interventions.create()`, `OrdresReparation.cloturer()`) fermés/redirigés vers la validation partagée. Le schéma `consommables` (9 types v1) est posé de façon extensible. Aucune UI, aucun endpoint HTTP nouveau au-delà de ce qui sert la vérification DB-level dans cette phase — c'est une phase schéma + logique d'intégrité pure (KM-01, KM-04, CONSO-02).
+Le kilométrage moto ne peut plus être modifié que via une source de vérité unique (`releves_km`), protégée contre toute régression par un trigger DB. Des 3 chemins d'écriture existants, `Motos.update()` et `OrdresReparation.cloturer()` sont fermés/redirigés vers la validation partagée ; `Interventions.create()` reste volontairement découplé (km historique, voir D-05) mais son découplage devient explicite/documenté au lieu de silencieux. Le schéma `consommables` (9 types v1) est posé de façon extensible. Aucune UI, aucun endpoint HTTP nouveau au-delà de ce qui sert la vérification DB-level dans cette phase — c'est une phase schéma + logique d'intégrité pure (KM-01, KM-04, CONSO-02).
 
 </domain>
 
@@ -30,15 +30,22 @@ Le kilométrage moto ne peut plus être modifié que via une source de vérité 
 
 ### Fermeture des 3 chemins d'écriture existants (KM-04 — scope confirmé, pas de gray area)
 - `Motos.update()` (`supabase.js` ~L350, `allowed = ['km','pneu_av','pneu_ar','pneu_km_montage','couleur','photo_url']`) : retirer `km` de la liste `allowed`.
-- `Interventions.create()` (`supabase.js` ~L397) : router son écriture de km vers la même fonction de validation partagée plutôt que d'ignorer `motos.km`.
+- `Interventions.create()` (`supabase.js` ~L397) : **voir D-05 ci-dessous** — ne route PAS vers la validation monotone (le km d'intervention est un historique découplé par design), mais son découplage de `motos.km` doit être rendu explicite/documenté plutôt que silencieux.
 - `OrdresReparation.cloturer()` (`supabase.js` ~L893-922) : remplacer le garde-fou ad-hoc (`if (km_sortie < or.km_entree) throw` + silent-skip) par un appel à la même fonction de validation partagée, avec rejet+log au lieu du skip silencieux actuel.
 - Les colonnes `pneu_av`/`pneu_ar`/`pneu_km_montage` legacy restent intactes dans `Motos.update()` pour cette phase — leur migration/retrait est explicitement scope de Phase 27 (CONSO-04), pas de cette phase.
+
+### Km sur les interventions (`Interventions.create()`) — décision post-recherche
+- **D-05:** Le km saisi sur une intervention reste une **métadonnée historique découplée** du ratchet anti-fraude — jamais utilisé pour mettre à jour `motos.km` ni comparé au max historique de `releves_km`. Comportement actuel conservé, mais rendu **explicite et documenté** (commentaire dans le code + `schema.sql`), pas juste un silence non-intentionnel comme aujourd'hui. Permet au garage de continuer à saisir un historique d'entretien passé (km antérieur au km actuel de la moto) sans être bloqué. Résout la question ouverte n°1 de `23-RESEARCH.md`.
+- Conséquence : `Interventions.create()` n'a PAS besoin d'appeler la fonction de validation monotone partagée — seul `Motos.update()` (endpoint km normal, hors scope endpoint dans cette phase-ci mais le bypass doit être fermé) et `OrdresReparation.cloturer()` (qui, lui, représente un vrai "km de sortie live", pas un historique) doivent router vers la validation partagée pour respecter KM-04. La fermeture du bypass `Interventions.create()` pour KM-04 consiste à **documenter/garantir qu'il ne touche jamais `motos.km`**, pas à lui imposer la même monotonie.
+- Le sort du trigger existant `trg_update_km` (sur `interventions`) est laissé à la discrétion de l'implémentation (voir ci-dessous) — conséquence logique de D-05, pas une nouvelle décision produit.
 
 ### Claude's Discretion
 - Nom exact du trigger PL/pgSQL et de la fonction de validation partagée.
 - Forme exacte de la table de rejet (nom de table, nommage des colonnes) tant que D-04 est respecté.
 - Comment le bypass `type_evenement = 'remplacement_compteur'` est représenté dans `releves_km` (colonne enum vs table séparée d'événements) — détail d'implémentation.
 - Ordre exact des fichiers de migration (23/24/25/26 vs un seul fichier groupé) tant que la discipline "same-commit schema.sql + bootstrap-fresh-schema.js" (Pitfall 4/Anti-Pattern 2) est respectée.
+- Sort du trigger `trg_update_km` existant (sur `interventions`) : le garder tel quel (il ne touche pas `releves_km`, reste isolé) ou le supprimer s'il devient redondant/source de confusion — conséquence technique de D-05, pas de contrainte produit.
+- Faut-il seeder une ligne `releves_km` de baseline pour chaque moto existante (confort pour l'audit, pas une exigence de correction) — nice-to-have identifié par la recherche, laissé à la planification.
 
 </decisions>
 
@@ -46,6 +53,9 @@ Le kilométrage moto ne peut plus être modifié que via une source de vérité 
 ## Canonical References
 
 **Downstream agents MUST read these before planning or implementing.**
+
+### Phase-level research (produced 2026-07-14)
+- `.planning/phases/23-sch-ma-anti-fraude-km-au-niveau-db/23-RESEARCH.md` — trigger PL/pgSQL exact (BEFORE INSERT gate+log via RETURN NULL, AFTER INSERT motos.km sync), NULL-safe `GREATEST(motos.km, MAX(releves_km.km))` baseline finding, re-confirmed line numbers for the 3 existing km write paths, exact RLS-comment convention to mirror
 
 ### Research (v1.6 milestone, produced 2026-07-13/14)
 - `.planning/research/SUMMARY.md` — synthèse exécutive, ordre de phases, risques critiques
