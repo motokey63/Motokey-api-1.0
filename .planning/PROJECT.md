@@ -8,9 +8,18 @@ MotoKey est un système de gestion de garage moto (DMS) pour Garage Motolab. Con
 
 Le score d'intégrité anti-fraude (pondération 1.0/0.6/0.3 selon la preuve) — sans lui, MotoKey est un simple DMS ; avec lui, c'est une preuve de valeur vérifiable à la revente.
 
-## Next Milestone: TBD
+## Current Milestone: v1.6 Suivi usure consommables + anti-fraude km
 
-v1.5 (Résolution dérive schema.sql) shipped 2026-07-11 — see `.planning/milestones/v1.5-ROADMAP.md` for full detail. No new milestone scoped yet. Run `/gsd:new-milestone` to define the next one.
+**Goal:** Donner à MotoKey le suivi d'usure des consommables moto (pneus, chaîne, plaquettes, disques, huile, liquide de frein) par photo + analyse IA, avec anti-fraude sur le kilométrage — cœur produit différenciateur, attaché au passeport moto transmissible à la revente.
+
+**Target features:**
+- Schéma DB : `consommables` (par moto, extensible), `photos_consommables` (historique + analyses), `releves_km` (historique lectures km) — tout attaché à `moto_id`, jamais à `client_id`
+- Anti-fraude km : croissance monotone stricte, rejet + log garage si régression ; changement de compteur (remplacement totaliseur) réservé aux comptes PRO+ (PRO/CONCESSION/ADMIN), avec archivage de l'ancien relevé + signature garage
+- Endpoints upload photo consommable + relevé km, avec stub IA (fausse analyse structurée : % usure + état + confiance) — point de branchement propre pour la vraie clé Anthropic Claude Vision plus tard
+- Écrans mobile client + garage : jauges % par consommable + jauge générale = maillon le plus faible ; rappel de photo basé sur km parcouru depuis dernière photo + filet de sécurité 6 mois (push mobile + badge garage)
+- Cloudinary (stockage photos réel) et clé Anthropic (analyse Vision réelle) : câblage différé, stub/flag en attendant — même convention que `EMAIL_ENABLED`/`PUSH_ENABLED`
+
+v1.5 (Résolution dérive schema.sql) shipped 2026-07-11 — see `.planning/milestones/v1.5-ROADMAP.md` for full detail.
 
 ## Current State (after v1.5 — 2026-07-11)
 
@@ -172,4 +181,4 @@ This document evolves at phase transitions and milestone boundaries.
 5. Key Decisions log updated
 
 ---
-*Last updated: 2026-07-11 — v1.5 (Résolution dérive schema.sql) archived and shipped*
+*Last updated: 2026-07-13 — v1.6 (Suivi usure consommables + anti-fraude km) started*
