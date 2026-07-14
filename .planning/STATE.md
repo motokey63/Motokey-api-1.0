@@ -45,7 +45,7 @@ v1.6 [██░░░░░░░░] IN PROGRESS — Phase 23 COMPLETE (4/4 pla
 |--------|-------|
 | Milestones shipped | 6 (v1.0 + v1.1 + v1.2 + v1.3 + v1.4 + v1.5) |
 | Known gaps carried forward | Phase 8/BILL-06 (Stripe live mode, since v1.2), MSTORE-02 (store submission, since v1.3) — both blocked on Mehdi's external account/dashboard actions |
-| Next action | Phase 23 complete — run `/gsd:verify-phase 23` (optional) then start Phase 24 (helpers + stub IA contract). Prod migration `sql/migrations/23_consommables_km.sql` still needs manual apply via Supabase Dashboard SQL Editor before Phase 25 endpoints go live. |
+| Next action | Phase 23 complete, migration applied to prod (2026-07-14) — start Phase 24 (helpers + stub IA contract). |
 | Phase 23 P04 | 25min | 2 tasks | 3 files |
 
 ## Accumulated Context
@@ -86,7 +86,7 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - Phase 8 et MSTORE-02 restent des known gaps externes.
 - v1.6 discipline critique : toute nouvelle migration (Phase 23) doit inclure ses policies RLS dans le MÊME fichier que `CREATE TABLE`, et `schema.sql` doit être mis à jour dans la même phase, vérifié via `scripts/bootstrap-fresh-schema.js` — répéter la dérive résolue en v1.5 serait un échec de discipline évitable. **Vérifié tenu en Phase 23 (23-04).**
 - Ce repo a `.planning/` gitignored avec force-add individuel des fichiers — si `gsd-tools.cjs commit` signale `skipped_commit_docs_false`, force-add et committer directement avec git plutôt que de bloquer.
-- Prod migration `sql/migrations/23_consommables_km.sql` (avec le fix `analyse_ia`) reste à appliquer manuellement par Mehdi via Supabase Dashboard SQL Editor avant que Phase 25 ne câble des endpoints HTTP vers ces 4 tables — hors scope de Phase 23 (schéma seul, aucun chemin client-atteignable encore).
+- ~~Prod migration `sql/migrations/23_consommables_km.sql` reste à appliquer~~ → **APPLIQUÉE EN PROD 2026-07-14** (Mehdi, Supabase Dashboard SQL Editor, `rzbqbaccjyxvtlnfitrr`, exécution propre confirmée sans erreur). Vérifié côté Claude via sonde REST live (service-role key) : les 4 tables (`consommables`, `photos_consommables`, `releves_km`, `releves_km_rejets`) répondent `200 []`, et la clé publishable/anon reçoit aussi `200 []` (RLS default-deny actif, cohérent avec le pattern Phase 19/21). **Corrige un bug prod actif introduit par le déploiement du code 23-03 avant cette migration** : `OrdresReparation.cloturer()` appelait déjà `RelevesKm.enregistrer()` → `INSERT INTO releves_km` sur une table qui n'existait pas encore en prod (le code avait été poussé sur `origin/master` et auto-déployé par Railway avant l'application manuelle de la migration) — toute clôture d'OR en prod aurait échoué avec une exception non catchée après avoir déjà marqué l'OR `statut='termine'` en DB. Résolu, plus aucun blocage restant avant Phase 25.
 
 ## Session Continuity
 
