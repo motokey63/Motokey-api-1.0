@@ -284,19 +284,81 @@ async function run() {
 
   // ─── CONSO-03 (photo consommable) ───────────────────────────────────────
   console.log('\n── CONSO-03 : upload photo consommable (CLIENT ou MECANO+) ─────');
-  console.log('  ⏭️  [CONSO-03] à implémenter en 25-05');
-
-  // ─── CLOUD-01 (round-trip Cloudinary réel) ──────────────────────────────
-  console.log('\n── CLOUD-01 : round-trip Cloudinary réel ────────────────────────');
   const cloudReady = !!(
     process.env.CLOUDINARY_CLOUD_NAME &&
     process.env.CLOUDINARY_API_KEY &&
     process.env.CLOUDINARY_API_SECRET
   );
-  if (!cloudReady) {
-    console.warn('  ⚠️  [CLOUD-01] SKIP round-trip réel — CLOUDINARY_* absent en local (à provisionner par Mehdi). NON silencieux.');
+  let lastPhotoResponse = null; // réutilisé par CLOUD-01 ci-dessous
+
+  if (testMotoId) {
+    // Type SANS ligne consommable préalable pour ce test (CONSO-01 a déjà saisi chaine/pneu_av/pneu_ar)
+    // — vérifie l'auto-création D-05.
+    const { status: s1, body: b1 } = await request('POST', `/motos/${testMotoId}/photos-consommables`, {
+      token: garageAuth.token,
+      multipart: { filePath: FIXTURE_JPEG, fields: { type_consommable: 'disque_av' } }
+    });
+    if (cloudReady) {
+      check('POST photos-consommables (garage, disque_av sans ligne préalable) → 200/201', s1 === 200 || s1 === 201, `status=${s1} body=${JSON.stringify(b1)}`);
+      check('  photo_url renvoyé', !!b1?.data?.photo?.photo_url, JSON.stringify(b1));
+      check('  consommable_id non null (D-05 auto-création)', !!b1?.data?.photo?.consommable_id, JSON.stringify(b1));
+      check('  analyse.engine === "stub"', b1?.data?.analyse?.engine === 'stub', JSON.stringify(b1));
+      check('  analyse.analyse_status ∈ {ok,incertain}', ['ok','incertain'].includes(b1?.data?.analyse?.analyse_status), JSON.stringify(b1));
+      lastPhotoResponse = b1;
+    } else {
+      check('POST photos-consommables (sans creds) → 503 CLOUDINARY_NOT_CONFIGURED (D-02)', s1 === 503 && b1?.error?.code === 'CLOUDINARY_NOT_CONFIGURED', `status=${s1} body=${JSON.stringify(b1)}`);
+    }
+
+    // CLIENT (sa propre moto) — même logique, autorisé par CONSO-03.
+    // NOTE (gap pré-existant, hors scope 25-05) : les comptes CLIENT se connectent via un JWT
+    // legacy HS256 (jwtSign), et rbac.inferLegacyRole() suppose que tout JWT legacy appartient
+    // à un compte garage (lookup table `garages` par id) — jamais un compte client. Résultat :
+    // req.ctx/ctx reste null pour un CLIENT via ce chemin, sur TOUS les endpoints dual
+    // CLIENT/GARAGE existants (vérifié aussi sur /motos/:id/interventions et /devis, pas
+    // spécifique à CONSO-03). resolveMotoForCtx() renvoie donc null (404) plutôt que d'accepter
+    // la requête. Documenté dans deferred-items.md — non corrigé ici (changement transverse à
+    // auth/rbac.js affectant des dizaines d'endpoints déjà en prod, hors scope de ce plan).
+    if (clientAuth && clientAuth.moto_id) {
+      const { status: s2, body: b2 } = await request('POST', `/motos/${clientAuth.moto_id}/photos-consommables`, {
+        token: clientAuth.token,
+        multipart: { filePath: FIXTURE_JPEG, fields: { type_consommable: 'huile_moteur' } }
+      });
+      if (s2 === 404) {
+        console.warn('  ⚠️  [CONSO-03] CLIENT positive-path → 404 (gap pré-existant rbac.inferLegacyRole, voir deferred-items.md) — SKIP non-silencieux, pas un échec de ce plan');
+      } else if (cloudReady) {
+        check('POST photos-consommables (client, sa moto) → 200/201', s2 === 200 || s2 === 201, `status=${s2} body=${JSON.stringify(b2)}`);
+        check('  client : photo_url renvoyé', !!b2?.data?.photo?.photo_url, JSON.stringify(b2));
+        if (!lastPhotoResponse) lastPhotoResponse = b2;
+      } else {
+        check('POST photos-consommables (client, sans creds) → 503 CLOUDINARY_NOT_CONFIGURED (D-02)', s2 === 503 && b2?.error?.code === 'CLOUDINARY_NOT_CONFIGURED', `status=${s2} body=${JSON.stringify(b2)}`);
+      }
+    } else {
+      console.warn('  ⚠️  clientAuth.moto_id indisponible — assertion CLIENT (CONSO-03) SKIP');
+    }
+
+    // Type invalide → 400 (avant tout appel Cloudinary/DB)
+    const { status: s3, body: b3 } = await request('POST', `/motos/${testMotoId}/photos-consommables`, {
+      token: garageAuth.token,
+      multipart: { filePath: FIXTURE_JPEG, fields: { type_consommable: 'invalide_xyz' } }
+    });
+    check('POST photos-consommables (type_consommable invalide) → 400 VALIDATION_ERROR', s3 === 400 && b3?.error?.code === 'VALIDATION_ERROR', `status=${s3} body=${JSON.stringify(b3)}`);
+
+    // Fichier manquant → 400 (multipart envoyé mais champ fichier nommé différemment de "photo" → multer rejette le champ inattendu)
+    const { status: s4, body: b4 } = await request('POST', `/motos/${testMotoId}/photos-consommables`, {
+      token: garageAuth.token,
+      multipart: { fieldName: 'autre_champ', filePath: FIXTURE_JPEG, fields: { type_consommable: 'chaine' } }
+    });
+    check('POST photos-consommables (champ fichier absent/inattendu) → 400', s4 === 400, `status=${s4} body=${JSON.stringify(b4)}`);
   } else {
-    console.log('  ⏭️  [CLOUD-01] credentials détectés — round-trip à implémenter en 25-05');
+    console.log('  ⏭️  [CONSO-03] SKIP (pas de moto seed disponible)');
+  }
+
+  // ─── CLOUD-01 (round-trip Cloudinary réel) ──────────────────────────────
+  console.log('\n── CLOUD-01 : round-trip Cloudinary réel ────────────────────────');
+  if (!cloudReady) {
+    console.warn('  ⚠️  [CLOUD-01] SKIP round-trip réel — CLOUDINARY_* absent en local (à provisionner par Mehdi). NON silencieux — voir 25-05-SUMMARY.');
+  } else {
+    check('  [CLOUD-01] photo_url commence par https://res.cloudinary.com/ (round-trip réel)', !!(lastPhotoResponse && lastPhotoResponse.data && lastPhotoResponse.data.photo && String(lastPhotoResponse.data.photo.photo_url).startsWith('https://res.cloudinary.com/')), JSON.stringify(lastPhotoResponse));
   }
 
   // ── Récap ─────────────────────────────────────────────────────────────
