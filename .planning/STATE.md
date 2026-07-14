@@ -4,13 +4,13 @@ milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: executing
 stopped_at: "Phase 23 planned (4 plans, 3 waves) and validated — resumed session found STATE.md stale (still said "ready to plan") and 2 uncommitted plan refinements (D-04 acteur_id threading in 23-03, validation sign-off in 23-VALIDATION.md); reconciled and committed. Next: execute Phase 23 (blocked on FRESH_DB_URL for 23-02/23-04)."
-last_updated: "2026-07-14T09:27:20.984Z"
-last_activity: 2026-07-14 — Phase 23 execution: plan 23-01 complete (4 tables + 2 triggers + RLS default-deny, schema.sql same-commit); 23-02 partial (test harness written, checkpoint blocked on FRESH_DB_URL)
+last_updated: "2026-07-14T10:00:00.000Z"
+last_activity: 2026-07-14 — Phase 23 execution: plan 23-01 complete (4 tables + 2 triggers + RLS default-deny, schema.sql same-commit); 23-02 complete (test harness written, FRESH_DB_URL checkpoint resolved — throwaway project xjgyoehennuydoocbprj, connection verified live)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # MotoKey API — Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 ## Current Position
 
 Phase: 23 of 28 (Schéma + Anti-Fraude km au niveau DB) — EXECUTING
-Plan: 4 plans / 3 waves — 23-01 (wave 1, autonomous, DONE), 23-02 (wave 1, non-autonomous, PARTIAL — test harness written, blocked on FRESH_DB_URL), 23-03 (wave 2, autonomous, depends on 23-01), 23-04 (wave 3, gate, non-autonomous, depends on 23-01/02/03)
-Status: 23-01 complete (4 tables + 2 triggers + RLS, schema.sql hand-appended same commit) — 23-02 partial, checkpoint blocked on human action (FRESH_DB_URL, see Blockers); 23-03 can proceed (depends only on 23-01)
-Last activity: 2026-07-14 — Plan 23-01 executed: releves_km source de vérité km, anti-fraude monotone trigger, clamp legacy retiré (commits 4939644, bc7068a); Plan 23-02 partial: scripts/test-releves-km-trigger.js écrit (RED), checkpoint FRESH_DB_URL en attente
+Plan: 4 plans / 3 waves — 23-01 (wave 1, autonomous, DONE), 23-02 (wave 1, non-autonomous, DONE — FRESH_DB_URL resolved), 23-03 (wave 2, autonomous, depends on 23-01, IN PROGRESS), 23-04 (wave 3, gate, non-autonomous, depends on 23-01/02/03)
+Status: Wave 1 complete (23-01 + 23-02). Wave 2 (23-03) executing. Wave 3 (23-04 bootstrap gate) unblocked — FRESH_DB_URL now live-verified against throwaway project.
+Last activity: 2026-07-14 — Plan 23-01 executed: releves_km source de vérité km, anti-fraude monotone trigger, clamp legacy retiré (commits 4939644, bc7068a); Plan 23-02 complete: scripts/test-releves-km-trigger.js écrit (RED) + checkpoint FRESH_DB_URL résolu (projet jetable xjgyoehennuydoocbprj, connexion pg live vérifiée)
 
 ```
 v1.0 ████████████ SHIPPED
@@ -36,7 +36,7 @@ v1.2 [█████████░] SHIPPED 2026-07-01 (86%, Phase 8 known gap
 v1.3 ████████████ SHIPPED 2026-07-08 (MSTORE-02 known gap — carried forward)
 v1.4 ████████████ SHIPPED 2026-07-09 (undocumented schema drift known gap — carried forward)
 v1.5 ████████████ SHIPPED 2026-07-11 (Gap A/B schema.sql drift fully resolved, SCHEMA-02→07)
-v1.6 [██░░░░░░░░] IN PROGRESS — Phase 23: 1/4 plans done (23-01), wave 1 checkpoint (23-02) blocked on FRESH_DB_URL
+v1.6 [█████░░░░░] IN PROGRESS — Phase 23: 2/4 plans done (23-01, 23-02), Wave 2 (23-03) in progress
 ```
 
 ## Performance Metrics
@@ -45,7 +45,7 @@ v1.6 [██░░░░░░░░] IN PROGRESS — Phase 23: 1/4 plans done (
 |--------|-------|
 | Milestones shipped | 6 (v1.0 + v1.1 + v1.2 + v1.3 + v1.4 + v1.5) |
 | Known gaps carried forward | Phase 8/BILL-06 (Stripe live mode, since v1.2), MSTORE-02 (store submission, since v1.3) — both blocked on Mehdi's external account/dashboard actions |
-| Next action | `FRESH_DB_URL` from Mehdi (throwaway Supabase project, Dashboard → Settings → Database → Connection string) to unblock 23-02 checkpoint and 23-04 gate; meanwhile 23-03 (wave 2) can execute since it only depends on 23-01 |
+| Next action | Wave 2 (23-03: close 3 km write paths in supabase.js/motokey-api.js), then Wave 3 (23-04: bootstrap gate against xjgyoehennuydoocbprj, must go RED→GREEN) |
 
 ## Accumulated Context
 
@@ -79,8 +79,7 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ### Blockers/Concerns
 
-- **FRESH_DB_URL manquant** — plans 23-02 (script de test trigger) et 23-04 (gate bootstrap final) nécessitent une connexion Postgres directe vers un projet Supabase **jetable** (jamais prod). Action Mehdi : créer un nouveau projet Supabase, copier la connection string (mode session) depuis Dashboard → Settings → Database, l'ajouter dans `.env` sous `FRESH_DB_URL`. 23-01 (wave 1) et 23-03 (wave 2) ne dépendent pas de cette variable et peuvent s'exécuter sans elle.
-- **23-02 PARTIEL (2026-07-14)** — Task 1 (`scripts/test-releves-km-trigger.js`, 5 cas trigger + CHECK 9-types, RED tant que 23-01 n'est pas bootstrappé) livrée et committée (`3e6a96a`). Task 2 (checkpoint humain FRESH_DB_URL) non résolue cette session — re-confirmé absent de `.env`, aucune valeur fabriquée. Voir `23-02-SUMMARY.md` pour le détail. Plan 23-02 reste bloqué jusqu'à ce que Mehdi fournisse `FRESH_DB_URL` ; le plan 23-04 (gate bootstrap) en dépend directement.
+- ~~**FRESH_DB_URL manquant**~~ → **RÉSOLU 2026-07-14** — Mehdi a créé un projet Supabase jetable (`xjgyoehennuydoocbprj`, distinct de la prod `rzbqbaccjyxvtlnfitrr`) et fourni la connection string Postgres directe (Dashboard → Settings → Database → Connection string, mode session, port 5432). Écrite dans `.env` sous `FRESH_DB_URL` (gitignored, jamais committée). Connexion pg live vérifiée (`SELECT current_database()`) avant tout usage. Plans 23-02 (checkpoint) et 23-04 (gate bootstrap) débloqués.
 - Phase 8 et MSTORE-02 restent des known gaps externes.
 - v1.6 discipline critique : toute nouvelle migration (Phase 23) doit inclure ses policies RLS dans le MÊME fichier que `CREATE TABLE`, et `schema.sql` doit être mis à jour dans la même phase, vérifié via `scripts/bootstrap-fresh-schema.js` — répéter la dérive résolue en v1.5 serait un échec de discipline évitable.
 - Ce repo a `.planning/` gitignored avec force-add individuel des fichiers — si `gsd-tools.cjs commit` signale `skipped_commit_docs_false`, force-add et committer directement avec git plutôt que de bloquer.

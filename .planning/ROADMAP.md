@@ -116,7 +116,7 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
   5. `scripts/bootstrap-fresh-schema.js` confirme un bootstrap propre incluant les nouvelles tables (`consommables`, `photos_consommables`, `releves_km`) et leurs policies RLS écrites dans la même migration que leur `CREATE TABLE`
 **Plans**: 4 plans (2 waves autonomes + gate)
   - [x] 23-01-PLAN.md — Schéma: 4 tables + triggers km (monotone/sync) + suppression trg_update_km + RLS documenté (migration + schema.sql même commit)
-  - [ ] 23-02-PLAN.md — Infra test Wave 0 (script pg trigger) + checkpoint FRESH_DB_URL
+  - [x] 23-02-PLAN.md — Infra test Wave 0 (script pg trigger) + checkpoint FRESH_DB_URL
   - [ ] 23-03-PLAN.md — supabase.js: RelevesKm.enregistrer() + fermeture des 3 chemins d écriture km (KM-04)
   - [ ] 23-04-PLAN.md — Gate: bootstrap propre + test trigger vert + revue RLS/parité schema.sql
 
