@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: executing
-stopped_at: Phase 25 context gathered
-last_updated: "2026-07-14T17:08:09.554Z"
+stopped_at: Completed 25-01-PLAN.md
+last_updated: "2026-07-14T17:16:01.319Z"
 last_activity: 2026-07-14 -- Phase 25 execution started
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 11
-  completed_plans: 6
+  completed_plans: 7
 ---
 
 # MotoKey API — Project State
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 ## Current Position
 
 Phase: 25 (endpoints-backend-km-photos-remplacement-compteur-cloudinary) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 25
+Plan: 01 complete, 02 pending merge, 03/04/05 not started
+Status: Executing Phase 25 — 25-01 (Cloudinary service + TYPES_CONSOMMABLES foundations) complete, 3/3 tasks, no deviations
 Last activity: 2026-07-14 -- Phase 25 execution started
 
 ```
@@ -45,8 +45,9 @@ v1.6 [██░░░░░░░░] IN PROGRESS — Phase 23 COMPLETE (4/4 pla
 |--------|-------|
 | Milestones shipped | 6 (v1.0 + v1.1 + v1.2 + v1.3 + v1.4 + v1.5) |
 | Known gaps carried forward | Phase 8/BILL-06 (Stripe live mode, since v1.2), MSTORE-02 (store submission, since v1.3) — both blocked on Mehdi's external account/dashboard actions |
-| Next action | Phase 23 complete, migration applied to prod (2026-07-14) — start Phase 24 (helpers + stub IA contract). |
+| Next action | Phase 25 plan 01 (Cloudinary service + TYPES_CONSOMMABLES) complete — other Phase 25 plans (02-05) may be executing in parallel worktrees. |
 | Phase 23 P04 | 25min | 2 tasks | 3 files |
+| Phase 25 P01 | 20min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,9 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - [Phase 23]: Trigger monotone NULL-safe via GREATEST(COALESCE(v_moto_km,0), COALESCE(v_max_releve,0)) pour couvrir le premier relevé d'une moto prod existante
 - [Phase 23, plan 23-04]: `photos_consommables.analyse` renommée `analyse_ia` — "analyse" est un mot réservé PostgreSQL (ANALYSE/ANALYZE), causait un SCHEMA_BOOTSTRAP_FAILED réel ; découvert seulement en exécutant le bootstrap live (pas visible par simple lecture SQL) — confirme la discipline "gate = exécution réelle" de v1.5
 - [Phase 23, plan 23-04]: fixtures `test-releves-km-trigger.js` corrigées pour poser `proprietaire_type='garage'` + `proprietaire_garage_id` — la contrainte CHECK `moto_proprietaire_coherence` (L8) exige `client_id NOT NULL` si `proprietaire_type='client'` (valeur par défaut), incompatible avec un script qui n'a que des fixtures garage
+- [Phase 25]: D-02: cloudinaryService.uploadPhoto() throws 503 CLOUDINARY_NOT_CONFIGURED without credentials, never a placeholder URL (anti-fraud proof integrity)
+- [Phase 25]: multer forced to ^2.2.0 (never 1.x) to avoid unpatched CVE-2025-47944/CVE-2026-3520
+- [Phase 25]: TYPES_CONSOMMABLES centralized as single JS source of truth mirroring migration 23 CHECK constraint
 
 ### Pending Todos
 
@@ -90,5 +94,5 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ## Session Continuity
 
-Last session: 2026-07-14T16:17:38.852Z
-Stopped at: Phase 25 context gathered
+Last session: 2026-07-14T17:16:01.316Z
+Stopped at: Completed 25-01-PLAN.md

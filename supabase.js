@@ -1311,6 +1311,11 @@ const CataloguePieces = {
 // ══════════════════════════════════════════════════════════
 // CONSOMMABLES (v1.6 — Phase 24) — état courant d'un consommable par moto
 // ══════════════════════════════════════════════════════════
+
+// Les 9 types canoniques v1.6 — source d'autorité = contrainte CHECK migration 23.
+// Une seule copie JS pour valider côté endpoint (Pitfall 5 RESEARCH.md) ; extensible sans dupliquer.
+const TYPES_CONSOMMABLES = ['pneu_av','pneu_ar','chaine','plaquettes_av','plaquettes_ar','disque_av','disque_ar','huile_moteur','liquide_frein'];
+
 const Consommables = {
   // upsert (pas insert) : UNIQUE(moto_id, type_consommable) — la table modélise
   // l'état courant (une ligne par type), pas un historique append-only.
@@ -1654,6 +1659,7 @@ module.exports = {
   CataloguePieces,
   Consommables,
   PhotosConsommables,
+  TYPES_CONSOMMABLES,
   GarageUsers,
   resolveProprietaire,
   checkLimiteMotosClient,
