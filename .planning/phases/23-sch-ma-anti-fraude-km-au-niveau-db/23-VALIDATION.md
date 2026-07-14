@@ -2,8 +2,8 @@
 phase: 23
 slug: sch-ma-anti-fraude-km-au-niveau-db
 status: draft
-nyquist_compliant: false
-wave_0_complete: false
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-07-14
 ---
 
@@ -42,13 +42,15 @@ created: 2026-07-14
 | 23-0N-0N | TBD | 1 | KM-01 | DB-level (trigger) | `node scripts/test-releves-km-trigger.js --case=reject-regression` | ❌ W0 | ⬜ pending |
 | 23-0N-0N | TBD | 1 | KM-01 | DB-level (trigger, NULL-safe baseline) | `node scripts/test-releves-km-trigger.js --case=null-safe-baseline` | ❌ W0 | ⬜ pending |
 | 23-0N-0N | TBD | 1 | KM-01 | DB-level (remplacement_compteur bypass) | `node scripts/test-releves-km-trigger.js --case=counter-replacement-bypass` | ❌ W0 | ⬜ pending |
-| 23-0N-0N | TBD | 1-2 | KM-04 | Integration (direct `supabase.js` calls, no HTTP yet) | Node script calling `Motos.update()`, `Interventions.create()`, `OrdresReparation.cloturer()` directly against throwaway DB, asserting `km` never lands on `motos` except via the shared validated path | ❌ W0 | ⬜ pending |
+| 23-03-01/02, 23-04-01 | 03, 04 | 2-3 | KM-04 | Static analysis (grep source) + trigger behavioral | 23-03: `node --check supabase.js && node --check motokey-api.js` + grep asserts (km absent de `Motos.update` allowed, `cloturer` route via `RelevesKm.enregistrer` avec acteur threadé, `Interventions.create` découplé D-05) ; 23-04: `node scripts/test-releves-km-trigger.js` (comportement DB du chemin validé) | ✅ (23-03 static) | ⬜ pending |
 | 23-0N-0N | TBD | 1 | CONSO-02 | DB-level (CHECK constraint) | Attempt `INSERT ... type_consommable='invalide'`, assert Postgres `23514` check_violation; attempt each of the 9 valid types, assert success | ❌ W0 | ⬜ pending |
 | 23-0N-0N | TBD | final | (all) | Full bootstrap | `node scripts/bootstrap-fresh-schema.js` against throwaway project — prints `SCHEMA_BOOTSTRAP_OK` | ✅ (existing, Phase 22) | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
 *Exact task IDs/plan numbers filled in by gsd-planner — this map is a template the planner's task breakdown must satisfy, not a final assignment.*
+
+> **KM-04 verification scope (documented trade-off).** KM-04 closure ("aucun bypass km applicatif") is verified via **static analysis** — `node --check` + grep-based source-code assertions in 23-03 (acceptance criteria: `km` absent de `Motos.update` allowed, `OrdresReparation.cloturer()` route via `RelevesKm.enregistrer()`, endpoint thread `ctx.user_id`, `Interventions.create` découplé D-05) and by grep in 23-04 — **plus** the trigger-level **behavioral** tests in `scripts/test-releves-km-trigger.js` (which prove the validated path itself rejects/syncs correctly at the DB). It is **not** verified by a live `supabase.js`-level integration test that calls `Motos.update()` / `Interventions.create()` / `OrdresReparation.cloturer()` against a throwaway Supabase REST endpoint. **Why:** such a test would require a second credential type (a Supabase **REST/anon** endpoint + key exercising the JS client) beyond the `FRESH_DB_URL` direct-`pg` connection already requested from Mehdi — out of proportion for a pure schema + integrity phase. The static checks prove the code says the right thing (no direct `motos.km` writer remains); the trigger tests prove the shared path behaves correctly. Wiring both together at the JS-client level is deferred to a future phase that already needs REST credentials.
 
 ---
 
@@ -71,11 +73,12 @@ created: 2026-07-14
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references (`scripts/test-releves-km-trigger.js`, `FRESH_DB_URL`)
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (`scripts/test-releves-km-trigger.js`, `FRESH_DB_URL`)
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
+- [x] KM-04 static-verification scope documented (see note under Per-Task Verification Map)
 
-**Approval:** pending
+**Approval:** 2026-07-14 (approved with documented KM-04 static-verification scope)
