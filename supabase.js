@@ -379,6 +379,43 @@ const Motos = {
 };
 
 // ══════════════════════════════════════════════════════════
+// RELEVES KM — source de vérité km (KM-04)
+// ══════════════════════════════════════════════════════════
+const RelevesKm = {
+  // Unique point d'écriture km. Le trigger DB BEFORE INSERT est le vrai gate :
+  // si le km régresse, le trigger annule la ligne (0 row => PGRST116) et journalise
+  // dans releves_km_rejets. On normalise succès/rejet en un retour stable.
+  async enregistrer(garage_id, moto_id, { km, type_evenement = 'lecture', acteur_type, acteur_id, note = null, photo_url = null }) {
+    if (!moto_id) throw new Error('[RelevesKm.enregistrer] moto_id requis');
+    if (km === undefined || km === null || isNaN(parseInt(km))) throw new Error('[RelevesKm.enregistrer] km numérique requis');
+    if (!acteur_type || !acteur_id) throw new Error('[RelevesKm.enregistrer] acteur_type + acteur_id requis (jamais anonyme)');
+
+    const payload = {
+      moto_id, garage_id: garage_id || null,
+      km: parseInt(km), type_evenement,
+      acteur_type, acteur_id, note, photo_url
+    };
+
+    const { data, error } = await supabase.from('releves_km').insert(payload).select().single();
+
+    if (error) {
+      // PGRST116 = 0 ligne renvoyée = ligne annulée par le trigger monotone (rejet).
+      if (error.code === 'PGRST116') {
+        // Récupérer le rejet fraîchement journalisé pour renvoyer km_actuel/km_tente.
+        const { data: rejet } = await supabase.from('releves_km_rejets')
+          .select('km_tente, km_actuel')
+          .eq('moto_id', moto_id)
+          .order('created_at', { ascending: false })
+          .limit(1).maybeSingle();
+        return { accepted: false, km_tente: rejet?.km_tente ?? parseInt(km), km_actuel: rejet?.km_actuel ?? null };
+      }
+      throw new Error(`[RelevesKm.enregistrer] ${error.message}`);
+    }
+    return { accepted: true, releve: data };
+  }
+};
+
+// ══════════════════════════════════════════════════════════
 // INTERVENTIONS
 // ══════════════════════════════════════════════════════════
 const Interventions = {
@@ -1523,6 +1560,7 @@ module.exports = {
   Auth,
   Garages,
   Motos,
+  RelevesKm,
   Interventions,
   Entretien,
   Devis,
