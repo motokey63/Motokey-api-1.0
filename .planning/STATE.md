@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: executing
-stopped_at: Completed 25-03 (Wave 2)
-last_updated: "2026-07-14T20:46:05.000Z"
-last_activity: 2026-07-14 -- Phase 25 plan 03 (KM-02/KM-03 endpoints) complete
+stopped_at: Completed 25-04 (Wave 3) — CONSO-01 consommables endpoints, live-verified 15/15 against prod
+last_updated: "2026-07-14T22:59:31.000Z"
+last_activity: 2026-07-14 -- Phase 25 plan 04 complete
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 11
-  completed_plans: 8
+  completed_plans: 10
 ---
 
 # MotoKey API — Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 ## Current Position
 
 Phase: 25 (endpoints-backend-km-photos-remplacement-compteur-cloudinary) — EXECUTING
-Plan: 01/02/03 complete, 04/05 not started
-Status: Executing Phase 25 — 25-03 (KM-02 remplacement-compteur + KM-03 relevé km, multipart upload infra) complete, 3/3 tasks, live-verified 8/8 against prod (1 auto-fixed deviation, see 25-03-SUMMARY.md)
-Last activity: 2026-07-14 -- Phase 25 plan 03 complete
+Plan: 01/02/03/04 complete, 05 not started
+Status: Executing Phase 25 — 25-04 (CONSO-01 : PATCH unitaire + POST bulk consommables, MECANO+) complete, 2/2 tasks, live-verified 15/15 against prod (no deviations)
+Last activity: 2026-07-14 -- Phase 25 plan 04 complete
 
 ```
 v1.0 ████████████ SHIPPED
@@ -45,11 +45,12 @@ v1.6 [██░░░░░░░░] IN PROGRESS — Phase 23 COMPLETE (4/4 pla
 |--------|-------|
 | Milestones shipped | 6 (v1.0 + v1.1 + v1.2 + v1.3 + v1.4 + v1.5) |
 | Known gaps carried forward | Phase 8/BILL-06 (Stripe live mode, since v1.2), MSTORE-02 (store submission, since v1.3) — both blocked on Mehdi's external account/dashboard actions |
-| Next action | Phase 25 plan 03 (KM-02/KM-03 endpoints + multipart infra) complete — plans 04 (CONSO-01) and 05 (CONSO-03/CLOUD-01) remain, may be executing in parallel worktrees. |
+| Next action | Phase 25 plan 04 (CONSO-01 consommables endpoints) complete — plan 05 (CONSO-03/CLOUD-01) remains. |
 | Phase 23 P04 | 25min | 2 tasks | 3 files |
 | Phase 25 P01 | 20min | 3 tasks | 4 files |
 | Phase 25 P02 | 17min | 2 tasks | 2 files |
 | Phase 25 P03 | 25min | 3 tasks | 3 files |
+| Phase 25 P04 | 8min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,7 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - [Phase 25]: 25-02: garage login (rbac_role=CONCESSION) reused as PRO+/MECANO+ proxy token in test harness pending a dedicated seed account
 - [Phase 25, plan 25-03]: Multipart routes (`/motos/:id/km`, `/motos/:id/km/remplacement-compteur`) intercepted before the router's unconditional `body()` call (mirrors `/stripe/webhook`), posing `req.ctx` themselves via `rbac.extractRoleFromRequest` — first multipart pattern in `motokey-api.js`, established for CONSO-03 (25-05) to reuse
 - [Phase 25, plan 25-03]: `RelevesKm.enregistrer()` now falls back to `motos.km` when `releves_km_rejets` has no matching row, so the 409 `km_actuel` field is never null — found live against prod, where the audit-trail insert inside `verifier_km_monotone()` isn't persisting despite the rejection itself working correctly (see deferred-items.md, Phase 25 dir)
+- [Phase 25, plan 25-04]: CONSO-01 (PATCH unitaire + POST bulk consommables) exécuté sans déviation — les deux endpoints réutilisent exactement le pattern MECANO+/`resolveMotoForCtx()` déjà établi en 25-03, aucun nouveau helper
 
 ### Pending Todos
 
@@ -100,5 +102,5 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ## Session Continuity
 
-Last session: 2026-07-14T20:46:05.000Z
-Stopped at: Completed 25-03 (Wave 2) — KM-02/KM-03 endpoints + multipart infra, live-verified 8/8 against prod
+Last session: 2026-07-14T22:59:31.000Z
+Stopped at: Completed 25-04 (Wave 3) — CONSO-01 consommables endpoints, live-verified 15/15 against prod
