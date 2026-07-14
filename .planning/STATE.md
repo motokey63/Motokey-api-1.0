@@ -4,13 +4,13 @@ milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: executing
 stopped_at: "Phase 23 planned (4 plans, 3 waves) and validated — resumed session found STATE.md stale (still said "ready to plan") and 2 uncommitted plan refinements (D-04 acteur_id threading in 23-03, validation sign-off in 23-VALIDATION.md); reconciled and committed. Next: execute Phase 23 (blocked on FRESH_DB_URL for 23-02/23-04)."
-last_updated: "2026-07-14T10:00:00.000Z"
-last_activity: 2026-07-14 — Phase 23 execution: plan 23-01 complete (4 tables + 2 triggers + RLS default-deny, schema.sql same-commit); 23-02 complete (test harness written, FRESH_DB_URL checkpoint resolved — throwaway project xjgyoehennuydoocbprj, connection verified live)
+last_updated: "2026-07-14T10:04:43.631Z"
+last_activity: 2026-07-14 — Phase 23 execution: plan 23-01 complete (4 tables + 2 triggers + RLS default-deny, schema.sql same-commit); 23-02 complete (test harness written, FRESH_DB_URL checkpoint resolved — throwaway project xjgyoehennuydoocbprj, connection verified live); 23-03 complete (RelevesKm.enregistrer() shared validation, 3 km write paths closed, acteur_id threaded D-04)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
 ---
 
 # MotoKey API — Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 ## Current Position
 
 Phase: 23 of 28 (Schéma + Anti-Fraude km au niveau DB) — EXECUTING
-Plan: 4 plans / 3 waves — 23-01 (wave 1, autonomous, DONE), 23-02 (wave 1, non-autonomous, DONE — FRESH_DB_URL resolved), 23-03 (wave 2, autonomous, depends on 23-01, IN PROGRESS), 23-04 (wave 3, gate, non-autonomous, depends on 23-01/02/03)
-Status: Wave 1 complete (23-01 + 23-02). Wave 2 (23-03) executing. Wave 3 (23-04 bootstrap gate) unblocked — FRESH_DB_URL now live-verified against throwaway project.
-Last activity: 2026-07-14 — Plan 23-01 executed: releves_km source de vérité km, anti-fraude monotone trigger, clamp legacy retiré (commits 4939644, bc7068a); Plan 23-02 complete: scripts/test-releves-km-trigger.js écrit (RED) + checkpoint FRESH_DB_URL résolu (projet jetable xjgyoehennuydoocbprj, connexion pg live vérifiée)
+Plan: 4 plans / 3 waves — 23-01 (wave 1, autonomous, DONE), 23-02 (wave 1, non-autonomous, DONE — FRESH_DB_URL resolved), 23-03 (wave 2, autonomous, depends on 23-01, DONE), 23-04 (wave 3, gate, non-autonomous, depends on 23-01/02/03, NEXT)
+Status: Wave 1 + Wave 2 complete (23-01, 23-02, 23-03). Wave 3 (23-04 bootstrap gate) unblocked — FRESH_DB_URL live-verified against throwaway project, ready to execute.
+Last activity: 2026-07-14 — Plan 23-01 executed: releves_km source de vérité km, anti-fraude monotone trigger, clamp legacy retiré (commits 4939644, bc7068a); Plan 23-02 complete: scripts/test-releves-km-trigger.js écrit (RED) + checkpoint FRESH_DB_URL résolu (projet jetable xjgyoehennuydoocbprj, connexion pg live vérifiée); Plan 23-03 complete: RelevesKm.enregistrer() ajouté (supabase.js), Motos.update()/OrdresReparation.cloturer() fermés, acteur_id threadé (D-04), Interventions.create() documenté découplé (D-05) — commits 52e3bad, 1691389
 
 ```
 v1.0 ████████████ SHIPPED
@@ -36,7 +36,7 @@ v1.2 [█████████░] SHIPPED 2026-07-01 (86%, Phase 8 known gap
 v1.3 ████████████ SHIPPED 2026-07-08 (MSTORE-02 known gap — carried forward)
 v1.4 ████████████ SHIPPED 2026-07-09 (undocumented schema drift known gap — carried forward)
 v1.5 ████████████ SHIPPED 2026-07-11 (Gap A/B schema.sql drift fully resolved, SCHEMA-02→07)
-v1.6 [█████░░░░░] IN PROGRESS — Phase 23: 2/4 plans done (23-01, 23-02), Wave 2 (23-03) in progress
+v1.6 [███████░░░] IN PROGRESS — Phase 23: 3/4 plans done (23-01, 23-02, 23-03), Wave 3 (23-04) next
 ```
 
 ## Performance Metrics
@@ -45,7 +45,7 @@ v1.6 [█████░░░░░] IN PROGRESS — Phase 23: 2/4 plans done (
 |--------|-------|
 | Milestones shipped | 6 (v1.0 + v1.1 + v1.2 + v1.3 + v1.4 + v1.5) |
 | Known gaps carried forward | Phase 8/BILL-06 (Stripe live mode, since v1.2), MSTORE-02 (store submission, since v1.3) — both blocked on Mehdi's external account/dashboard actions |
-| Next action | Wave 2 (23-03: close 3 km write paths in supabase.js/motokey-api.js), then Wave 3 (23-04: bootstrap gate against xjgyoehennuydoocbprj, must go RED→GREEN) |
+| Next action | Wave 3 (23-04: bootstrap gate against xjgyoehennuydoocbprj, must go RED→GREEN) |
 
 ## Accumulated Context
 
@@ -86,5 +86,5 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ## Session Continuity
 
-Last session: 2026-07-14T00:00:00.000Z
-Stopped at: Phase 23 planned (4 plans, 3 waves) and validated — resumed session found STATE.md stale (still said "ready to plan") and 2 uncommitted plan refinements (D-04 acteur_id threading in 23-03, validation sign-off in 23-VALIDATION.md); reconciled and committed. Next: execute Phase 23 (blocked on FRESH_DB_URL for 23-02/23-04).
+Last session: 2026-07-14T10:04:43.631Z
+Stopped at: Plan 23-03 executed (parallel worktree agent) — RelevesKm.enregistrer() added as the single km write gateway; Motos.update() and OrdresReparation.cloturer() closed and routed through it with acteur_id threaded (D-04, fallback garage_id); Interventions.create() documented decoupled (D-05, no behavior change). node --check green on supabase.js/motokey-api.js. Worktree branch had diverged from master (missing 23-01/23-02 commits) — merged master in cleanly before finishing (commit 4347d1c), no conflicts. Next: execute Phase 23 (23-04, wave 3 bootstrap gate against xjgyoehennuydoocbprj — must go RED→GREEN).
