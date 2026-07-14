@@ -143,7 +143,12 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
   3. Le mécano peut saisir/mettre à jour km_montage, date_montage et référence pour chacun des 9 types de consommables d'une moto via l'API
   4. Un client ou un membre du garage peut uploader une photo de consommable ; l'upload déclenche l'analyse (stub) et l'historise avec sa date et son résultat d'analyse
   5. L'upload de photo (compteur ou consommable) stocke réellement l'image sur Cloudinary et renvoie une URL exploitable — plus aucun placeholder
-**Plans**: TBD
+**Plans**: 5 plans (4 vagues — parallélisme limité par le fichier partagé motokey-api.js)
+  - [ ] 25-01-PLAN.md — Fondations : deps cloudinary/multer + cloudinaryService.js (no-fallback D-02) + TYPES_CONSOMMABLES
+  - [ ] 25-02-PLAN.md — Harnais de test d intégration + fixture image (Wave 0 VALIDATION.md)
+  - [ ] 25-03-PLAN.md — Infra multipart + relevé km normal (KM-03) + remplacement compteur PRO+ (KM-02)
+  - [ ] 25-04-PLAN.md — Saisie consommables : PATCH unitaire + POST bulk (CONSO-01)
+  - [ ] 25-05-PLAN.md — Upload photo consommable + Cloudinary réel + analyse stub (CONSO-03, CLOUD-01)
 
 ### Phase 26: Cron de Rappel + Push/Badge
 **Goal**: Les clients et les garages sont alertés automatiquement quand une photo de consommable devient nécessaire, sans spam et sans angle mort pour les motos garage non réclamées.
@@ -209,10 +214,10 @@ Phases execute in numeric order: 18 → 19 → 20 → 21 → 22 → 23 → 24 �
 | Phase 22 | v1.5 | 3/3 | ✅ Complete | 2026-07-11 |
 | Phase 23 | v1.6 | 0/4 | Not started | - |
 | Phase 24 | v1.6 | 0/2 | Not started | - |
-| Phase 25 | v1.6 | 0/TBD | Not started | - |
+| Phase 25 | v1.6 | 0/5 | Not started | - |
 | Phase 26 | v1.6 | 0/TBD | Not started | - |
 | Phase 27 | v1.6 | 0/TBD | Not started | - |
 | Phase 28 | v1.6 | 0/TBD | Not started | - |
 
 ---
-*Roadmap updated: 2026-07-14 — v1.6 roadmap created (Phases 23–28, 17/17 requirements mapped, Phase 28 added after confirming mobile gauges were in scope per original request). Next: /gsd:plan-phase 23.*
+*Roadmap updated: 2026-07-14 — Phase 25 planifiée (5 plans, 4 vagues ; KM-02/KM-03/CONSO-01/CONSO-03/CLOUD-01 couverts). Next: /gsd:execute-phase 25.*
