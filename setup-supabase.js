@@ -91,6 +91,16 @@ async function main() {
         let clientUserId = cliAuthData?.user?.id;
         if (!clientUserId) clientUserId = await findAuthUserIdByEmail('sophie@email.com');
 
+        if (clientUserId) {
+          // Rôle CLIENT dans app_metadata (non falsifiable côté client) — sans ça,
+          // rbac.extractRoleFromRequest() ne résout jamais ctx.role pour ce compte,
+          // même via une vraie session Supabase (/auth/client/login). Idempotent.
+          const { error: roleErr } = await sb.auth.admin.updateUserById(
+            clientUserId, { app_metadata: { role: 'CLIENT' } }
+          );
+          if (roleErr) console.warn('  ⚠️  Rôle CLIENT non posé pour sophie —', roleErr.message);
+        }
+
         const { data: client } = await sb.from('clients').upsert({
           auth_user_id: clientUserId,
           garage_id: garage.id,

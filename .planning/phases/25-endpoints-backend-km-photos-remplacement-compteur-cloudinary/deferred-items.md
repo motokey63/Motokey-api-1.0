@@ -49,7 +49,46 @@ see `tests/test-km-photos-cloudinary.js` header and 25-02 decision log) — its 
 18850 (was 18650 before this session); not reverted, consistent with how other test scripts
 (e.g. `tests/test-or-e2e.js`) already write real records against prod seed data.
 
-## [25-05] CLIENT accounts never resolve to `ctx.role === 'CLIENT'` on legacy-JWT dual endpoints (pre-existing, cross-cutting)
+## [25-05] CLIENT accounts never resolve to `ctx.role === 'CLIENT'` on legacy-JWT dual endpoints — **RÉSOLU 2026-07-15, sévérité revue à la baisse**
+
+**Correction (2026-07-15, suite à question de Mehdi) :** l'analyse initiale ci-dessous
+surestimait l'impact prod. Le diagnostic exact, vérifié en direct contre Supabase Auth :
+
+- **Aucun vrai client n'était affecté.** Le flux réel (`POST /auth/client/register`,
+  utilisé par `MotoKey_Client.html` L825/L878 et `mobile-app/context/AuthContext.tsx` L127)
+  pose déjà `app_metadata.role='CLIENT'` correctement (`motokey-api.js` L2587-2590). Sondage
+  live sur 6 comptes clients réels/inscrits : 6/6 avaient `role:'CLIENT'` posé.
+- **Seul `sophie@email.com`** (fixture de dev créée par `setup-supabase.js`, Phase 18) n'avait
+  pas de rôle posé — `sb.auth.admin.createUser()` sans `app_metadata`, contrairement au vrai
+  flux d'inscription.
+- **Les scripts de test compoundaient le problème** en connectant sophie via l'ancien
+  `POST /auth/login` (`role:'client'`, JWT maison HS256) au lieu du vrai
+  `POST /auth/client/login` (session Supabase réelle) qu'utilisent les vraies apps — donc
+  même avec le rôle posé, le token de test n'aurait jamais été résolu par
+  `rbac.extractRoleFromRequest`.
+- `rbac.inferLegacyRole()` n'est **pas** un bug à corriger : c'est un fallback garage-only
+  qui fait exactement ce pour quoi il a été écrit (résoudre les vieux tokens garage HS256) —
+  il n'a jamais eu vocation à résoudre un rôle CLIENT.
+
+**Corrections appliquées :**
+1. `setup-supabase.js` pose désormais `app_metadata.role='CLIENT'` pour sophie (idempotent,
+   même motif que `scripts/seed-rbac-test-users.js`) — appliqué live en prod.
+2. `tests/test-km-photos-cloudinary.js` : nouveau helper `loginClient()` qui utilise
+   `/auth/client/login` (vraie session Supabase) au lieu de `login(..., 'client')`
+   (`/auth/login` legacy).
+3. `tests/test-client-device-tokens.js` : même correction (`/auth/client/login` +
+   `session.access_token`).
+
+**Résultat live :** `tests/test-km-photos-cloudinary.js` 19/19 OK (le CLIENT positive-path
+CONSO-03 passe désormais, plus de SKIP) ; `tests/test-client-device-tokens.js` 15/15 OK
+(était 3/15) ; `test-api.js` 9/9 inchangé.
+
+**Pas de dette RBAC transverse à planifier avant Phase 27/28** — c'était un défaut de fixture
+de test, pas un gap de code affectant les utilisateurs réels.
+
+---
+
+**Analyse initiale (2026-07-14, conservée pour trace) :**
 
 **Discovered during:** Plan 25-05, Task 2 live verification (2026-07-14) — CONSO-03 CLIENT
 positive-path assertion (`POST /motos/:id/photos-consommables` as `sophie@email.com`).
@@ -103,11 +142,10 @@ node tests/test-km-photos-cloudinary.js`) — out of scope, logged not fixed (Sc
   relative require path left over from commit `8b1d817` ("move test-or-e2e.js to tests/
   folder"), which moved the file down one directory without updating `require('./supabase')`
   to `require('../supabase')`. Unrelated to Phase 25/25-05 code.
-- `tests/test-client-device-tokens.js` — 3/15 pass, 12 fail with `HTTP 401` on `GET /client/me`
-  and the device-token endpoints. Same root cause already documented above (CLIENT legacy JWT
-  never resolves via `ctx`/`rbac.extractRoleFromRequest`, since that endpoint requires a real
-  Supabase Auth JWT and the CLIENT login path issues a legacy HS256 token instead) — additional
-  live confirmation of the same pre-existing, cross-cutting gap, not a new one.
+- `tests/test-client-device-tokens.js` — was 3/15 (12 failed `HTTP 401`), same root cause as
+  above (missing `app_metadata.role` on the `sophie@email.com` fixture + test using the legacy
+  `/auth/login` instead of `/auth/client/login`). **RÉSOLU 2026-07-15** — now 15/15, see
+  correction note above.
 
 `node test-api.js` (9/9) and `tests/test-km-photos-cloudinary.js` (18/18, this plan's own
 suite) both pass cleanly.

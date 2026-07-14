@@ -99,7 +99,7 @@ function request(method, urlPath, options = {}) {
   });
 }
 
-// ── Helper : login → token de session ──────────────────────────────────────
+// ── Helper : login garage → token de session (JWT legacy garage) ───────────
 async function login(email, password, role = 'garage') {
   const { status, body } = await request('POST', '/auth/login', {
     json: { email, password, role }
@@ -108,6 +108,28 @@ async function login(email, password, role = 'garage') {
     throw new Error(`login échoué (${email}) — status ${status} — ${JSON.stringify(body)}`);
   }
   return body.data;
+}
+
+// ── Helper : login client → vraie session Supabase Auth ────────────────────
+// /auth/login (role:'client') émet un JWT maison HS256, jamais résolu par
+// rbac.extractRoleFromRequest (qui attend une session Supabase réelle) — c'est
+// le flux qu'utilisent MotoKey_Client.html et l'app mobile (/auth/client/login).
+async function loginClient(email, password) {
+  const { status, body } = await request('POST', '/auth/client/login', {
+    json: { email, password }
+  });
+  const token = body && body.data && body.data.session && body.data.session.access_token;
+  if (status !== 200 || !token) {
+    throw new Error(`login client échoué (${email}) — status ${status} — ${JSON.stringify(body)}`);
+  }
+  let moto_id = null;
+  try {
+    const { status: ms, body: mb } = await request('GET', '/motos', { token });
+    if (ms === 200 && mb && mb.data && mb.data.motos && mb.data.motos.length) {
+      moto_id = mb.data.motos[0].id;
+    }
+  } catch (e) { /* non-fatal — assertions dépendant de moto_id feront SKIP */ }
+  return { token, moto_id };
 }
 
 async function run() {
@@ -141,7 +163,7 @@ async function run() {
     console.error(`❌ Login garage échoué : ${e.message}`);
   }
   try {
-    clientAuth = await login(CREDS.client.email, CREDS.client.password, 'client');
+    clientAuth = await loginClient(CREDS.client.email, CREDS.client.password);
     console.log(`  ✅ Login client OK`);
   } catch (e) {
     console.error(`❌ Login client échoué : ${e.message}`);

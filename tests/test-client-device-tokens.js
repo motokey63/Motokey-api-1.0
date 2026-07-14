@@ -29,9 +29,12 @@ function test(nom, ok, detail='') {
 async function run() {
   console.log('\n🧪 Tests MotoKey — client device tokens (Phase 12)\n');
 
-  const login = await req('POST','/auth/login',{email:'sophie@email.com',password:'client123',role:'client'});
+  // /auth/client/login (session Supabase réelle) — même flux que MotoKey_Client.html
+  // et l'app mobile ; /auth/login legacy émet un JWT maison jamais résolu par
+  // rbac.extractRoleFromRequest.
+  const login = await req('POST','/auth/client/login',{email:'sophie@email.com',password:'client123'});
   test('Login client', login.s===200, 'HTTP '+login.s);
-  const TOKEN = login.b?.data?.token;
+  const TOKEN = login.b?.data?.session?.access_token;
   test('Token reçu', !!TOKEN);
 
   const SAMPLE = 'ExponentPushToken[gsd-test-'+Date.now()+']';
