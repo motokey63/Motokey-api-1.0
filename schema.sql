@@ -691,21 +691,73 @@ CREATE TRIGGER trg_recalc_score
   FOR EACH ROW EXECUTE FUNCTION recalc_score_moto();
 
 -- ══════════════════════════════════════════════════════════
--- TRIGGER : Mise à jour km moto
+-- Phase 23 (v1.6) — Triggers km (monotone + sync)
 -- ══════════════════════════════════════════════════════════
-CREATE OR REPLACE FUNCTION update_moto_km()
+-- D-05 / KM-04 : le km d'intervention est un historique découplé — il ne doit plus
+-- toucher motos.km. On retire l'ancien clamp GREATEST (second writer non coordonné,
+-- incompatible avec "releves_km = source de vérité unique"). Désormais motos.km
+-- n'est écrit QUE par trg_sync_moto_km ci-dessous.
+
+CREATE OR REPLACE FUNCTION verifier_km_monotone()
 RETURNS TRIGGER AS $$
+DECLARE
+  v_moto_km    INTEGER;
+  v_last_reset TIMESTAMPTZ;
+  v_max_releve INTEGER;
+  v_km_actuel  INTEGER;
 BEGIN
-  UPDATE motos
-  SET km = GREATEST(km, NEW.km), updated_at = NOW()
-  WHERE id = NEW.moto_id;
+  -- Bypass total pour un changement de compteur explicite (gate PRO+ fait côté app).
+  -- Démarre une chaîne monotone FRAÎCHE : les relevés suivants ne seront comparés
+  -- qu'aux relevés postérieurs à ce remplacement.
+  IF NEW.type_evenement = 'remplacement_compteur' THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT km INTO v_moto_km FROM motos WHERE id = NEW.moto_id;
+
+  SELECT MAX(created_at) INTO v_last_reset
+    FROM releves_km
+    WHERE moto_id = NEW.moto_id AND type_evenement = 'remplacement_compteur';
+
+  SELECT MAX(km) INTO v_max_releve
+    FROM releves_km
+    WHERE moto_id = NEW.moto_id
+      AND (v_last_reset IS NULL OR created_at >= v_last_reset);
+
+  -- NULL-safe baseline (Pitfall A) : sans GREATEST(v_moto_km, ...), le tout premier
+  -- releve de CHAQUE moto prod existante (releves_km vide mais motos.km déjà peuplé)
+  -- passerait quelle que soit sa valeur, car MAX sur 0 ligne = NULL et "NEW.km < NULL"
+  -- vaut NULL (faux) en PL/pgSQL. Après un remplacement, v_moto_km reflète déjà le
+  -- nouveau compteur bas (posé par trg_sync_moto_km), donc GREATEST reste correct.
+  v_km_actuel := GREATEST(COALESCE(v_moto_km, 0), COALESCE(v_max_releve, 0));
+
+  IF NEW.km < v_km_actuel THEN
+    INSERT INTO releves_km_rejets
+      (moto_id, garage_id, acteur_type, acteur_id, km_tente, km_actuel, created_at)
+    VALUES
+      (NEW.moto_id, NEW.garage_id, NEW.acteur_type, NEW.acteur_id, NEW.km, v_km_actuel, NOW());
+    RETURN NULL;  -- annule UNIQUEMENT cet insert — pas d'exception, le log survit (Pitfall B)
+  END IF;
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trg_update_km
-  AFTER INSERT OR UPDATE ON interventions
-  FOR EACH ROW EXECUTE FUNCTION update_moto_km();
+CREATE TRIGGER trg_verifier_km_monotone
+  BEFORE INSERT ON releves_km
+  FOR EACH ROW EXECUTE FUNCTION verifier_km_monotone();
+
+CREATE OR REPLACE FUNCTION sync_moto_km_depuis_releve()
+RETURNS TRIGGER AS $$
+BEGIN
+  UPDATE motos SET km = NEW.km, updated_at = NOW() WHERE id = NEW.moto_id;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_sync_moto_km
+  AFTER INSERT ON releves_km
+  FOR EACH ROW EXECUTE FUNCTION sync_moto_km_depuis_releve();
 
 -- ══════════════════════════════════════════════════════════
 -- INDEX
@@ -765,6 +817,17 @@ ALTER TABLE reclamations_moto              ENABLE ROW LEVEL SECURITY;
 -- publishable key, Phase 21 plan 03) : calibration garages -> HTTP 200 [] ; les 4 tables Gap B,
 -- y compris les 2 backfillées (liaisons_client_garage, motos_proprietaires_historique qui contiennent
 -- des lignes en prod) -> HTTP 200 [] également = signal default-deny, pas "table vide".
+
+ALTER TABLE consommables         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE photos_consommables  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE releves_km           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE releves_km_rejets    ENABLE ROW LEVEL SECURITY;
+-- Phase 23 (v1.6) : RLS activé SANS policy explicite, INTENTIONNEL — même pattern que
+-- garage_users/client_device_tokens/push_send_log (Phase 19) et les 4 tables Gap B (Phase 21).
+-- Default-deny pour anon/authenticated ; seul service_role (utilisé par supabase.js) lit/écrit.
+-- Toute l'autorisation réelle (requireRole() + ownership via moto_id/garage_id) vit dans
+-- motokey-api.js, ajoutée en Phase 25 avec les endpoints HTTP — Phase 23 livre le schéma seul,
+-- aucun chemin client-atteignable vers ces tables n'existe encore.
 
 -- Helpers
 CREATE OR REPLACE FUNCTION my_garage_id()
