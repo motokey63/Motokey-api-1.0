@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: executing
-stopped_at: Completed 25-01-PLAN.md
-last_updated: "2026-07-14T17:16:01.319Z"
-last_activity: 2026-07-14 -- Phase 25 execution started
+stopped_at: Completed 25-01 and 25-02 (Wave 1)
+last_updated: "2026-07-14T17:16:52.441Z"
+last_activity: 2026-07-14 -- Phase 25 Wave 1 complete
 progress:
   total_phases: 6
   completed_phases: 2
@@ -48,6 +48,7 @@ v1.6 [██░░░░░░░░] IN PROGRESS — Phase 23 COMPLETE (4/4 pla
 | Next action | Phase 25 plan 01 (Cloudinary service + TYPES_CONSOMMABLES) complete — other Phase 25 plans (02-05) may be executing in parallel worktrees. |
 | Phase 23 P04 | 25min | 2 tasks | 3 files |
 | Phase 25 P01 | 20min | 3 tasks | 4 files |
+| Phase 25 P02 | 17min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,7 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - [Phase 25]: D-02: cloudinaryService.uploadPhoto() throws 503 CLOUDINARY_NOT_CONFIGURED without credentials, never a placeholder URL (anti-fraud proof integrity)
 - [Phase 25]: multer forced to ^2.2.0 (never 1.x) to avoid unpatched CVE-2025-47944/CVE-2026-3520
 - [Phase 25]: TYPES_CONSOMMABLES centralized as single JS source of truth mirroring migration 23 CHECK constraint
+- [Phase 25]: 25-02: garage login (rbac_role=CONCESSION) reused as PRO+/MECANO+ proxy token in test harness pending a dedicated seed account
 
 ### Pending Todos
 
@@ -94,5 +96,5 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ## Session Continuity
 
-Last session: 2026-07-14T17:16:01.316Z
-Stopped at: Completed 25-01-PLAN.md
+Last session: 2026-07-14T17:16:52.438Z
+Stopped at: Completed 25-01 and 25-02 (Wave 1)
