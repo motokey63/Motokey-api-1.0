@@ -39,6 +39,10 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- NETTOYAGE
 -- ══════════════════════════════════════════════════════════
 DROP VIEW  IF EXISTS v_motos_avec_proprietaire     CASCADE;
+DROP TABLE IF EXISTS releves_km_rejets             CASCADE;
+DROP TABLE IF EXISTS releves_km                    CASCADE;
+DROP TABLE IF EXISTS photos_consommables           CASCADE;
+DROP TABLE IF EXISTS consommables                  CASCADE;
 DROP TABLE IF EXISTS reclamations_moto             CASCADE;
 DROP TABLE IF EXISTS liaisons_client_garage        CASCADE;
 DROP TABLE IF EXISTS motos_proprietaires_historique CASCADE;
@@ -547,6 +551,67 @@ CREATE TABLE reclamations_moto (
 CREATE INDEX idx_rec_moto ON reclamations_moto(moto_id);
 CREATE INDEX idx_rec_client ON reclamations_moto(client_id);
 CREATE INDEX idx_rec_attente ON reclamations_moto(statut) WHERE statut = 'en_attente';
+
+-- ══════════════════════════════════════════════════════════
+-- Phase 23 (v1.6) — Consommables + source de vérité km
+-- ══════════════════════════════════════════════════════════
+
+CREATE TABLE consommables (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  moto_id           UUID NOT NULL REFERENCES motos(id) ON DELETE CASCADE,
+  -- Extensibilité CONSO-02 : TEXT + CHECK (même pattern que interventions.niveau_preuve).
+  -- Ajouter un type plus tard = ALTER TABLE ... DROP CONSTRAINT ... ADD CONSTRAINT (migration légère).
+  type_consommable  TEXT NOT NULL CHECK (type_consommable IN (
+                      'pneu_av','pneu_ar','chaine','plaquettes_av','plaquettes_ar',
+                      'disque_av','disque_ar','huile_moteur','liquide_frein')),
+  km_montage        INTEGER,
+  date_montage      DATE,
+  reference         TEXT,
+  created_at        TIMESTAMPTZ DEFAULT NOW(),
+  updated_at        TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE (moto_id, type_consommable)
+);
+
+CREATE TABLE photos_consommables (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  moto_id           UUID NOT NULL REFERENCES motos(id) ON DELETE CASCADE,
+  consommable_id    UUID REFERENCES consommables(id) ON DELETE CASCADE,
+  type_consommable  TEXT,
+  photo_url         TEXT NOT NULL,
+  analyse           JSONB,           -- rempli par le stub vision (Phase 24/25)
+  analyse_status    TEXT,            -- ok / incertain / echec (Phase 24)
+  created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE releves_km (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  moto_id           UUID NOT NULL REFERENCES motos(id) ON DELETE CASCADE,
+  garage_id         UUID,            -- nullable : moto client sans garage (modèle L8) ; renseigné côté app
+  km                INTEGER NOT NULL CHECK (km >= 0),
+  type_evenement    TEXT NOT NULL DEFAULT 'lecture'
+                      CHECK (type_evenement IN ('lecture','lecture_initiale','remplacement_compteur')),
+  acteur_type       TEXT NOT NULL CHECK (acteur_type IN ('client','garage')),  -- D-04 : jamais anonyme
+  acteur_id         UUID NOT NULL,
+  note              TEXT,            -- obligatoire côté app pour remplacement_compteur (D-03)
+  photo_url         TEXT,           -- photo compteur optionnelle (Phase 25)
+  created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE releves_km_rejets (
+  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  moto_id           UUID NOT NULL,
+  garage_id         UUID,
+  acteur_type       TEXT,
+  acteur_id         UUID,
+  km_tente          INTEGER NOT NULL,
+  km_actuel         INTEGER NOT NULL,  -- vrai max historique au moment de la tentative (D-04)
+  created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_releves_km_moto        ON releves_km(moto_id, created_at DESC);
+CREATE INDEX idx_releves_km_rejets_moto ON releves_km_rejets(moto_id, created_at DESC);
+CREATE INDEX idx_consommables_moto      ON consommables(moto_id);
+CREATE INDEX idx_photos_conso_moto      ON photos_consommables(moto_id);
 
 -- v_motos_avec_proprietaire — source : sql/migrations/13_liaison_client_moto.sql
 CREATE OR REPLACE VIEW v_motos_avec_proprietaire AS
