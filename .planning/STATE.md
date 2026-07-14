@@ -4,12 +4,12 @@ milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: executing
 stopped_at: Phase 25 context gathered
-last_updated: "2026-07-14T16:17:38.855Z"
-last_activity: 2026-07-14
+last_updated: "2026-07-14T17:08:09.554Z"
+last_activity: 2026-07-14 -- Phase 25 execution started
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 6
+  total_plans: 11
   completed_plans: 6
 ---
 
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-13)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 24 — helpers-supabase-js-contrat-stub-vision
+**Current focus:** Phase 25 — endpoints-backend-km-photos-remplacement-compteur-cloudinary
 
 ## Current Position
 
-Phase: 25
-Plan: Not started
-Status: Executing Phase 24
-Last activity: 2026-07-14
+Phase: 25 (endpoints-backend-km-photos-remplacement-compteur-cloudinary) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 25
+Last activity: 2026-07-14 -- Phase 25 execution started
 
 ```
 v1.0 ████████████ SHIPPED
