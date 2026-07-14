@@ -259,6 +259,29 @@ async function run() {
     console.log('  ⏭️  [CONSO-01 unitaire] SKIP (pas de moto seed disponible)');
   }
 
+  if (testMotoId) {
+    const { status: s4, body: b4 } = await request('POST', `/motos/${testMotoId}/consommables`, {
+      token: garageAuth.token,
+      json: { consommables: [
+        { type_consommable: 'pneu_av', km_montage: 0 },
+        { type_consommable: 'pneu_ar', km_montage: 0 }
+      ] }
+    });
+    check('POST /motos/:id/consommables (bulk, garage) → 200/201', s4 === 200 || s4 === 201, `status=${s4} body=${JSON.stringify(b4)}`);
+    check('  bulk : 2 consommables enregistrés', Array.isArray(b4?.data?.consommables) && b4.data.consommables.length === 2, JSON.stringify(b4));
+
+    const { status: s5, body: b5 } = await request('POST', `/motos/${testMotoId}/consommables`, {
+      token: garageAuth.token,
+      json: { consommables: [
+        { type_consommable: 'pneu_av', km_montage: 0 },
+        { type_consommable: 'invalide_xyz', km_montage: 0 }
+      ] }
+    });
+    check('POST /motos/:id/consommables (bulk, type invalide) → 400 VALIDATION_ERROR', s5 === 400 && b5?.error?.code === 'VALIDATION_ERROR', `status=${s5} body=${JSON.stringify(b5)}`);
+  } else {
+    console.log('  ⏭️  [CONSO-01 bulk] SKIP (pas de moto seed disponible)');
+  }
+
   // ─── CONSO-03 (photo consommable) ───────────────────────────────────────
   console.log('\n── CONSO-03 : upload photo consommable (CLIENT ou MECANO+) ─────');
   console.log('  ⏭️  [CONSO-03] à implémenter en 25-05');

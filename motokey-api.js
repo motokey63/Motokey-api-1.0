@@ -1039,6 +1039,24 @@ const server = http.createServer(async function(req, res){
     } catch (e) { return fail(res, e.message, 500, 'SERVER_ERROR'); }
   }
 
+  if((p=M('POST','/motos/:id/consommables'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res,'Non authentifié',401,'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx,'MECANO')) return fail(res,'Permission refusée — MECANO minimum requis',403,'FORBIDDEN_ROLE');
+    const items = Array.isArray(b.consommables) ? b.consommables : (Array.isArray(b) ? b : null);
+    if (!items || !items.length) return fail(res, 'tableau consommables requis', 400, 'VALIDATION_ERROR');
+    const bad = items.find(it => !it || !SBLayer.TYPES_CONSOMMABLES.includes(it.type_consommable));
+    if (bad) return fail(res, 'type_consommable invalide dans le tableau: '+(bad&&bad.type_consommable), 400, 'VALIDATION_ERROR');
+    const r = await resolveMotoForCtx(ctx, p.id, a);
+    if (!r) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
+    try {
+      const rows = [];
+      for (const it of items) { rows.push(await SBLayer.Consommables.upsert(p.id, { type_consommable: it.type_consommable, km_montage: it.km_montage, date_montage: it.date_montage, reference: it.reference })); }
+      return ok(res, { consommables: rows }, rows.length+' consommables enregistrés', 201);
+    } catch (e) { return fail(res, e.message, 500, 'SERVER_ERROR'); }
+  }
+
   /* INTERVENTIONS */
   if((p=M('GET','/motos/:id/interventions'))!==null){
     // RBAC: CLIENT voit ses propres interventions, MECANO+ voit celles du garage
