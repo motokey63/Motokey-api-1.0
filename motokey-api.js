@@ -453,6 +453,11 @@ async function handleKmReading(req, res, motoId, { remplacement }, bodyFields) {
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
 
+    // KM-02 : remplacement de compteur réservé PRO+ (exclut MECANO et CLIENT)
+    if (remplacement) {
+      if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    }
+
     // Extraction champs : multipart (photo présente) vs JSON
     let file = null;
     let fields = bodyFields || {};
@@ -468,6 +473,11 @@ async function handleKmReading(req, res, motoId, { remplacement }, bodyFields) {
     }
     const km = fields.km;
     const note = fields.note;
+
+    // KM-02 : note obligatoire pour un remplacement de compteur
+    if (remplacement && (!note || !String(note).trim())) {
+      return fail(res, 'note obligatoire pour un remplacement de compteur', 400, 'VALIDATION_ERROR');
+    }
 
     // Ownership (dual CLIENT/GARAGE) — même sémantique 404 que le pattern existant
     const r = await resolveMotoForCtx(ctx, motoId, a);
@@ -488,10 +498,18 @@ async function handleKmReading(req, res, motoId, { remplacement }, bodyFields) {
       }
     }
 
-    const type_evenement = remplacement ? 'remplacement_compteur' : 'lecture';
-    const result = await SBLayer.RelevesKm.enregistrer(r.garage_id, motoId, {
-      km, type_evenement, acteur_type: r.acteur_type, acteur_id: r.acteur_id, note: note || null, photo_url
-    });
+    // Le trigger DB ne rejette jamais type_evenement:'remplacement_compteur' (reset monotone,
+    // gate PRO+ déjà appliqué côté app) — mais on garde la branche accepted:false par sécurité.
+    let result;
+    if (remplacement) {
+      result = await SBLayer.RelevesKm.enregistrer(r.garage_id, motoId, {
+        km, type_evenement:'remplacement_compteur', acteur_type: r.acteur_type, acteur_id: r.acteur_id, note, photo_url
+      });
+    } else {
+      result = await SBLayer.RelevesKm.enregistrer(r.garage_id, motoId, {
+        km, type_evenement:'lecture', acteur_type: r.acteur_type, acteur_id: r.acteur_id, note: note || null, photo_url
+      });
+    }
 
     if (!result.accepted) {
       return sendJSON(res, 409, {
@@ -1001,6 +1019,9 @@ const server = http.createServer(async function(req, res){
   /* KILOMÉTRAGE (KM-02/KM-03) — route JSON (sans photo) ; le multipart est intercepté avant body() */
   if((p=M('POST','/motos/:id/km'))!==null){
     return handleKmReading(req, res, p.id, { remplacement:false }, b);
+  }
+  if((p=M('POST','/motos/:id/km/remplacement-compteur'))!==null){
+    return handleKmReading(req, res, p.id, { remplacement:true }, b);
   }
 
   /* INTERVENTIONS */
