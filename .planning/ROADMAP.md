@@ -95,7 +95,7 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
 
 **Milestone Goal:** Donner à MotoKey le suivi d'usure des consommables moto (pneus, chaîne, plaquettes, disques, huile, liquide de frein) par photo + analyse IA (stub), avec anti-fraude stricte sur le kilométrage — cœur produit différenciateur, attaché au passeport moto transmissible à la revente.
 
-- [ ] **Phase 23: Schéma + Anti-Fraude km au niveau DB** - `releves_km` devient la source de vérité du km, croissance monotone stricte imposée par trigger DB, les 3 chemins d'écriture existants sont fermés
+- [x] **Phase 23: Schéma + Anti-Fraude km au niveau DB** - `releves_km` devient la source de vérité du km, croissance monotone stricte imposée par trigger DB, les 3 chemins d'écriture existants sont fermés (completed 2026-07-14)
 - [ ] **Phase 24: Helpers supabase.js + Contrat Stub Vision** - Helpers CRUD des 3 nouvelles tables + `visionAnalysisService.js` flag-gated dont le contrat de réponse est verrouillé avant tout consommateur
 - [ ] **Phase 25: Endpoints Backend (km, photos, remplacement compteur, Cloudinary)** - Relevé km, changement de compteur PRO+, saisie consommables, upload photo avec stockage Cloudinary réel
 - [ ] **Phase 26: Cron de Rappel + Push/Badge** - Rappel photo 3000km OU 6 mois, idempotent, avec équivalent badge garage pour motos non réclamées
@@ -118,7 +118,7 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
   - [x] 23-01-PLAN.md — Schéma: 4 tables + triggers km (monotone/sync) + suppression trg_update_km + RLS documenté (migration + schema.sql même commit)
   - [x] 23-02-PLAN.md — Infra test Wave 0 (script pg trigger) + checkpoint FRESH_DB_URL
   - [x] 23-03-PLAN.md — supabase.js: RelevesKm.enregistrer() + fermeture des 3 chemins d écriture km (KM-04)
-  - [ ] 23-04-PLAN.md — Gate: bootstrap propre + test trigger vert + revue RLS/parité schema.sql
+  - [x] 23-04-PLAN.md — Gate: bootstrap propre + test trigger vert + revue RLS/parité schema.sql
 
 ### Phase 24: Helpers supabase.js + Contrat Stub Vision
 **Goal**: Le contrat de réponse d'analyse IA (stub aujourd'hui, réel plus tard) est verrouillé et consommé identiquement par tous les futurs endpoints/jauges ; les helpers CRUD des 3 nouvelles tables existent comme unique point d'accès DB.

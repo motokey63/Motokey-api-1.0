@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
-status: executing
-stopped_at: "Phase 23 planned (4 plans, 3 waves) and validated — resumed session found STATE.md stale (still said "ready to plan") and 2 uncommitted plan refinements (D-04 acteur_id threading in 23-03, validation sign-off in 23-VALIDATION.md); reconciled and committed. Next: execute Phase 23 (blocked on FRESH_DB_URL for 23-02/23-04)."
-last_updated: "2026-07-14T10:04:43.631Z"
-last_activity: 2026-07-14 — Phase 23 execution: plan 23-01 complete (4 tables + 2 triggers + RLS default-deny, schema.sql same-commit); 23-02 complete (test harness written, FRESH_DB_URL checkpoint resolved — throwaway project xjgyoehennuydoocbprj, connection verified live); 23-03 complete (RelevesKm.enregistrer() shared validation, 3 km write paths closed, acteur_id threaded D-04)
+status: verifying
+stopped_at: Completed 23-04-PLAN.md (Phase 23 complete, 4/4 plans)
+last_updated: "2026-07-14T10:37:45.347Z"
+last_activity: "2026-07-14 — Plan 23-04 (bootstrap + trigger gate) executed: SCHEMA_BOOTSTRAP_OK against xjgyoehennuydoocbprj including all 4 Phase 23 tables; test-releves-km-trigger.js 28/28 PASS (RED→GREEN); RLS default-deny live-confirmed (0 pg_policies, RLS on) on consommables/photos_consommables/releves_km/releves_km_rejets; migration↔schema.sql parity confirmed via block diff; trg_update_km confirmed absent. 2 blocking bugs fixed live: reserved keyword `analyse`→`analyse_ia` (schema.sql + migration 23), test fixture motos missing proprietaire_type/proprietaire_garage_id (moto_proprietaire_coherence CHECK, L8) — commits 9359102 (merge 23-01/02/03), df4a8c0 (fixes)."
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # MotoKey API — Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-13)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 23 — sch-ma-anti-fraude-km-au-niveau-db
+**Current focus:** Phase 23 — sch-ma-anti-fraude-km-au-niveau-db — COMPLETE, ready for next phase (24)
 
 ## Current Position
 
-Phase: 23 of 28 (Schéma + Anti-Fraude km au niveau DB) — EXECUTING
-Plan: 4 plans / 3 waves — 23-01 (wave 1, autonomous, DONE), 23-02 (wave 1, non-autonomous, DONE — FRESH_DB_URL resolved), 23-03 (wave 2, autonomous, depends on 23-01, DONE), 23-04 (wave 3, gate, non-autonomous, depends on 23-01/02/03, NEXT)
-Status: Wave 1 + Wave 2 complete (23-01, 23-02, 23-03). Wave 3 (23-04 bootstrap gate) unblocked — FRESH_DB_URL live-verified against throwaway project, ready to execute.
-Last activity: 2026-07-14 — Plan 23-01 executed: releves_km source de vérité km, anti-fraude monotone trigger, clamp legacy retiré (commits 4939644, bc7068a); Plan 23-02 complete: scripts/test-releves-km-trigger.js écrit (RED) + checkpoint FRESH_DB_URL résolu (projet jetable xjgyoehennuydoocbprj, connexion pg live vérifiée); Plan 23-03 complete: RelevesKm.enregistrer() ajouté (supabase.js), Motos.update()/OrdresReparation.cloturer() fermés, acteur_id threadé (D-04), Interventions.create() documenté découplé (D-05) — commits 52e3bad, 1691389
+Phase: 23 of 28 (Schéma + Anti-Fraude km au niveau DB) — COMPLETE
+Plan: 4 plans / 3 waves — 23-01 (wave 1, autonomous, DONE), 23-02 (wave 1, non-autonomous, DONE), 23-03 (wave 2, autonomous, DONE), 23-04 (wave 3, gate, non-autonomous, DONE)
+Status: Phase 23 fully gated and complete (4/4 plans). Bootstrap-fresh-schema.js -> SCHEMA_BOOTSTRAP_OK, test-releves-km-trigger.js -> 28/28 PASS, RLS default-deny confirmed, migration/schema.sql parity confirmed. Ready for /gsd:verify-phase or Phase 24.
+Last activity: 2026-07-14 — Plan 23-04 (bootstrap + trigger gate) executed: SCHEMA_BOOTSTRAP_OK against xjgyoehennuydoocbprj including all 4 Phase 23 tables; test-releves-km-trigger.js 28/28 PASS (RED→GREEN); RLS default-deny live-confirmed (0 pg_policies, RLS on) on consommables/photos_consommables/releves_km/releves_km_rejets; migration↔schema.sql parity confirmed via block diff; trg_update_km confirmed absent. 2 blocking bugs fixed live: reserved keyword `analyse`→`analyse_ia` (schema.sql + migration 23), test fixture motos missing proprietaire_type/proprietaire_garage_id (moto_proprietaire_coherence CHECK, L8) — commits 9359102 (merge 23-01/02/03), df4a8c0 (fixes).
 
 ```
 v1.0 ████████████ SHIPPED
@@ -36,7 +36,7 @@ v1.2 [█████████░] SHIPPED 2026-07-01 (86%, Phase 8 known gap
 v1.3 ████████████ SHIPPED 2026-07-08 (MSTORE-02 known gap — carried forward)
 v1.4 ████████████ SHIPPED 2026-07-09 (undocumented schema drift known gap — carried forward)
 v1.5 ████████████ SHIPPED 2026-07-11 (Gap A/B schema.sql drift fully resolved, SCHEMA-02→07)
-v1.6 [███████░░░] IN PROGRESS — Phase 23: 3/4 plans done (23-01, 23-02, 23-03), Wave 3 (23-04) next
+v1.6 [██░░░░░░░░] IN PROGRESS — Phase 23 COMPLETE (4/4 plans, live-verified bootstrap gate), Phase 24 next
 ```
 
 ## Performance Metrics
@@ -45,7 +45,8 @@ v1.6 [███████░░░] IN PROGRESS — Phase 23: 3/4 plans done (
 |--------|-------|
 | Milestones shipped | 6 (v1.0 + v1.1 + v1.2 + v1.3 + v1.4 + v1.5) |
 | Known gaps carried forward | Phase 8/BILL-06 (Stripe live mode, since v1.2), MSTORE-02 (store submission, since v1.3) — both blocked on Mehdi's external account/dashboard actions |
-| Next action | Wave 3 (23-04: bootstrap gate against xjgyoehennuydoocbprj, must go RED→GREEN) |
+| Next action | Phase 23 complete — run `/gsd:verify-phase 23` (optional) then start Phase 24 (helpers + stub IA contract). Prod migration `sql/migrations/23_consommables_km.sql` still needs manual apply via Supabase Dashboard SQL Editor before Phase 25 endpoints go live. |
+| Phase 23 P04 | 25min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,8 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - KM-04 vérifié par analyse statique (grep + `node --check`) en 23-03/23-04, pas par un test d'intégration live `supabase.js`→REST — décision documentée dans `23-VALIDATION.md` (évite de demander un 2e type de credential Supabase pour cette seule phase)
 - [Phase 23]: DROP trg_update_km/update_moto_km() dans la même migration que la création de releves_km (D-05) — évite un second writer non coordonné vers motos.km
 - [Phase 23]: Trigger monotone NULL-safe via GREATEST(COALESCE(v_moto_km,0), COALESCE(v_max_releve,0)) pour couvrir le premier relevé d'une moto prod existante
+- [Phase 23, plan 23-04]: `photos_consommables.analyse` renommée `analyse_ia` — "analyse" est un mot réservé PostgreSQL (ANALYSE/ANALYZE), causait un SCHEMA_BOOTSTRAP_FAILED réel ; découvert seulement en exécutant le bootstrap live (pas visible par simple lecture SQL) — confirme la discipline "gate = exécution réelle" de v1.5
+- [Phase 23, plan 23-04]: fixtures `test-releves-km-trigger.js` corrigées pour poser `proprietaire_type='garage'` + `proprietaire_garage_id` — la contrainte CHECK `moto_proprietaire_coherence` (L8) exige `client_id NOT NULL` si `proprietaire_type='client'` (valeur par défaut), incompatible avec un script qui n'a que des fixtures garage
 
 ### Pending Todos
 
@@ -81,10 +84,11 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 - ~~**FRESH_DB_URL manquant**~~ → **RÉSOLU 2026-07-14** — Mehdi a créé un projet Supabase jetable (`xjgyoehennuydoocbprj`, distinct de la prod `rzbqbaccjyxvtlnfitrr`) et fourni la connection string Postgres directe (Dashboard → Settings → Database → Connection string, mode session, port 5432). Écrite dans `.env` sous `FRESH_DB_URL` (gitignored, jamais committée). Connexion pg live vérifiée (`SELECT current_database()`) avant tout usage. Plans 23-02 (checkpoint) et 23-04 (gate bootstrap) débloqués.
 - Phase 8 et MSTORE-02 restent des known gaps externes.
-- v1.6 discipline critique : toute nouvelle migration (Phase 23) doit inclure ses policies RLS dans le MÊME fichier que `CREATE TABLE`, et `schema.sql` doit être mis à jour dans la même phase, vérifié via `scripts/bootstrap-fresh-schema.js` — répéter la dérive résolue en v1.5 serait un échec de discipline évitable.
+- v1.6 discipline critique : toute nouvelle migration (Phase 23) doit inclure ses policies RLS dans le MÊME fichier que `CREATE TABLE`, et `schema.sql` doit être mis à jour dans la même phase, vérifié via `scripts/bootstrap-fresh-schema.js` — répéter la dérive résolue en v1.5 serait un échec de discipline évitable. **Vérifié tenu en Phase 23 (23-04).**
 - Ce repo a `.planning/` gitignored avec force-add individuel des fichiers — si `gsd-tools.cjs commit` signale `skipped_commit_docs_false`, force-add et committer directement avec git plutôt que de bloquer.
+- Prod migration `sql/migrations/23_consommables_km.sql` (avec le fix `analyse_ia`) reste à appliquer manuellement par Mehdi via Supabase Dashboard SQL Editor avant que Phase 25 ne câble des endpoints HTTP vers ces 4 tables — hors scope de Phase 23 (schéma seul, aucun chemin client-atteignable encore).
 
 ## Session Continuity
 
-Last session: 2026-07-14T10:04:43.631Z
-Stopped at: Plan 23-03 executed (parallel worktree agent) — RelevesKm.enregistrer() added as the single km write gateway; Motos.update() and OrdresReparation.cloturer() closed and routed through it with acteur_id threaded (D-04, fallback garage_id); Interventions.create() documented decoupled (D-05, no behavior change). node --check green on supabase.js/motokey-api.js. Worktree branch had diverged from master (missing 23-01/23-02 commits) — merged master in cleanly before finishing (commit 4347d1c), no conflicts. Next: execute Phase 23 (23-04, wave 3 bootstrap gate against xjgyoehennuydoocbprj — must go RED→GREEN).
+Last session: 2026-07-14T10:37:45.343Z
+Stopped at: Completed 23-04-PLAN.md (Phase 23 complete, 4/4 plans)
