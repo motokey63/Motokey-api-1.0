@@ -4,8 +4,8 @@ milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: verifying
 stopped_at: Completed 25-05-PLAN.md (Phase 25 complete, 5/5 plans)
-last_updated: "2026-07-14T21:24:58.622Z"
-last_activity: 2026-07-14 -- Phase 25 plan 05 complete (Phase 25 done)
+last_updated: "2026-07-14T21:48:18.621Z"
+last_activity: 2026-07-14
 progress:
   total_phases: 6
   completed_phases: 3
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 
 ## Current Position
 
-Phase: 26 of 28 (cron rappel)
+Phase: 26 of 28 (cron de rappel + push/badge)
 Plan: Not started
 Status: Phase 25 fully complete (5/5 plans). CONSO-03 (upload photo consommable) + CLOUD-01 (round-trip Cloudinary réel, skippable sans credentials) livrés et live-vérifiés (18/18 assertions, garage path). Ready for /gsd:verify-phase or Phase 26.
-Last activity: 2026-07-14 -- Phase 25 plan 05 complete (Phase 25 done)
+Last activity: 2026-07-14
 
 ```
 v1.0 ████████████ SHIPPED
