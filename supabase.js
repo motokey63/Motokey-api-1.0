@@ -1309,6 +1309,78 @@ const CataloguePieces = {
 };
 
 // ══════════════════════════════════════════════════════════
+// CONSOMMABLES (v1.6 — Phase 24) — état courant d'un consommable par moto
+// ══════════════════════════════════════════════════════════
+const Consommables = {
+  // upsert (pas insert) : UNIQUE(moto_id, type_consommable) — la table modélise
+  // l'état courant (une ligne par type), pas un historique append-only.
+  async upsert(moto_id, { type_consommable, km_montage, date_montage, reference }) {
+    if (!moto_id) throw new Error('[Consommables.upsert] moto_id requis');
+    if (!type_consommable) throw new Error('[Consommables.upsert] type_consommable requis');
+    const payload = {
+      moto_id,
+      type_consommable,
+      km_montage: (km_montage !== undefined && km_montage !== null && km_montage !== '') ? parseInt(km_montage) : null,
+      date_montage: date_montage || null,
+      reference: reference || null,
+      updated_at: new Date().toISOString()
+    };
+    const { data, error } = await supabase
+      .from('consommables')
+      .upsert(payload, { onConflict: 'moto_id,type_consommable' })
+      .select().single();
+    if (error) throw new Error(`[Consommables.upsert] ${error.message}`);
+    return data;
+  },
+
+  async listByMoto(moto_id) {
+    if (!moto_id) throw new Error('[Consommables.listByMoto] moto_id requis');
+    const { data, error } = await supabase
+      .from('consommables').select('*')
+      .eq('moto_id', moto_id)
+      .order('type_consommable');
+    if (error) throw new Error(`[Consommables.listByMoto] ${error.message}`);
+    return data || [];
+  }
+};
+
+// ══════════════════════════════════════════════════════════
+// PHOTOS CONSOMMABLES (v1.6 — Phase 24) — historique photo + résultat analyse vision
+// ══════════════════════════════════════════════════════════
+const PhotosConsommables = {
+  // analyse_ia = objet contrat complet renvoyé par visionAnalysisService.analyzePhoto()
+  // (pct_usure/etat/confiance/analyse_status/engine) ; analyse_status dupliqué en colonne
+  // dédiée pour requêtes rapides. type_consommable dénormalisé DOIT être fourni (pas de CHECK
+  // sur cette colonne — pitfall dénormalisation).
+  async insert({ moto_id, consommable_id, type_consommable, photo_url, analyse_ia, analyse_status }) {
+    if (!moto_id) throw new Error('[PhotosConsommables.insert] moto_id requis');
+    if (!photo_url) throw new Error('[PhotosConsommables.insert] photo_url requis');
+    const payload = {
+      moto_id,
+      consommable_id: consommable_id || null,
+      type_consommable: type_consommable || null,
+      photo_url,
+      analyse_ia: analyse_ia || null,
+      analyse_status: analyse_status || null
+    };
+    const { data, error } = await supabase
+      .from('photos_consommables').insert(payload).select().single();
+    if (error) throw new Error(`[PhotosConsommables.insert] ${error.message}`);
+    return data;
+  },
+
+  async listByConsommable(consommable_id) {
+    if (!consommable_id) throw new Error('[PhotosConsommables.listByConsommable] consommable_id requis');
+    const { data, error } = await supabase
+      .from('photos_consommables').select('*')
+      .eq('consommable_id', consommable_id)
+      .order('created_at', { ascending: false });
+    if (error) throw new Error(`[PhotosConsommables.listByConsommable] ${error.message}`);
+    return data || [];
+  }
+};
+
+// ══════════════════════════════════════════════════════════
 // GARAGE USERS (L4 v2 hardening)
 // ══════════════════════════════════════════════════════════
 const GarageUsers = {
@@ -1580,6 +1652,8 @@ module.exports = {
   OrTaches,
   OrPieces,
   CataloguePieces,
+  Consommables,
+  PhotosConsommables,
   GarageUsers,
   resolveProprietaire,
   checkLimiteMotosClient,
