@@ -154,41 +154,47 @@ async function setupFixtures(client, f) {
     [f.garageId, 'Fixture Garage 23-02', `fixture-23-02-${f.garageId}@test.local`]
   );
 
+  // Toutes les motos fixtures sont propriété garage (proprietaire_type='garage',
+  // proprietaire_garage_id=f.garageId) — moto_proprietaire_coherence (L8) exige
+  // client_id NULL dans ce cas ; aucune fixture client n'existe dans ce script,
+  // donc "garage" est le seul mode d'ownership cohérent avec l'unique fixture
+  // garage disponible.
+
   // moto pour "accept" : km pré-peuplé = 10000, zéro releves_km au départ.
   await client.query(
-    `INSERT INTO motos (id, garage_id, marque, modele, annee, plaque, vin, km)
-     VALUES ($1, $2, 'Yamaha', 'MT-07', 2023, 'FIX-ACCEPT', $3, 10000)`,
+    `INSERT INTO motos (id, garage_id, marque, modele, annee, plaque, vin, km, proprietaire_type, proprietaire_garage_id)
+     VALUES ($1, $2, 'Yamaha', 'MT-07', 2023, 'FIX-ACCEPT', $3, 10000, 'garage', $2)`,
     [f.motoAccept, f.garageId, `VIN-ACCEPT-${f.motoAccept}`]
   );
 
   // moto pour "reject-regression" : km pré-peuplé = 0, le cas construit lui-même
   // l'historique jusqu'à 12000 avant de tenter la régression.
   await client.query(
-    `INSERT INTO motos (id, garage_id, marque, modele, annee, plaque, vin, km)
-     VALUES ($1, $2, 'Triumph', 'Street Triple', 2022, 'FIX-REJECT', $3, 0)`,
+    `INSERT INTO motos (id, garage_id, marque, modele, annee, plaque, vin, km, proprietaire_type, proprietaire_garage_id)
+     VALUES ($1, $2, 'Triumph', 'Street Triple', 2022, 'FIX-REJECT', $3, 0, 'garage', $2)`,
     [f.motoReject, f.garageId, `VIN-REJECT-${f.motoReject}`]
   );
 
   // moto pour "null-safe-baseline" : km pré-peuplé = 40000, ZÉRO ligne releves_km
   // avant l'insert testé — reproduit l'état par défaut de toute moto prod existante.
   await client.query(
-    `INSERT INTO motos (id, garage_id, marque, modele, annee, plaque, vin, km)
-     VALUES ($1, $2, 'Honda', 'CB500', 2022, 'FIX-NULLSAFE', $3, 40000)`,
+    `INSERT INTO motos (id, garage_id, marque, modele, annee, plaque, vin, km, proprietaire_type, proprietaire_garage_id)
+     VALUES ($1, $2, 'Honda', 'CB500', 2022, 'FIX-NULLSAFE', $3, 40000, 'garage', $2)`,
     [f.motoNullSafe, f.garageId, `VIN-NULLSAFE-${f.motoNullSafe}`]
   );
 
   // moto pour "counter-replacement-bypass" : km pré-peuplé = 40000, le cas construit
   // lui-même un relevé jusqu'à 40000 avant le remplacement de compteur.
   await client.query(
-    `INSERT INTO motos (id, garage_id, marque, modele, annee, plaque, vin, km)
-     VALUES ($1, $2, 'Kawasaki', 'Z650', 2021, 'FIX-BYPASS', $3, 40000)`,
+    `INSERT INTO motos (id, garage_id, marque, modele, annee, plaque, vin, km, proprietaire_type, proprietaire_garage_id)
+     VALUES ($1, $2, 'Kawasaki', 'Z650', 2021, 'FIX-BYPASS', $3, 40000, 'garage', $2)`,
     [f.motoBypass, f.garageId, `VIN-BYPASS-${f.motoBypass}`]
   );
 
   // moto pour "conso-check-violation" (km arbitraire, non pertinent pour ce cas).
   await client.query(
-    `INSERT INTO motos (id, garage_id, marque, modele, annee, plaque, vin, km)
-     VALUES ($1, $2, 'Suzuki', 'SV650', 2020, 'FIX-CONSO', $3, 0)`,
+    `INSERT INTO motos (id, garage_id, marque, modele, annee, plaque, vin, km, proprietaire_type, proprietaire_garage_id)
+     VALUES ($1, $2, 'Suzuki', 'SV650', 2020, 'FIX-CONSO', $3, 0, 'garage', $2)`,
     [f.motoConso, f.garageId, `VIN-CONSO-${f.motoConso}`]
   );
 }

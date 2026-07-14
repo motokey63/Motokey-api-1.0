@@ -578,7 +578,7 @@ CREATE TABLE photos_consommables (
   consommable_id    UUID REFERENCES consommables(id) ON DELETE CASCADE,
   type_consommable  TEXT,
   photo_url         TEXT NOT NULL,
-  analyse           JSONB,           -- rempli par le stub vision (Phase 24/25)
+  analyse_ia        JSONB,           -- rempli par le stub vision (Phase 24/25) — nommé analyse_ia (pas "analyse", mot réservé Postgres/ANALYZE)
   analyse_status    TEXT,            -- ok / incertain / echec (Phase 24)
   created_at        TIMESTAMPTZ DEFAULT NOW()
 );
