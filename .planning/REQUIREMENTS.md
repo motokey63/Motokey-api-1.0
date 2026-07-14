@@ -23,8 +23,8 @@ Requirements for milestone v1.6 (Suivi usure consommables + anti-fraude km). Eac
 
 ### Stub IA Vision (VISION)
 
-- [ ] **VISION-01**: Une photo de consommable uploadée déclenche une analyse via un service dédié flag-gated (`VISION_ENABLED`), qui renvoie une fausse analyse structurée tant que la clé Anthropic n'est pas configurée
-- [ ] **VISION-02**: La réponse d'analyse (stub ou réelle plus tard) suit un contrat fixe (% usure, état, confiance, statut d'analyse, moteur) consommé identiquement par les jauges
+- [x] **VISION-01**: Une photo de consommable uploadée déclenche une analyse via un service dédié flag-gated (`VISION_ENABLED`), qui renvoie une fausse analyse structurée tant que la clé Anthropic n'est pas configurée
+- [x] **VISION-02**: La réponse d'analyse (stub ou réelle plus tard) suit un contrat fixe (% usure, état, confiance, statut d'analyse, moteur) consommé identiquement par les jauges
 
 ### Cloudinary (CLOUD)
 
@@ -70,8 +70,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONSO-02 | Phase 23 | Complete |
 | CONSO-03 | Phase 25 | Pending |
 | CONSO-04 | Phase 27 | Pending |
-| VISION-01 | Phase 24 | Pending |
-| VISION-02 | Phase 24 | Pending |
+| VISION-01 | Phase 24 | Complete |
+| VISION-02 | Phase 24 | Complete |
 | CLOUD-01 | Phase 25 | Pending |
 | GAUGE-01 | Phase 27 | Pending |
 | GAUGE-02 | Phase 27 | Pending |

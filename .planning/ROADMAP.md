@@ -96,7 +96,7 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
 **Milestone Goal:** Donner à MotoKey le suivi d'usure des consommables moto (pneus, chaîne, plaquettes, disques, huile, liquide de frein) par photo + analyse IA (stub), avec anti-fraude stricte sur le kilométrage — cœur produit différenciateur, attaché au passeport moto transmissible à la revente.
 
 - [x] **Phase 23: Schéma + Anti-Fraude km au niveau DB** - `releves_km` devient la source de vérité du km, croissance monotone stricte imposée par trigger DB, les 3 chemins d'écriture existants sont fermés (completed 2026-07-14)
-- [ ] **Phase 24: Helpers supabase.js + Contrat Stub Vision** - Helpers CRUD des 3 nouvelles tables + `visionAnalysisService.js` flag-gated dont le contrat de réponse est verrouillé avant tout consommateur
+- [x] **Phase 24: Helpers supabase.js + Contrat Stub Vision** - Helpers CRUD des 3 nouvelles tables + `visionAnalysisService.js` flag-gated dont le contrat de réponse est verrouillé avant tout consommateur (completed 2026-07-14)
 - [ ] **Phase 25: Endpoints Backend (km, photos, remplacement compteur, Cloudinary)** - Relevé km, changement de compteur PRO+, saisie consommables, upload photo avec stockage Cloudinary réel
 - [ ] **Phase 26: Cron de Rappel + Push/Badge** - Rappel photo 3000km OU 6 mois, idempotent, avec équivalent badge garage pour motos non réclamées
 - [ ] **Phase 27: UI Web Garage + Client (jauges, retrait Pneus legacy)** - Jauges % par consommable + jauge générale maillon faible, migration et retrait de la section Pneus historique
@@ -130,8 +130,8 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
   3. Un appel direct à `analyzePhoto()` avec une URL factice renvoie une réponse conforme au contrat, vérifiable indépendamment de tout endpoint HTTP (test isolé, sans upload réel)
   4. `Consommables`, `PhotosConsommables`, `RelevesKm` existent comme helpers CRUD minces dans `supabase.js`, seul point d'accès DB pour les 3 nouvelles tables
 **Plans**: 2 plans (1 wave — 2 plans autonomes parallèles)
-  - [ ] 24-01-PLAN.md — Service vision stub flag-gated (`visionAnalysisService.js`) + harnais de test contrat autonome (VISION-01/02)
-  - [ ] 24-02-PLAN.md — Helpers CRUD `Consommables`/`PhotosConsommables` dans `supabase.js` + vérif structurelle/pg (RelevesKm confirmé suffisant)
+  - [x] 24-01-PLAN.md — Service vision stub flag-gated (`visionAnalysisService.js`) + harnais de test contrat autonome (VISION-01/02)
+  - [x] 24-02-PLAN.md — Helpers CRUD `Consommables`/`PhotosConsommables` dans `supabase.js` + vérif structurelle/pg (RelevesKm confirmé suffisant)
 
 ### Phase 25: Endpoints Backend (km, photos, remplacement compteur, Cloudinary)
 **Goal**: Les garages et clients peuvent soumettre des relevés km et des photos de consommables via l'API ; le mécano peut saisir les données de montage ; l'upload stocke réellement l'image sur Cloudinary.

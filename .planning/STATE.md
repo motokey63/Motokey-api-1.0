@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
-status: verifying
+status: executing
 stopped_at: Phase 24 context gathered
-last_updated: "2026-07-14T11:15:49.757Z"
+last_updated: "2026-07-14T15:59:48.761Z"
 last_activity: 2026-07-14
 progress:
   total_phases: 6
-  completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  completed_phases: 2
+  total_plans: 6
+  completed_plans: 6
 ---
 
 # MotoKey API — Project State
@@ -20,13 +20,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-13)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 23 — sch-ma-anti-fraude-km-au-niveau-db — COMPLETE, ready for next phase (24)
+**Current focus:** Phase 24 — helpers-supabase-js-contrat-stub-vision
 
 ## Current Position
 
-Phase: 24 of 28 (helpers supabase.js + contrat stub vision)
+Phase: 25
 Plan: Not started
-Status: Phase 23 fully gated and complete (4/4 plans). Bootstrap-fresh-schema.js -> SCHEMA_BOOTSTRAP_OK, test-releves-km-trigger.js -> 28/28 PASS, RLS default-deny confirmed, migration/schema.sql parity confirmed. Ready for /gsd:verify-phase or Phase 24.
+Status: Executing Phase 24
 Last activity: 2026-07-14
 
 ```
