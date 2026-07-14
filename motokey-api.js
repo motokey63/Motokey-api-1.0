@@ -1024,6 +1024,21 @@ const server = http.createServer(async function(req, res){
     return handleKmReading(req, res, p.id, { remplacement:true }, b);
   }
 
+  /* CONSOMMABLES (CONSO-01) — saisie MECANO+, délègue à Consommables.upsert (D-04) */
+  if((p=M('PATCH','/motos/:id/consommables/:type'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res,'Non authentifié',401,'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx,'MECANO')) return fail(res,'Permission refusée — MECANO minimum requis',403,'FORBIDDEN_ROLE');
+    if (!SBLayer.TYPES_CONSOMMABLES.includes(p.type)) return fail(res, 'type_consommable invalide', 400, 'VALIDATION_ERROR');
+    const r = await resolveMotoForCtx(ctx, p.id, a);
+    if (!r) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
+    try {
+      const row = await SBLayer.Consommables.upsert(p.id, { type_consommable: p.type, km_montage: b.km_montage, date_montage: b.date_montage, reference: b.reference });
+      return ok(res, { consommable: row }, 'Consommable enregistré');
+    } catch (e) { return fail(res, e.message, 500, 'SERVER_ERROR'); }
+  }
+
   /* INTERVENTIONS */
   if((p=M('GET','/motos/:id/interventions'))!==null){
     // RBAC: CLIENT voit ses propres interventions, MECANO+ voit celles du garage

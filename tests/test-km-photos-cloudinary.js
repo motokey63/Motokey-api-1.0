@@ -232,7 +232,32 @@ async function run() {
 
   // ─── CONSO-01 (saisie consommables) ─────────────────────────────────────
   console.log('\n── CONSO-01 : saisie consommables (MECANO+) ────────────────────');
-  console.log('  ⏭️  [CONSO-01] à implémenter en 25-04');
+  if (testMotoId) {
+    const { status: s1, body: b1 } = await request('PATCH', `/motos/${testMotoId}/consommables/chaine`, {
+      token: garageAuth.token,
+      json: { km_montage: 12000 }
+    });
+    check('PATCH /motos/:id/consommables/chaine (garage, type valide) → 200', s1 === 200, `status=${s1} body=${JSON.stringify(b1)}`);
+    check('  consommable upserté (type_consommable=chaine)', b1?.data?.consommable?.type_consommable === 'chaine', JSON.stringify(b1));
+
+    const { status: s2, body: b2 } = await request('PATCH', `/motos/${testMotoId}/consommables/invalide_xyz`, {
+      token: garageAuth.token,
+      json: { km_montage: 1000 }
+    });
+    check('PATCH /motos/:id/consommables/invalide_xyz → 400 VALIDATION_ERROR', s2 === 400 && b2?.error?.code === 'VALIDATION_ERROR', `status=${s2} body=${JSON.stringify(b2)}`);
+
+    if (clientAuth) {
+      const { status: s3, body: b3 } = await request('PATCH', `/motos/${testMotoId}/consommables/chaine`, {
+        token: clientAuth.token,
+        json: { km_montage: 5000 }
+      });
+      check('PATCH /motos/:id/consommables/chaine (CLIENT) → 403 FORBIDDEN_ROLE', s3 === 403 && b3?.error?.code === 'FORBIDDEN_ROLE', `status=${s3} body=${JSON.stringify(b3)}`);
+    } else {
+      console.warn('  ⚠️  clientAuth indisponible — assertion CLIENT→403 (unitaire) SKIP');
+    }
+  } else {
+    console.log('  ⏭️  [CONSO-01 unitaire] SKIP (pas de moto seed disponible)');
+  }
 
   // ─── CONSO-03 (photo consommable) ───────────────────────────────────────
   console.log('\n── CONSO-03 : upload photo consommable (CLIENT ou MECANO+) ─────');
