@@ -444,6 +444,70 @@ async function resolveMotoForCtx(ctx, motoId, a) {
   return { moto, garage_id: garageId, acteur_type: 'garage', acteur_id: (ctx && ctx.user_id) || garageId };
 }
 
+// Handler partagé relevé km normal (KM-03) et remplacement compteur (KM-02).
+// `bodyFields` : chemin JSON passe `b` (déjà parsé par body()) ; chemin multipart
+// laisse ce paramètre undefined et récupère les champs texte via req.body après runMulter.
+async function handleKmReading(req, res, motoId, { remplacement }, bodyFields) {
+  try {
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+
+    // Extraction champs : multipart (photo présente) vs JSON
+    let file = null;
+    let fields = bodyFields || {};
+    const ct = req.headers['content-type'] || '';
+    if (ct.startsWith('multipart/form-data')) {
+      try {
+        file = await runMulter(req, res);
+      } catch (e) {
+        if (e && e.code === 'LIMIT_FILE_SIZE') return fail(res, 'Fichier trop volumineux (5 Mo max)', 400, 'FILE_TOO_LARGE');
+        return fail(res, e.message || 'Fichier invalide', 400, 'UNSUPPORTED_MEDIA');
+      }
+      fields = req.body || {};
+    }
+    const km = fields.km;
+    const note = fields.note;
+
+    // Ownership (dual CLIENT/GARAGE) — même sémantique 404 que le pattern existant
+    const r = await resolveMotoForCtx(ctx, motoId, a);
+    if (!r) return fail(res, 'Moto non trouvée', 404, 'NOT_FOUND');
+
+    if (km === undefined || km === null || km === '' || isNaN(parseInt(km))) {
+      return fail(res, 'km numérique requis', 400, 'VALIDATION_ERROR');
+    }
+
+    // Upload Cloudinary AVANT l'écriture km (photo_url doit être connue avant l'INSERT)
+    let photo_url = null;
+    if (file) {
+      try {
+        const up = await cloudinaryService.uploadPhoto(file.buffer, { folder: 'motokey/km/' + motoId });
+        photo_url = up.secure_url;
+      } catch (e) {
+        return fail(res, e.message, e.statusCode || 500, e.code || 'UPLOAD_ERROR');
+      }
+    }
+
+    const type_evenement = remplacement ? 'remplacement_compteur' : 'lecture';
+    const result = await SBLayer.RelevesKm.enregistrer(r.garage_id, motoId, {
+      km, type_evenement, acteur_type: r.acteur_type, acteur_id: r.acteur_id, note: note || null, photo_url
+    });
+
+    if (!result.accepted) {
+      return sendJSON(res, 409, {
+        success: false,
+        error: { code: 'KM_REGRESSION', message: 'Kilométrage en régression' },
+        km_tente: result.km_tente,
+        km_actuel: result.km_actuel,
+        timestamp: nowISO()
+      });
+    }
+    return ok(res, { releve: result.releve }, 'Relevé km enregistré', 201);
+  } catch (e) {
+    return fail(res, e.message, 500, 'SERVER_ERROR');
+  }
+}
+
 /* ─── ROUTE MATCHER ─── */
 function match(method, reqMethod, pattern, pathname) {
   if(method!==reqMethod) return null;
@@ -932,6 +996,11 @@ const server = http.createServer(async function(req, res){
     const pt = {vert:0,bleu:0,jaune:0,rouge:0};
     is.forEach(function(i){pt[i.type]=(pt[i.type]||0)+1;});
     return ok(res,{score:sc,couleur:couleur(sc),nb_interventions:is.length,par_type:pt,detail:{concession:pt.vert*12,pro_valide:pt.bleu*8,proprietaire:pt.jaune*5,malus:pt.rouge*5}});
+  }
+
+  /* KILOMÉTRAGE (KM-02/KM-03) — route JSON (sans photo) ; le multipart est intercepté avant body() */
+  if((p=M('POST','/motos/:id/km'))!==null){
+    return handleKmReading(req, res, p.id, { remplacement:false }, b);
   }
 
   /* INTERVENTIONS */

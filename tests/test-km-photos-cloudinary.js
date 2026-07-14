@@ -149,11 +149,86 @@ async function run() {
 
   // ─── KM-03 (relevé km normal) ────────────────────────────────────────────
   console.log('\n── KM-03 : relevé km normal (CLIENT ou MECANO+) ────────────────');
-  console.log('  ⏭️  [KM-03] à implémenter en 25-03');
+  let testMotoId = null;
+  let testMotoKm = 0;
+  if (garageAuth) {
+    try {
+      const { status, body: b } = await request('GET', '/motos', { token: garageAuth.token });
+      if (status === 200 && b?.data?.motos?.length) {
+        testMotoId = b.data.motos[0].id;
+        testMotoKm = b.data.motos[0].km || 0;
+        console.log(`  ℹ️  Moto de test : ${testMotoId} (km actuel ${testMotoKm})`);
+      } else {
+        console.warn(`  ⚠️  Aucune moto trouvée pour le garage seed — sections KM-02/KM-03 SKIP`, JSON.stringify(b));
+      }
+    } catch (e) {
+      console.warn(`  ⚠️  Setup moto échoué — ${e.message}`);
+    }
+  }
+
+  if (testMotoId) {
+    const kmValide = testMotoKm + 100;
+    const { status: s1, body: b1 } = await request('POST', `/motos/${testMotoId}/km`, {
+      token: garageAuth.token,
+      json: { km: kmValide }
+    });
+    check('POST /motos/:id/km (garage, km valide) → 200/201', s1 === 200 || s1 === 201, `status=${s1} body=${JSON.stringify(b1)}`);
+    check('  releve enregistré (acteur_type=garage)', b1?.data?.releve?.acteur_type === 'garage', JSON.stringify(b1));
+
+    const kmRegression = testMotoKm; // <= max historique après l'insert précédent
+    const { status: s2, body: b2 } = await request('POST', `/motos/${testMotoId}/km`, {
+      token: garageAuth.token,
+      json: { km: kmRegression }
+    });
+    check('POST /motos/:id/km (régression) → 409 KM_REGRESSION', s2 === 409 && b2?.error?.code === 'KM_REGRESSION', `status=${s2} body=${JSON.stringify(b2)}`);
+    check('  409 expose km_tente + km_actuel', typeof b2?.km_tente === 'number' && typeof b2?.km_actuel === 'number', JSON.stringify(b2));
+
+    // Multipart avec photo (round-trip Cloudinary réel si configuré, sinon 503 typé — les deux sont des preuves valides du wiring)
+    const kmMultipart = kmValide + 50;
+    const { status: s3, body: b3 } = await request('POST', `/motos/${testMotoId}/km`, {
+      token: garageAuth.token,
+      multipart: { filePath: FIXTURE_JPEG, fields: { km: String(kmMultipart) } }
+    });
+    const cloudReadyForKm3 = !!(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET);
+    if (cloudReadyForKm3) {
+      check('POST /motos/:id/km multipart+photo → 200/201 avec photo_url', (s3 === 200 || s3 === 201) && !!b3?.data?.releve?.photo_url, `status=${s3} body=${JSON.stringify(b3)}`);
+    } else {
+      check('POST /motos/:id/km multipart+photo → 503 CLOUDINARY_NOT_CONFIGURED (pas de credentials locaux)', s3 === 503 && b3?.error?.code === 'CLOUDINARY_NOT_CONFIGURED', `status=${s3} body=${JSON.stringify(b3)}`);
+    }
+  } else {
+    console.log('  ⏭️  [KM-03] SKIP (pas de moto seed disponible)');
+  }
 
   // ─── KM-02 (remplacement compteur) ──────────────────────────────────────
   console.log('\n── KM-02 : remplacement compteur (PRO+ strict) ─────────────────');
-  console.log('  ⏭️  [KM-02] à implémenter en 25-03');
+  if (testMotoId) {
+    const kmReset = 0;
+    const { status: s1, body: b1 } = await request('POST', `/motos/${testMotoId}/km/remplacement-compteur`, {
+      token: garageAuth.token,
+      json: { km: kmReset, note: 'Remplacement compteur — test intégration Phase 25-03' }
+    });
+    check('POST remplacement-compteur (garage PRO+, avec note) → 200/201', s1 === 200 || s1 === 201, `status=${s1} body=${JSON.stringify(b1)}`);
+
+    const { status: s2, body: b2 } = await request('POST', `/motos/${testMotoId}/km/remplacement-compteur`, {
+      token: garageAuth.token,
+      json: { km: kmReset + 10 }
+    });
+    check('POST remplacement-compteur sans note → 400 VALIDATION_ERROR', s2 === 400 && b2?.error?.code === 'VALIDATION_ERROR', `status=${s2} body=${JSON.stringify(b2)}`);
+
+    if (clientAuth) {
+      const { status: s3, body: b3 } = await request('POST', `/motos/${testMotoId}/km/remplacement-compteur`, {
+        token: clientAuth.token,
+        json: { km: kmReset + 10, note: 'Tentative CLIENT — doit être refusée' }
+      });
+      check('POST remplacement-compteur (CLIENT) → 403 FORBIDDEN_ROLE', s3 === 403 && b3?.error?.code === 'FORBIDDEN_ROLE', `status=${s3} body=${JSON.stringify(b3)}`);
+    } else {
+      console.warn('  ⚠️  clientAuth indisponible — assertion CLIENT→403 SKIP');
+    }
+    // Pas de compte MECANO seed distinct pour l'instant (voir commentaire CREDS) — assertion
+    // MECANO→403 à ajouter quand un compte seed MECANO existera.
+  } else {
+    console.log('  ⏭️  [KM-02] SKIP (pas de moto seed disponible)');
+  }
 
   // ─── CONSO-01 (saisie consommables) ─────────────────────────────────────
   console.log('\n── CONSO-01 : saisie consommables (MECANO+) ────────────────────');

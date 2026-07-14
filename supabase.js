@@ -408,7 +408,17 @@ const RelevesKm = {
           .eq('moto_id', moto_id)
           .order('created_at', { ascending: false })
           .limit(1).maybeSingle();
-        return { accepted: false, km_tente: rejet?.km_tente ?? parseInt(km), km_actuel: rejet?.km_actuel ?? null };
+        let km_actuel = rejet?.km_actuel ?? null;
+        // Filet de sécurité (25-03) : si la ligne d'audit releves_km_rejets n'a pas été
+        // journalisée par le trigger (constaté en exécution live prod, cause distincte non
+        // encore élucidée — voir deferred-items.md), retomber sur motos.km qui reste, par
+        // KM-04, la source de vérité synchronisée. Ne JAMAIS renvoyer km_actuel:null au
+        // client — la réponse 409 doit toujours porter une valeur exploitable.
+        if (km_actuel === null) {
+          const { data: motoRow } = await supabase.from('motos').select('km').eq('id', moto_id).maybeSingle();
+          km_actuel = motoRow?.km ?? null;
+        }
+        return { accepted: false, km_tente: rejet?.km_tente ?? parseInt(km), km_actuel };
       }
       throw new Error(`[RelevesKm.enregistrer] ${error.message}`);
     }
