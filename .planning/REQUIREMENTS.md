@@ -18,7 +18,7 @@ Requirements for milestone v1.6 (Suivi usure consommables + anti-fraude km). Eac
 
 - [x] **CONSO-01**: Chaque moto a une fiche consommables avec les 9 types donnés (pneu_av/ar, chaîne, plaquettes_av/ar, disque_av/ar, huile_moteur, liquide_frein), chacun avec km_montage/date_montage/référence saisis par le mécano
 - [x] **CONSO-02**: Le schéma consommables permet d'ajouter un nouveau type de consommable plus tard sans migration lourde
-- [ ] **CONSO-03**: Un client ou un membre du garage peut uploader une photo d'un consommable, historisée avec sa date et son analyse
+- [x] **CONSO-03**: Un client ou un membre du garage peut uploader une photo d'un consommable, historisée avec sa date et son analyse
 - [ ] **CONSO-04**: Les données `pneu_av`/`pneu_ar`/`pneu_km_montage` existantes sont migrées vers les nouvelles lignes consommables, puis la section Pneus legacy est retirée de la navigation garage et `CLAUDE.md` corrigé
 
 ### Stub IA Vision (VISION)
@@ -68,7 +68,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | KM-04 | Phase 23 | Complete |
 | CONSO-01 | Phase 25 | Complete |
 | CONSO-02 | Phase 23 | Complete |
-| CONSO-03 | Phase 25 | Pending |
+| CONSO-03 | Phase 25 | Complete |
 | CONSO-04 | Phase 27 | Pending |
 | VISION-01 | Phase 24 | Complete |
 | VISION-02 | Phase 24 | Complete |

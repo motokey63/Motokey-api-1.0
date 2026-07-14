@@ -97,7 +97,7 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
 
 - [x] **Phase 23: Schéma + Anti-Fraude km au niveau DB** - `releves_km` devient la source de vérité du km, croissance monotone stricte imposée par trigger DB, les 3 chemins d'écriture existants sont fermés (completed 2026-07-14)
 - [x] **Phase 24: Helpers supabase.js + Contrat Stub Vision** - Helpers CRUD des 3 nouvelles tables + `visionAnalysisService.js` flag-gated dont le contrat de réponse est verrouillé avant tout consommateur (completed 2026-07-14)
-- [ ] **Phase 25: Endpoints Backend (km, photos, remplacement compteur, Cloudinary)** - Relevé km, changement de compteur PRO+, saisie consommables, upload photo avec stockage Cloudinary réel
+- [x] **Phase 25: Endpoints Backend (km, photos, remplacement compteur, Cloudinary)** - Relevé km, changement de compteur PRO+, saisie consommables, upload photo avec stockage Cloudinary réel (completed 2026-07-14)
 - [ ] **Phase 26: Cron de Rappel + Push/Badge** - Rappel photo 3000km OU 6 mois, idempotent, avec équivalent badge garage pour motos non réclamées
 - [ ] **Phase 27: UI Web Garage + Client (jauges, retrait Pneus legacy)** - Jauges % par consommable + jauge générale maillon faible, migration et retrait de la section Pneus historique
 - [ ] **Phase 28: UI Mobile Client (jauges, lecture seule)** - Écran jauges consommables sur l'app mobile native + deep link depuis la notification de rappel photo
@@ -148,7 +148,7 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
   - [x] 25-02-PLAN.md — Harnais de test d intégration + fixture image (Wave 0 VALIDATION.md)
   - [x] 25-03-PLAN.md — Infra multipart + relevé km normal (KM-03) + remplacement compteur PRO+ (KM-02)
   - [x] 25-04-PLAN.md — Saisie consommables : PATCH unitaire + POST bulk (CONSO-01)
-  - [ ] 25-05-PLAN.md — Upload photo consommable + Cloudinary réel + analyse stub (CONSO-03, CLOUD-01)
+  - [x] 25-05-PLAN.md — Upload photo consommable + Cloudinary réel + analyse stub (CONSO-03, CLOUD-01)
 
 ### Phase 26: Cron de Rappel + Push/Badge
 **Goal**: Les clients et les garages sont alertés automatiquement quand une photo de consommable devient nécessaire, sans spam et sans angle mort pour les motos garage non réclamées.

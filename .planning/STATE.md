@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
-status: executing
-stopped_at: Completed 25-04 (Wave 3) — CONSO-01 consommables endpoints, live-verified 15/15 against prod
-last_updated: "2026-07-14T22:59:31.000Z"
-last_activity: 2026-07-14 -- Phase 25 plan 04 complete
+status: verifying
+stopped_at: Completed 25-05-PLAN.md (Phase 25 complete, 5/5 plans)
+last_updated: "2026-07-14T21:24:58.622Z"
+last_activity: 2026-07-14 -- Phase 25 plan 05 complete (Phase 25 done)
 progress:
   total_phases: 6
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # MotoKey API — Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-13)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 25 — endpoints-backend-km-photos-remplacement-compteur-cloudinary
+**Current focus:** Phase 25 — endpoints-backend-km-photos-remplacement-compteur-cloudinary — COMPLETE, ready for next phase (26)
 
 ## Current Position
 
-Phase: 25 (endpoints-backend-km-photos-remplacement-compteur-cloudinary) — EXECUTING
-Plan: 01/02/03/04 complete, 05 not started
-Status: Executing Phase 25 — 25-04 (CONSO-01 : PATCH unitaire + POST bulk consommables, MECANO+) complete, 2/2 tasks, live-verified 15/15 against prod (no deviations)
-Last activity: 2026-07-14 -- Phase 25 plan 04 complete
+Phase: 26 of 28 (cron rappel)
+Plan: Not started
+Status: Phase 25 fully complete (5/5 plans). CONSO-03 (upload photo consommable) + CLOUD-01 (round-trip Cloudinary réel, skippable sans credentials) livrés et live-vérifiés (18/18 assertions, garage path). Ready for /gsd:verify-phase or Phase 26.
+Last activity: 2026-07-14 -- Phase 25 plan 05 complete (Phase 25 done)
 
 ```
 v1.0 ████████████ SHIPPED
@@ -36,7 +36,7 @@ v1.2 [█████████░] SHIPPED 2026-07-01 (86%, Phase 8 known gap
 v1.3 ████████████ SHIPPED 2026-07-08 (MSTORE-02 known gap — carried forward)
 v1.4 ████████████ SHIPPED 2026-07-09 (undocumented schema drift known gap — carried forward)
 v1.5 ████████████ SHIPPED 2026-07-11 (Gap A/B schema.sql drift fully resolved, SCHEMA-02→07)
-v1.6 [██░░░░░░░░] IN PROGRESS — Phase 23 COMPLETE (4/4 plans, live-verified bootstrap gate), Phase 24 next
+v1.6 [████░░░░░░] IN PROGRESS — Phase 23/24/25 COMPLETE (schéma+anti-fraude km, helpers+stub vision, endpoints backend+Cloudinary), Phase 26 (cron rappel) next
 ```
 
 ## Performance Metrics
@@ -45,12 +45,13 @@ v1.6 [██░░░░░░░░] IN PROGRESS — Phase 23 COMPLETE (4/4 pla
 |--------|-------|
 | Milestones shipped | 6 (v1.0 + v1.1 + v1.2 + v1.3 + v1.4 + v1.5) |
 | Known gaps carried forward | Phase 8/BILL-06 (Stripe live mode, since v1.2), MSTORE-02 (store submission, since v1.3) — both blocked on Mehdi's external account/dashboard actions |
-| Next action | Phase 25 plan 04 (CONSO-01 consommables endpoints) complete — plan 05 (CONSO-03/CLOUD-01) remains. |
+| Next action | Phase 25 complete (5/5 plans) — start Phase 26 (cron rappel photo/entretien). |
 | Phase 23 P04 | 25min | 2 tasks | 3 files |
 | Phase 25 P01 | 20min | 3 tasks | 4 files |
 | Phase 25 P02 | 17min | 2 tasks | 2 files |
 | Phase 25 P03 | 25min | 3 tasks | 3 files |
 | Phase 25 P04 | 8min | 2 tasks | 2 files |
+| Phase 25 P05 | 35min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -84,12 +85,8 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - [Phase 25, plan 25-03]: Multipart routes (`/motos/:id/km`, `/motos/:id/km/remplacement-compteur`) intercepted before the router's unconditional `body()` call (mirrors `/stripe/webhook`), posing `req.ctx` themselves via `rbac.extractRoleFromRequest` — first multipart pattern in `motokey-api.js`, established for CONSO-03 (25-05) to reuse
 - [Phase 25, plan 25-03]: `RelevesKm.enregistrer()` now falls back to `motos.km` when `releves_km_rejets` has no matching row, so the 409 `km_actuel` field is never null — found live against prod, where the audit-trail insert inside `verifier_km_monotone()` isn't persisting despite the rejection itself working correctly (see deferred-items.md, Phase 25 dir)
 - [Phase 25, plan 25-04]: CONSO-01 (PATCH unitaire + POST bulk consommables) exécuté sans déviation — les deux endpoints réutilisent exactement le pattern MECANO+/`resolveMotoForCtx()` déjà établi en 25-03, aucun nouveau helper
-
-### Pending Todos
-
-- **MSTORE-02** — soumission TestFlight/Play Store réelle, bloquée sur création de comptes développeur payants par Mehdi. Voir `.planning/PROJECT.md` Known Gaps.
-- **Phase 8 / BILL-06** — Stripe live mode, bloqué sur action humaine Stripe Dashboard.
-- **Tech debt from v1.5** (non-blocking, see `.planning/milestones/v1.5-MILESTONE-AUDIT.md`): niveau_preuve CHECK not applied in migration 21's own DDL, billing_events.created_at not backported to migration 15, no README/.env.example for the new bootstrap-verification chain.
+- [Phase 25, plan 25-05]: CONSO-03 (`POST /motos/:id/photos-consommables`) livré — 3e intercept multipart (après KM-02/KM-03), pipeline multer→Cloudinary→D-05 auto-création consommable→analyzePhoto stub→PhotosConsommables.insert, live-vérifié 18/18 (garage path) sans credentials Cloudinary (503 D-02 prouvé). **Phase 25 complète (5/5 plans).**
+- [Phase 25, plan 25-05]: Gap RBAC pré-existant et transverse découvert (pas introduit par ce plan) : les comptes CLIENT utilisent un JWT legacy HS256 (`jwtSign`), et `rbac.inferLegacyRole()` ne résout jamais `role='CLIENT'` (suppose systématiquement un compte garage) — `ctx` reste `null` pour tout CLIENT sur les 60+ endpoints dual CLIENT/GARAGE qui consomment ce helper, y compris CONSO-03 et des endpoints déjà en prod (`/motos/:id/interventions`, `/devis`, `/client/me`). Non corrigé (Rule 4 — changement transverse hors scope d'un plan mono-endpoint). Documenté en détail dans `deferred-items.md` Phase 25.
 
 ### Blockers/Concerns
 
@@ -99,8 +96,10 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - Ce repo a `.planning/` gitignored avec force-add individuel des fichiers — si `gsd-tools.cjs commit` signale `skipped_commit_docs_false`, force-add et committer directement avec git plutôt que de bloquer.
 - ~~Prod migration `sql/migrations/23_consommables_km.sql` reste à appliquer~~ → **APPLIQUÉE EN PROD 2026-07-14** (Mehdi, Supabase Dashboard SQL Editor, `rzbqbaccjyxvtlnfitrr`, exécution propre confirmée sans erreur). Vérifié côté Claude via sonde REST live (service-role key) : les 4 tables (`consommables`, `photos_consommables`, `releves_km`, `releves_km_rejets`) répondent `200 []`, et la clé publishable/anon reçoit aussi `200 []` (RLS default-deny actif, cohérent avec le pattern Phase 19/21). **Corrige un bug prod actif introduit par le déploiement du code 23-03 avant cette migration** : `OrdresReparation.cloturer()` appelait déjà `RelevesKm.enregistrer()` → `INSERT INTO releves_km` sur une table qui n'existait pas encore en prod (le code avait été poussé sur `origin/master` et auto-déployé par Railway avant l'application manuelle de la migration) — toute clôture d'OR en prod aurait échoué avec une exception non catchée après avoir déjà marqué l'OR `statut='termine'` en DB. Résolu, plus aucun blocage restant avant Phase 25.
 - **NOUVEAU 2026-07-14 (plan 25-03) — `releves_km_rejets` non alimentée en prod par le trigger déployé** : en vérifiant KM-03 en conditions réelles contre prod (serveur local branché sur `rzbqbaccjyxvtlnfitrr`), le rejet anti-fraude fonctionne (le trigger `verifier_km_monotone` bloque bien tout km régressif — cœur de KM-01 intact), mais la ligne d'audit qu'il est censé insérer dans `releves_km_rejets` n'apparaît jamais, alors qu'un insert direct dans cette même table via le même client service-role fonctionne et est immédiatement visible (RLS écarté comme cause). Root cause non déterminée — probablement une divergence entre le corps de fonction réellement appliqué en prod via le Dashboard SQL Editor et `sql/migrations/23_consommables_km.sql` (la validation prod du 2026-07-14 n'a testé que l'existence des tables via sonde REST `200 []`, pas le chemin de rejet réel). Mitigation applicative posée dans ce plan (`RelevesKm.enregistrer()` retombe sur `motos.km`) — mais l'audit trail lui-même reste à vérifier/re-déployer par Mehdi via Dashboard. Détail complet : `.planning/phases/25-endpoints-backend-km-photos-remplacement-compteur-cloudinary/deferred-items.md`. Non bloquant pour la suite de Phase 25.
+- **BLOQUANT EXTERNE avant usage prod réel de CONSO-03/CLOUD-01 — credentials Cloudinary absents** : `CLOUDINARY_CLOUD_NAME`/`CLOUDINARY_API_KEY`/`CLOUDINARY_API_SECRET` toujours non provisionnés (ni `.env` local, ni Railway `motokey1.1`) à la clôture de Phase 25. Le endpoint renvoie 503 `CLOUDINARY_NOT_CONFIGURED` sur toute tentative d'upload réel (comportement voulu, D-02 — jamais de placeholder), mais bloque de fait tout usage produit de CONSO-03/photos compteur tant que Mehdi n'a pas provisionné les 3 vars (Cloudinary Dashboard → Settings → Account/API Keys, puis Railway service `motokey1.1`). Ne bloque pas la complétion de Phase 25 (assertions D-02/CLOUD-01 skippables, plan autonomous) mais bloque potentiellement les jauges Phase 27/28 si aucune vraie photo n'a été uploadée en prod avant cette phase.
+- **NOUVEAU 2026-07-14 (plan 25-05) — gap RBAC transverse pré-existant, comptes CLIENT non reconnus via JWT legacy** : voir entrée Decisions ci-dessus + détail complet dans `deferred-items.md` Phase 25 (2 entrées `[25-05]`). Affecte potentiellement Phase 28 (UI mobile client) si elle réutilise le même mécanisme de login client legacy pour consommer les endpoints dual CLIENT/GARAGE de Phase 25 — à vérifier lors du scoping de cette phase.
 
 ## Session Continuity
 
-Last session: 2026-07-14T22:59:31.000Z
-Stopped at: Completed 25-04 (Wave 3) — CONSO-01 consommables endpoints, live-verified 15/15 against prod
+Last session: 2026-07-14T21:24:58.619Z
+Stopped at: Completed 25-05-PLAN.md (Phase 25 complete, 5/5 plans)

@@ -92,3 +92,22 @@ explicit non-silent SKIP warning for the CLIENT branch rather than asserting a f
 failing the whole suite over a pre-existing, unrelated gap (Scope Boundary rule). All other
 CONSO-03/CLOUD-01 assertions (garage positive path incl. D-05 auto-création, D-02 503 without
 credentials, validation errors, CLOUD-01 round-trip skip) pass: 18/18 OK.
+
+## [25-05] Two pre-existing, unrelated failures surfaced by the plan's full-suite verification step
+
+**Discovered during:** Plan 25-05, running the plan's own `<verification>` chain
+(`node test-api.js && node tests/test-or-e2e.js && node tests/test-client-device-tokens.js &&
+node tests/test-km-photos-cloudinary.js`) — out of scope, logged not fixed (Scope Boundary rule).
+
+- `tests/test-or-e2e.js` crashes immediately with `Cannot find module './supabase'` — a stale
+  relative require path left over from commit `8b1d817` ("move test-or-e2e.js to tests/
+  folder"), which moved the file down one directory without updating `require('./supabase')`
+  to `require('../supabase')`. Unrelated to Phase 25/25-05 code.
+- `tests/test-client-device-tokens.js` — 3/15 pass, 12 fail with `HTTP 401` on `GET /client/me`
+  and the device-token endpoints. Same root cause already documented above (CLIENT legacy JWT
+  never resolves via `ctx`/`rbac.extractRoleFromRequest`, since that endpoint requires a real
+  Supabase Auth JWT and the CLIENT login path issues a legacy HS256 token instead) — additional
+  live confirmation of the same pre-existing, cross-cutting gap, not a new one.
+
+`node test-api.js` (9/9) and `tests/test-km-photos-cloudinary.js` (18/18, this plan's own
+suite) both pass cleanly.
