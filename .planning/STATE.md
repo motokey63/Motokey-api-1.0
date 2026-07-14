@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: executing
-stopped_at: Phase 25 context gathered
-last_updated: "2026-07-14T16:17:38.855Z"
+stopped_at: Completed 25-02-PLAN.md (test harness skeleton, parallel wave 1)
+last_updated: "2026-07-14T17:16:52.441Z"
 last_activity: 2026-07-14
 progress:
   total_phases: 6
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 11
+  completed_plans: 7
 ---
 
 # MotoKey API — Project State
@@ -47,6 +47,7 @@ v1.6 [██░░░░░░░░] IN PROGRESS — Phase 23 COMPLETE (4/4 pla
 | Known gaps carried forward | Phase 8/BILL-06 (Stripe live mode, since v1.2), MSTORE-02 (store submission, since v1.3) — both blocked on Mehdi's external account/dashboard actions |
 | Next action | Phase 23 complete, migration applied to prod (2026-07-14) — start Phase 24 (helpers + stub IA contract). |
 | Phase 23 P04 | 25min | 2 tasks | 3 files |
+| Phase 25 P02 | 17min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,7 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - [Phase 23]: Trigger monotone NULL-safe via GREATEST(COALESCE(v_moto_km,0), COALESCE(v_max_releve,0)) pour couvrir le premier relevé d'une moto prod existante
 - [Phase 23, plan 23-04]: `photos_consommables.analyse` renommée `analyse_ia` — "analyse" est un mot réservé PostgreSQL (ANALYSE/ANALYZE), causait un SCHEMA_BOOTSTRAP_FAILED réel ; découvert seulement en exécutant le bootstrap live (pas visible par simple lecture SQL) — confirme la discipline "gate = exécution réelle" de v1.5
 - [Phase 23, plan 23-04]: fixtures `test-releves-km-trigger.js` corrigées pour poser `proprietaire_type='garage'` + `proprietaire_garage_id` — la contrainte CHECK `moto_proprietaire_coherence` (L8) exige `client_id NOT NULL` si `proprietaire_type='client'` (valeur par défaut), incompatible avec un script qui n'a que des fixtures garage
+- [Phase 25]: 25-02: garage login (rbac_role=CONCESSION) reused as PRO+/MECANO+ proxy token in test harness pending a dedicated seed account
 
 ### Pending Todos
 
@@ -90,5 +92,5 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ## Session Continuity
 
-Last session: 2026-07-14T16:17:38.852Z
-Stopped at: Phase 25 context gathered
+Last session: 2026-07-14T17:16:52.438Z
+Stopped at: Completed 25-02-PLAN.md (test harness skeleton, parallel wave 1)
