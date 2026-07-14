@@ -144,7 +144,7 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
   4. Un client ou un membre du garage peut uploader une photo de consommable ; l'upload déclenche l'analyse (stub) et l'historise avec sa date et son résultat d'analyse
   5. L'upload de photo (compteur ou consommable) stocke réellement l'image sur Cloudinary et renvoie une URL exploitable — plus aucun placeholder
 **Plans**: 5 plans (4 vagues — parallélisme limité par le fichier partagé motokey-api.js)
-  - [ ] 25-01-PLAN.md — Fondations : deps cloudinary/multer + cloudinaryService.js (no-fallback D-02) + TYPES_CONSOMMABLES
+  - [x] 25-01-PLAN.md — Fondations : deps cloudinary/multer + cloudinaryService.js (no-fallback D-02) + TYPES_CONSOMMABLES
   - [ ] 25-02-PLAN.md — Harnais de test d intégration + fixture image (Wave 0 VALIDATION.md)
   - [ ] 25-03-PLAN.md — Infra multipart + relevé km normal (KM-03) + remplacement compteur PRO+ (KM-02)
   - [ ] 25-04-PLAN.md — Saisie consommables : PATCH unitaire + POST bulk (CONSO-01)
