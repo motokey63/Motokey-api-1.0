@@ -83,6 +83,8 @@ const maintenanceAlertService = require('./services/maintenanceAlertService');
 const rbac        = require('./auth/rbac');
 const { stripe: stripeClient, handleWebhookEvent, createCheckoutSession, createAutoTrial, createPortalSession } = require('./services/stripeService');
 const planLimits = require('./auth/planLimits');
+const multer = require('multer');
+const cloudinaryService = require('./services/cloudinaryService');
 
 // Couche Supabase (supabase.js) — chargée si SUPABASE_URL + SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_KEY) présents
 let SBLayer = null;
@@ -410,6 +412,38 @@ function body(req) {
   });
 }
 
+/* ─── UPLOAD MULTIPART (Phase 25 — première introduction du pattern) ─── */
+// D-03 : 5 Mo max, JPEG/PNG/WebP uniquement, mémoire (jamais disque — buffer direct vers Cloudinary)
+const _upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, ['image/jpeg','image/png','image/webp'].includes(file.mimetype))
+});
+function runMulter(req, res) {
+  return new Promise((resolve, reject) => {
+    _upload.single('photo')(req, res, (err) => { if (err) return reject(err); resolve(req.file); });
+  });
+}
+
+// Résout la moto pour un contexte RBAC, dual CLIENT/GARAGE. Renvoie null si introuvable/non-possédée.
+// Même sémantique 404 que le pattern inline (ne fuit pas l'existence).
+async function resolveMotoForCtx(ctx, motoId, a) {
+  if (!SBLayer) return null;
+  if (rbac.requireAnyRole(ctx, ['CLIENT'])) {
+    const { data: rows } = await SBLayer.supabase.from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1);
+    if (!rows || !rows.length) return null;
+    const { data: moto } = await SBLayer.supabase.from('motos').select('*').eq('id', motoId).eq('client_id', rows[0].id).maybeSingle();
+    if (!moto) return null;
+    return { moto, garage_id: moto.garage_id || null, acteur_type: 'client', acteur_id: rows[0].id };
+  }
+  if (!rbac.requireRole(ctx, 'MECANO')) return null; // pas assez de droits → traité comme non-résolu par l'appelant (403 en amont)
+  const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+  if (!garageId) return null;
+  const { data: moto } = await SBLayer.supabase.from('motos').select('*').eq('id', motoId).eq('garage_id', garageId).maybeSingle();
+  if (!moto) return null;
+  return { moto, garage_id: garageId, acteur_type: 'garage', acteur_id: (ctx && ctx.user_id) || garageId };
+}
+
 /* ─── ROUTE MATCHER ─── */
 function match(method, reqMethod, pattern, pathname) {
   if(method!==reqMethod) return null;
@@ -549,6 +583,19 @@ const server = http.createServer(async function(req, res){
       res.writeHead(500); res.end(JSON.stringify({ error: 'Handler error' }));
     }
     return;
+  }
+
+  // ── Routes multipart (upload photo) — interceptées AVANT body() car body() coerce
+  // le Buffer en string (LOSSY) puis JSON.parse, ce qui corromprait un multipart/form-data.
+  // Chaque route multipart pose req.ctx elle-même (body() normal le fait plus bas, L560).
+  const _ct = req.headers['content-type'] || '';
+  if (method === 'POST' && _ct.startsWith('multipart/form-data') && /^\/motos\/[^/]+\/km$/.test(pathname)) {
+    req.ctx = await rbac.extractRoleFromRequest(req, SBLayer);
+    return handleKmReading(req, res, pathname.split('/')[2], { remplacement: false });
+  }
+  if (method === 'POST' && _ct.startsWith('multipart/form-data') && /^\/motos\/[^/]+\/km\/remplacement-compteur$/.test(pathname)) {
+    req.ctx = await rbac.extractRoleFromRequest(req, SBLayer);
+    return handleKmReading(req, res, pathname.split('/')[2], { remplacement: true });
   }
 
   let b = {};
