@@ -4,8 +4,8 @@ milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: verifying
 stopped_at: Completed 23-04-PLAN.md (Phase 23 complete, 4/4 plans)
-last_updated: "2026-07-14T10:37:45.347Z"
-last_activity: "2026-07-14 — Plan 23-04 (bootstrap + trigger gate) executed: SCHEMA_BOOTSTRAP_OK against xjgyoehennuydoocbprj including all 4 Phase 23 tables; test-releves-km-trigger.js 28/28 PASS (RED→GREEN); RLS default-deny live-confirmed (0 pg_policies, RLS on) on consommables/photos_consommables/releves_km/releves_km_rejets; migration↔schema.sql parity confirmed via block diff; trg_update_km confirmed absent. 2 blocking bugs fixed live: reserved keyword `analyse`→`analyse_ia` (schema.sql + migration 23), test fixture motos missing proprietaire_type/proprietaire_garage_id (moto_proprietaire_coherence CHECK, L8) — commits 9359102 (merge 23-01/02/03), df4a8c0 (fixes)."
+last_updated: "2026-07-14T10:42:55.284Z"
+last_activity: 2026-07-14
 progress:
   total_phases: 6
   completed_phases: 1
@@ -24,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 
 ## Current Position
 
-Phase: 23 of 28 (Schéma + Anti-Fraude km au niveau DB) — COMPLETE
-Plan: 4 plans / 3 waves — 23-01 (wave 1, autonomous, DONE), 23-02 (wave 1, non-autonomous, DONE), 23-03 (wave 2, autonomous, DONE), 23-04 (wave 3, gate, non-autonomous, DONE)
+Phase: 24 of 28 (helpers supabase.js + contrat stub vision)
+Plan: Not started
 Status: Phase 23 fully gated and complete (4/4 plans). Bootstrap-fresh-schema.js -> SCHEMA_BOOTSTRAP_OK, test-releves-km-trigger.js -> 28/28 PASS, RLS default-deny confirmed, migration/schema.sql parity confirmed. Ready for /gsd:verify-phase or Phase 24.
-Last activity: 2026-07-14 — Plan 23-04 (bootstrap + trigger gate) executed: SCHEMA_BOOTSTRAP_OK against xjgyoehennuydoocbprj including all 4 Phase 23 tables; test-releves-km-trigger.js 28/28 PASS (RED→GREEN); RLS default-deny live-confirmed (0 pg_policies, RLS on) on consommables/photos_consommables/releves_km/releves_km_rejets; migration↔schema.sql parity confirmed via block diff; trg_update_km confirmed absent. 2 blocking bugs fixed live: reserved keyword `analyse`→`analyse_ia` (schema.sql + migration 23), test fixture motos missing proprietaire_type/proprietaire_garage_id (moto_proprietaire_coherence CHECK, L8) — commits 9359102 (merge 23-01/02/03), df4a8c0 (fixes).
+Last activity: 2026-07-14
 
 ```
 v1.0 ████████████ SHIPPED
