@@ -85,6 +85,7 @@ const { stripe: stripeClient, handleWebhookEvent, createCheckoutSession, createA
 const planLimits = require('./auth/planLimits');
 const multer = require('multer');
 const cloudinaryService = require('./services/cloudinaryService');
+const { analyzePhoto } = require('./services/visionAnalysisService');
 
 // Couche Supabase (supabase.js) — chargée si SUPABASE_URL + SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_KEY) présents
 let SBLayer = null;
@@ -526,6 +527,55 @@ async function handleKmReading(req, res, motoId, { remplacement }, bodyFields) {
   }
 }
 
+// Handler upload photo consommable (CONSO-03) — multipart intercepté AVANT body().
+// Ordre strict (RESEARCH.md "Order of operations") : ctx → multer (taille/MIME) →
+// champs texte/type → ownership → Cloudinary (D-02: 503 si non configuré, jamais
+// placeholder) → D-05 (auto-création consommable si absent, avant de lier consommable_id)
+// → analyse stub synchrone → persistance PhotosConsommables.
+async function handlePhotoConsommable(req, res, motoId) {
+  try {
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+
+    let file;
+    try { file = await runMulter(req, res); }
+    catch (e) { if (e instanceof multer.MulterError && e.code === 'LIMIT_FILE_SIZE') return fail(res,'Photo trop volumineuse (max 5 Mo)',400,'FILE_TOO_LARGE'); return fail(res, e.message, 400, 'UPLOAD_PARSE_ERROR'); }
+    if (!file) return fail(res, 'Photo requise (champ multipart "photo", JPEG/PNG/WebP)', 400, 'VALIDATION_ERROR');
+
+    const type = (req.body && req.body.type_consommable) || null;
+    if (!type || !SBLayer.TYPES_CONSOMMABLES.includes(type)) return fail(res,'type_consommable invalide',400,'VALIDATION_ERROR');
+
+    // Ownership (dual CLIENT/GARAGE) — même sémantique 404 que le pattern existant
+    const r = await resolveMotoForCtx(ctx, motoId, a);
+    if (!r) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
+
+    // Upload Cloudinary AVANT tout écriture DB (photo_url doit être connue avant l'INSERT)
+    let secure_url;
+    try {
+      const up = await cloudinaryService.uploadPhoto(file.buffer, { folder: 'motokey/consommables/'+motoId });
+      secure_url = up.secure_url;
+    } catch (e) {
+      return fail(res, e.message, e.statusCode || 500, e.code || 'UPLOAD_ERROR'); // D-02: 503 si non configuré, jamais placeholder
+    }
+
+    // D-05 : trouver/auto-créer la ligne consommable pour ce type AVANT de lier consommable_id
+    let conso = (await SBLayer.Consommables.listByMoto(motoId)).find(c => c.type_consommable === type);
+    if (!conso) { conso = await SBLayer.Consommables.upsert(motoId, { type_consommable: type, km_montage: null }); }
+
+    // Analyse stub (synchrone) — contrat verrouillé Phase 24
+    const kmActuel = r.moto ? (r.moto.km ?? null) : null;
+    const analyse = await analyzePhoto({ photoUrl: secure_url, consommableId: conso.id, typeConsommable: type, kmActuel, kmMontage: conso.km_montage ?? null });
+
+    // Persistance historisée
+    const photo = await SBLayer.PhotosConsommables.insert({ moto_id: motoId, consommable_id: conso.id, type_consommable: type, photo_url: secure_url, analyse_ia: analyse, analyse_status: analyse.analyse_status });
+
+    return ok(res, { photo, analyse, consommable: conso }, 'Photo consommable enregistrée', 201);
+  } catch (e) {
+    return fail(res, e.message, 500, 'SERVER_ERROR');
+  }
+}
+
 /* ─── ROUTE MATCHER ─── */
 function match(method, reqMethod, pattern, pathname) {
   if(method!==reqMethod) return null;
@@ -678,6 +728,10 @@ const server = http.createServer(async function(req, res){
   if (method === 'POST' && _ct.startsWith('multipart/form-data') && /^\/motos\/[^/]+\/km\/remplacement-compteur$/.test(pathname)) {
     req.ctx = await rbac.extractRoleFromRequest(req, SBLayer);
     return handleKmReading(req, res, pathname.split('/')[2], { remplacement: true });
+  }
+  if (method === 'POST' && _ct.startsWith('multipart/form-data') && /^\/motos\/[^/]+\/photos-consommables$/.test(pathname)) {
+    req.ctx = await rbac.extractRoleFromRequest(req, SBLayer);
+    return handlePhotoConsommable(req, res, pathname.split('/')[2]);
   }
 
   let b = {};
