@@ -2783,7 +2783,9 @@ const server = http.createServer(async function(req, res){
 
     if (USE_SUPABASE && SBLayer) {
       try {
-        const result = await SBLayer.OrdresReparation.cloturer(p.id, garageId, { km_sortie });
+        // D-04 : ctx.user_id identifie le membre garage qui clôture (multi-user garage_users) ;
+        // il devient l'acteur du relevé km, jamais le garage_id générique.
+        const result = await SBLayer.OrdresReparation.cloturer(p.id, garageId, { km_sortie, acteur_id: ctx.user_id });
         return ok(res, result, 'Ordre clôturé · Intervention synchronisée');
       } catch(e) {
         const code = e.message && e.message.indexOf('Transition') >= 0 ? 'INVALID_TRANSITION' : 'DB_ERROR';

@@ -348,7 +348,8 @@ const Motos = {
   },
 
   async update(id, garage_id, payload) {
-    const allowed = ['km','pneu_av','pneu_ar','pneu_km_montage','couleur','photo_url'];
+    // km retiré (KM-04) : le km ne s'écrit plus que via RelevesKm.enregistrer() → releves_km → trigger de sync. pneu_* restent (retrait = Phase 27).
+    const allowed = ['pneu_av','pneu_ar','pneu_km_montage','couleur','photo_url'];
     const clean   = Object.fromEntries(Object.entries(payload).filter(([k]) => allowed.includes(k)));
     const { data, error } = await supabase.from('motos').update(clean).eq('id', id).eq('garage_id', garage_id).select().single();
     if (error) throw new Error(error.message);
@@ -437,6 +438,9 @@ const Interventions = {
       type:            payload.type,
       titre:           payload.titre,
       description:     payload.description || '',
+      // D-05 : le km d'intervention est un HISTORIQUE découplé — métadonnée volontairement
+      // NON routée vers RelevesKm/le ratchet monotone (permet la saisie d'entretien passé,
+      // km < km actuel de la moto). Ne touche JAMAIS motos.km (trg_update_km supprimé en 23-01).
       km:              payload.km,
       technicien_id:   payload.technicien_id || null,
       montant_ht:      payload.montant_ht    || 0,
@@ -927,7 +931,7 @@ const OrdresReparation = {
     return data;
   },
 
-  async cloturer(id, garage_id, { km_sortie }) {
+  async cloturer(id, garage_id, { km_sortie, acteur_id }) {
     const or = await OrdresReparation._getOrRaw(id, garage_id);
     if (or.statut !== 'en_cours')
       throw new Error(`Transition interdite : seul un OR 'en_cours' peut être clôturé (statut actuel: '${or.statut}')`);
@@ -954,10 +958,14 @@ const OrdresReparation = {
       statut: 'termine', km_sortie, date_cloture: new Date().toISOString()
     }).eq('id', id);
 
-    const { data: moto } = await supabase.from('motos').select('km').eq('id', or.moto_id).single();
-    if (moto && km_sortie > moto.km) {
-      await supabase.from('motos').update({ km: km_sortie }).eq('id', or.moto_id);
-    }
+    // KM-04 : le km de sortie représente un relevé compteur "live" — il passe par la
+    // validation partagée (releves_km + trigger). Un rejet est surfacé, plus de skip silencieux.
+    // D-04 : acteur = le membre garage qui clôture (acteur_id threadé depuis l'endpoint),
+    // fallback garage_id si absent — jamais anonyme.
+    const releveKm = await RelevesKm.enregistrer(garage_id, or.moto_id, {
+      km: km_sortie, type_evenement: 'lecture', acteur_type: 'garage', acteur_id: acteur_id || garage_id
+    });
+    // releveKm.accepted === false => km_sortie régresse vs historique ; on l'expose dans la réponse.
 
     let intervention, nouveau_score = null, nouvelle_couleur = null;
     if (or.devis_id) {
@@ -993,7 +1001,7 @@ const OrdresReparation = {
     }
 
     const { data: orFinal } = await supabase.from('ordres_reparation').select('*').eq('id', id).single();
-    return { ordre_reparation: orFinal, intervention, totaux, nouveau_score, nouvelle_couleur };
+    return { ordre_reparation: orFinal, intervention, totaux, nouveau_score, nouvelle_couleur, km_releve: releveKm };
   },
 
   async recalculerTotaux(or_id) {
