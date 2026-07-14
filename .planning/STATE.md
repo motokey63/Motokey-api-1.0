@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
-status: planning
-stopped_at: Phase 23 planned (4 plans, 3 waves), validation approved — ready to execute, FRESH_DB_URL pending (Mehdi)
-last_updated: "2026-07-14T00:00:00.000Z"
-last_activity: 2026-07-14 — Phase 23 plan created (4 plans, 3 waves, commit 2df5206) and refined (D-04: acteur_id threading on OR closure km release, commit pending), validation approved (nyquist_compliant, sign-off 2026-07-14)
+status: executing
+stopped_at: "Phase 23 planned (4 plans, 3 waves) and validated — resumed session found STATE.md stale (still said "ready to plan") and 2 uncommitted plan refinements (D-04 acteur_id threading in 23-03, validation sign-off in 23-VALIDATION.md); reconciled and committed. Next: execute Phase 23 (blocked on FRESH_DB_URL for 23-02/23-04)."
+last_updated: "2026-07-14T08:57:01.054Z"
+last_activity: 2026-07-14 -- Phase 23 execution started
 progress:
   total_phases: 6
   completed_phases: 0
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-13)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Milestone v1.6 (Suivi usure consommables + anti-fraude km) — Phase 23 (Schéma + Anti-Fraude km au niveau DB) planned, ready to execute
+**Current focus:** Phase 23 — sch-ma-anti-fraude-km-au-niveau-db
 
 ## Current Position
 
-Phase: 23 of 28 (Schéma + Anti-Fraude km au niveau DB)
-Plan: 4 plans / 3 waves — 23-01 (wave 1, autonomous), 23-02 (wave 1, non-autonomous — needs FRESH_DB_URL), 23-03 (wave 2, autonomous, depends on 23-01), 23-04 (wave 3, gate, non-autonomous, depends on 23-01/02/03)
-Status: Ready to execute — blocked on human action (FRESH_DB_URL, see Blockers) for 23-02/23-04; 23-01 can run standalone
-Last activity: 2026-07-14 — Phase 23 plan created and refined (D-04 acteur_id threading), validation approved
+Phase: 23 (sch-ma-anti-fraude-km-au-niveau-db) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 23
+Last activity: 2026-07-14 -- Phase 23 execution started
 
 ```
 v1.0 ████████████ SHIPPED
