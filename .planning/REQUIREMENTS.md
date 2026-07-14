@@ -10,8 +10,8 @@ Requirements for milestone v1.6 (Suivi usure consommables + anti-fraude km). Eac
 ### Anti-fraude km (KM)
 
 - [x] **KM-01**: Le système refuse tout relevé km inférieur au maximum historique de la moto et journalise la tentative de façon visible pour le garage
-- [ ] **KM-02**: Un compte PRO/CONCESSION/ADMIN peut déclarer un changement de compteur (remplacement totaliseur), qui archive l'ancien relevé et démarre un nouveau compteur signé — action interdite aux comptes MECANO et CLIENT
-- [ ] **KM-03**: Un client ou un membre du garage peut soumettre un relevé km normal (avec photo du compteur optionnelle) sans déclencher de changement de compteur
+- [x] **KM-02**: Un compte PRO/CONCESSION/ADMIN peut déclarer un changement de compteur (remplacement totaliseur), qui archive l'ancien relevé et démarre un nouveau compteur signé — action interdite aux comptes MECANO et CLIENT
+- [x] **KM-03**: Un client ou un membre du garage peut soumettre un relevé km normal (avec photo du compteur optionnelle) sans déclencher de changement de compteur
 - [x] **KM-04**: `releves_km` est la source de vérité du kilométrage — `motos.km` est recalculé/dérivé automatiquement à chaque relevé validé ; les trois chemins d'écriture existants (`Motos.update`, `Interventions.create`, `OrdresReparation.cloturer`) passent tous par la même validation partagée, plus aucun bypass possible
 
 ### Consommables (CONSO)
@@ -63,8 +63,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | KM-01 | Phase 23 | Complete |
-| KM-02 | Phase 25 | Pending |
-| KM-03 | Phase 25 | Pending |
+| KM-02 | Phase 25 | Complete |
+| KM-03 | Phase 25 | Complete |
 | KM-04 | Phase 23 | Complete |
 | CONSO-01 | Phase 25 | Complete |
 | CONSO-02 | Phase 23 | Complete |

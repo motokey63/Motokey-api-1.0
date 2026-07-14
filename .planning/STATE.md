@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: executing
-stopped_at: Completed 25-01 and 25-02 (Wave 1)
-last_updated: "2026-07-14T17:16:52.441Z"
-last_activity: 2026-07-14 -- Phase 25 Wave 1 complete
+stopped_at: Completed 25-03 (Wave 2)
+last_updated: "2026-07-14T20:46:05.000Z"
+last_activity: 2026-07-14 -- Phase 25 plan 03 (KM-02/KM-03 endpoints) complete
 progress:
   total_phases: 6
   completed_phases: 2
   total_plans: 11
-  completed_plans: 7
+  completed_plans: 8
 ---
 
 # MotoKey API — Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 ## Current Position
 
 Phase: 25 (endpoints-backend-km-photos-remplacement-compteur-cloudinary) — EXECUTING
-Plan: 01 complete, 02 pending merge, 03/04/05 not started
-Status: Executing Phase 25 — 25-01 (Cloudinary service + TYPES_CONSOMMABLES foundations) complete, 3/3 tasks, no deviations
-Last activity: 2026-07-14 -- Phase 25 execution started
+Plan: 01/02/03 complete, 04/05 not started
+Status: Executing Phase 25 — 25-03 (KM-02 remplacement-compteur + KM-03 relevé km, multipart upload infra) complete, 3/3 tasks, live-verified 8/8 against prod (1 auto-fixed deviation, see 25-03-SUMMARY.md)
+Last activity: 2026-07-14 -- Phase 25 plan 03 complete
 
 ```
 v1.0 ████████████ SHIPPED
@@ -45,10 +45,11 @@ v1.6 [██░░░░░░░░] IN PROGRESS — Phase 23 COMPLETE (4/4 pla
 |--------|-------|
 | Milestones shipped | 6 (v1.0 + v1.1 + v1.2 + v1.3 + v1.4 + v1.5) |
 | Known gaps carried forward | Phase 8/BILL-06 (Stripe live mode, since v1.2), MSTORE-02 (store submission, since v1.3) — both blocked on Mehdi's external account/dashboard actions |
-| Next action | Phase 25 plan 01 (Cloudinary service + TYPES_CONSOMMABLES) complete — other Phase 25 plans (02-05) may be executing in parallel worktrees. |
+| Next action | Phase 25 plan 03 (KM-02/KM-03 endpoints + multipart infra) complete — plans 04 (CONSO-01) and 05 (CONSO-03/CLOUD-01) remain, may be executing in parallel worktrees. |
 | Phase 23 P04 | 25min | 2 tasks | 3 files |
 | Phase 25 P01 | 20min | 3 tasks | 4 files |
 | Phase 25 P02 | 17min | 2 tasks | 2 files |
+| Phase 25 P03 | 25min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -79,6 +80,8 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - [Phase 25]: multer forced to ^2.2.0 (never 1.x) to avoid unpatched CVE-2025-47944/CVE-2026-3520
 - [Phase 25]: TYPES_CONSOMMABLES centralized as single JS source of truth mirroring migration 23 CHECK constraint
 - [Phase 25]: 25-02: garage login (rbac_role=CONCESSION) reused as PRO+/MECANO+ proxy token in test harness pending a dedicated seed account
+- [Phase 25, plan 25-03]: Multipart routes (`/motos/:id/km`, `/motos/:id/km/remplacement-compteur`) intercepted before the router's unconditional `body()` call (mirrors `/stripe/webhook`), posing `req.ctx` themselves via `rbac.extractRoleFromRequest` — first multipart pattern in `motokey-api.js`, established for CONSO-03 (25-05) to reuse
+- [Phase 25, plan 25-03]: `RelevesKm.enregistrer()` now falls back to `motos.km` when `releves_km_rejets` has no matching row, so the 409 `km_actuel` field is never null — found live against prod, where the audit-trail insert inside `verifier_km_monotone()` isn't persisting despite the rejection itself working correctly (see deferred-items.md, Phase 25 dir)
 
 ### Pending Todos
 
@@ -93,8 +96,9 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - v1.6 discipline critique : toute nouvelle migration (Phase 23) doit inclure ses policies RLS dans le MÊME fichier que `CREATE TABLE`, et `schema.sql` doit être mis à jour dans la même phase, vérifié via `scripts/bootstrap-fresh-schema.js` — répéter la dérive résolue en v1.5 serait un échec de discipline évitable. **Vérifié tenu en Phase 23 (23-04).**
 - Ce repo a `.planning/` gitignored avec force-add individuel des fichiers — si `gsd-tools.cjs commit` signale `skipped_commit_docs_false`, force-add et committer directement avec git plutôt que de bloquer.
 - ~~Prod migration `sql/migrations/23_consommables_km.sql` reste à appliquer~~ → **APPLIQUÉE EN PROD 2026-07-14** (Mehdi, Supabase Dashboard SQL Editor, `rzbqbaccjyxvtlnfitrr`, exécution propre confirmée sans erreur). Vérifié côté Claude via sonde REST live (service-role key) : les 4 tables (`consommables`, `photos_consommables`, `releves_km`, `releves_km_rejets`) répondent `200 []`, et la clé publishable/anon reçoit aussi `200 []` (RLS default-deny actif, cohérent avec le pattern Phase 19/21). **Corrige un bug prod actif introduit par le déploiement du code 23-03 avant cette migration** : `OrdresReparation.cloturer()` appelait déjà `RelevesKm.enregistrer()` → `INSERT INTO releves_km` sur une table qui n'existait pas encore en prod (le code avait été poussé sur `origin/master` et auto-déployé par Railway avant l'application manuelle de la migration) — toute clôture d'OR en prod aurait échoué avec une exception non catchée après avoir déjà marqué l'OR `statut='termine'` en DB. Résolu, plus aucun blocage restant avant Phase 25.
+- **NOUVEAU 2026-07-14 (plan 25-03) — `releves_km_rejets` non alimentée en prod par le trigger déployé** : en vérifiant KM-03 en conditions réelles contre prod (serveur local branché sur `rzbqbaccjyxvtlnfitrr`), le rejet anti-fraude fonctionne (le trigger `verifier_km_monotone` bloque bien tout km régressif — cœur de KM-01 intact), mais la ligne d'audit qu'il est censé insérer dans `releves_km_rejets` n'apparaît jamais, alors qu'un insert direct dans cette même table via le même client service-role fonctionne et est immédiatement visible (RLS écarté comme cause). Root cause non déterminée — probablement une divergence entre le corps de fonction réellement appliqué en prod via le Dashboard SQL Editor et `sql/migrations/23_consommables_km.sql` (la validation prod du 2026-07-14 n'a testé que l'existence des tables via sonde REST `200 []`, pas le chemin de rejet réel). Mitigation applicative posée dans ce plan (`RelevesKm.enregistrer()` retombe sur `motos.km`) — mais l'audit trail lui-même reste à vérifier/re-déployer par Mehdi via Dashboard. Détail complet : `.planning/phases/25-endpoints-backend-km-photos-remplacement-compteur-cloudinary/deferred-items.md`. Non bloquant pour la suite de Phase 25.
 
 ## Session Continuity
 
-Last session: 2026-07-14T17:16:52.438Z
-Stopped at: Completed 25-01 and 25-02 (Wave 1)
+Last session: 2026-07-14T20:46:05.000Z
+Stopped at: Completed 25-03 (Wave 2) — KM-02/KM-03 endpoints + multipart infra, live-verified 8/8 against prod
