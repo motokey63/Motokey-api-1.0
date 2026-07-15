@@ -98,7 +98,7 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
 - [x] **Phase 23: Schéma + Anti-Fraude km au niveau DB** - `releves_km` devient la source de vérité du km, croissance monotone stricte imposée par trigger DB, les 3 chemins d'écriture existants sont fermés (completed 2026-07-14)
 - [x] **Phase 24: Helpers supabase.js + Contrat Stub Vision** - Helpers CRUD des 3 nouvelles tables + `visionAnalysisService.js` flag-gated dont le contrat de réponse est verrouillé avant tout consommateur (completed 2026-07-14)
 - [x] **Phase 25: Endpoints Backend (km, photos, remplacement compteur, Cloudinary)** - Relevé km, changement de compteur PRO+, saisie consommables, upload photo avec stockage Cloudinary réel (completed 2026-07-14)
-- [ ] **Phase 26: Cron de Rappel + Push/Badge** - Rappel photo 3000km OU 6 mois, idempotent, avec équivalent badge garage pour motos non réclamées
+- [x] **Phase 26: Cron de Rappel + Push/Badge** - Rappel photo 3000km OU 6 mois, idempotent, avec équivalent badge garage pour motos non réclamées (completed 2026-07-15)
 - [ ] **Phase 27: UI Web Garage + Client (jauges, retrait Pneus legacy)** - Jauges % par consommable + jauge générale maillon faible, migration et retrait de la section Pneus historique
 - [ ] **Phase 28: UI Mobile Client (jauges, lecture seule)** - Écran jauges consommables sur l'app mobile native + deep link depuis la notification de rappel photo
 
@@ -162,7 +162,7 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
   - [x] 26-01-PLAN.md — Migration 24 (colonnes rappel + km_a_la_photo) + parité schema.sql + squelette test Wave 0
   - [x] 26-02-PLAN.md — Service consommableRappelService (seuils D-01, fonction pure) + supabase.js (reset D-05, km_a_la_photo, champ badge GAUGE-04)
   - [x] 26-03-PLAN.md — Endpoint POST /cron/rappels-photo-consommables (X-Cron-Secret) + capture km_a_la_photo + assertions intégration GAUGE-03/04
-  - [ ] 26-04-PLAN.md — Gate : application migration 24 prod + suite intégration GAUGE-03/04 réellement verte
+  - [x] 26-04-PLAN.md — Gate : application migration 24 prod + suite intégration GAUGE-03/04 réellement verte
 
 ### Phase 27: UI Web Garage + Client (jauges, retrait Pneus legacy)
 **Goal**: Le garage et le client voient l'état d'usure de chaque consommable et l'état général de la moto (maillon le plus faible), et la section Pneus historique n'existe plus en doublon contradictoire.

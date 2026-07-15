@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
-status: executing
-stopped_at: Completed 26-03-PLAN.md
-last_updated: "2026-07-15T09:22:33.217Z"
+status: verifying
+stopped_at: Completed 26-04-PLAN.md (Phase 26 complete, 4/4 plans)
+last_updated: "2026-07-15T09:38:00.000Z"
 last_activity: 2026-07-15
 progress:
   total_phases: 6
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 15
-  completed_plans: 14
+  completed_plans: 15
 ---
 
 # MotoKey API — Project State
@@ -20,13 +20,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-13)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 26 — cron-de-rappel-push-badge
+**Current focus:** Phase 26 — cron-de-rappel-push-badge — COMPLETE, ready for next phase (27)
 
 ## Current Position
 
-Phase: 26 (cron-de-rappel-push-badge) — EXECUTING
-Plan: 4 of 4
-Status: Ready to execute
+Phase: 26 of 28 (cron de rappel + push/badge)
+Plan: Not started (Phase 26 fully complete, 4/4 plans)
+Status: Migration 24 appliquée en prod, GAUGE-03/GAUGE-04 vérifiés de bout en bout (15/15 assertions actives, 0 skip inattendu), régression racine intacte (9/9). Ready for /gsd:verify-phase or Phase 27.
 Last activity: 2026-07-15
 
 ```
@@ -36,7 +36,7 @@ v1.2 [█████████░] SHIPPED 2026-07-01 (86%, Phase 8 known gap
 v1.3 ████████████ SHIPPED 2026-07-08 (MSTORE-02 known gap — carried forward)
 v1.4 ████████████ SHIPPED 2026-07-09 (undocumented schema drift known gap — carried forward)
 v1.5 ████████████ SHIPPED 2026-07-11 (Gap A/B schema.sql drift fully resolved, SCHEMA-02→07)
-v1.6 [████░░░░░░] IN PROGRESS — Phase 23/24/25 COMPLETE (schéma+anti-fraude km, helpers+stub vision, endpoints backend+Cloudinary), Phase 26 (cron rappel) next
+v1.6 [█████░░░░░] IN PROGRESS — Phase 23/24/25/26 COMPLETE (schéma+anti-fraude km, helpers+stub vision, endpoints backend+Cloudinary, cron rappel), Phase 27 (UI web) next
 ```
 
 ## Performance Metrics
@@ -45,7 +45,7 @@ v1.6 [████░░░░░░] IN PROGRESS — Phase 23/24/25 COMPLETE (s
 |--------|-------|
 | Milestones shipped | 6 (v1.0 + v1.1 + v1.2 + v1.3 + v1.4 + v1.5) |
 | Known gaps carried forward | Phase 8/BILL-06 (Stripe live mode, since v1.2), MSTORE-02 (store submission, since v1.3) — both blocked on Mehdi's external account/dashboard actions |
-| Next action | Phase 25 complete (5/5 plans) — start Phase 26 (cron rappel photo/entretien). |
+| Next action | Phase 26 complete (4/4 plans) — start Phase 27 (UI web garage + client, jauges). |
 | Phase 23 P04 | 25min | 2 tasks | 3 files |
 | Phase 25 P01 | 20min | 3 tasks | 4 files |
 | Phase 25 P02 | 17min | 2 tasks | 2 files |
@@ -55,6 +55,7 @@ v1.6 [████░░░░░░] IN PROGRESS — Phase 23/24/25 COMPLETE (s
 | Phase 26 P01 | 5min | 2 tasks | 3 files |
 | Phase 26 P02 | 12min | 2 tasks | 3 files |
 | Phase 26 P03 | 11min | 2 tasks | 2 files |
+| Phase 26 P04 | 15min | 2 tasks | 0 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,7 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - [Phase 26]: GAUGE-04 (badge garage) calcule au read-time dans Motos.list/getById, jamais par le cron -- le cron ne scanne que proprietaire_type=client
 - [Phase 26]: Lazy require du service dans supabase.js (pas en tete de fichier) pour eviter le cycle supabase.js<->consommableRappelService.js
 - [Phase 26]: GAUGE-04 skip proprement en mode RAM fallback (Supabase non configure localement) plutot que d'echouer -- champ calcule uniquement via SBLayer.Motos.list/getById
+- [Phase 26, plan 26-04]: Migration 24 appliquée en prod par Mehdi, GAUGE-03/GAUGE-04 vérifiés réellement verts (15/15 assertions actives, 0 KO), régression racine intacte (9/9). **Phase 26 complète (4/4 plans).** Note opérationnelle non bloquante : à confirmer avec Mehdi si le scheduler externe a besoin d'une entrée pour `POST /cron/rappels-photo-consommables`.
 
 ### Blockers/Concerns
 
@@ -108,5 +110,5 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ## Session Continuity
 
-Last session: 2026-07-15T09:22:33.213Z
-Stopped at: Completed 26-03-PLAN.md
+Last session: 2026-07-15T09:38:00.000Z
+Stopped at: Completed 26-04-PLAN.md (Phase 26 complete, 4/4 plans)
