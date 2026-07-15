@@ -1,0 +1,36 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-07-15T22:23:59.129Z",
+  "phase": "27",
+  "phase_name": "ui-web-garage-client-jauges-retrait-pneus-legacy",
+  "phase_dir": ".planning/phases/27-ui-web-garage-client-jauges-retrait-pneus-legacy",
+  "plan": 4,
+  "task": null,
+  "total_tasks": null,
+  "status": "phase_complete_clean_boundary",
+  "completed_tasks": [
+    {"id": "27-01", "name": "Wave 0 test harness scripts/test-consommables-jauges.js", "status": "done", "commit": "prior session"},
+    {"id": "27-02", "name": "GET /motos/:id/consommables + services/jaugeConsommables.js + migration 25", "status": "done", "commit": "312b6a4"},
+    {"id": "27-03", "name": "Garage app.html: Consommables tab + jauge générale + dashboard chip + retrait Pneus + CLAUDE.md", "status": "done", "commit": "eb0d255..f700606, merged a49f44a"},
+    {"id": "27-04", "name": "Client MotoKey_Client.html: jauges section + upload photo multipart (D-10) + retrait Pneus legacy", "status": "done", "commit": "635211c..8f47f2d, merged d309a68"}
+  ],
+  "remaining_tasks": [],
+  "blockers": [],
+  "human_actions_pending": [
+    {"action": "Visual QA: open app.html on a real moto fiche, check the 9 gauges + general gauge render correctly (colors matching etat, weakest-link badge)", "context": "Phase 27 verifier flagged this as human-only (CSS/visual rendering can't be grepped)", "blocking": false},
+    {"action": "Visual QA: open MotoKey_Client.html, check gauge section wording + 'Ajouter une photo' file picker interaction", "context": "Same as above, client side", "blocking": false},
+    {"action": "Confirm dashboard consommables chip ('📸 Photo consommable à faire') appears on a moto flagged consommables_en_retard/rappel_photo_en_retard", "context": "Requires a live moto row with the flag set", "blocking": false},
+    {"action": "Test live photo upload end-to-end once Cloudinary creds are provisioned in Railway (motokey1.1)", "context": "Currently returns 503 CLOUDINARY_NOT_CONFIGURED by design (D-02) — pre-existing blocker since Phase 25, not new to Phase 27", "blocking": false},
+    {"action": "Apply sql/migrations/25_migrate_pneus_to_consommables.sql in prod via Supabase Dashboard SQL Editor, then verify a previously-pneu-legacy moto now has 2 new consommables rows (pneu_av/pneu_ar)", "context": "Migration is idempotent and code-correct but has not been run against prod yet (rzbqbaccjyxvtlnfitrr) — until then has_data:false for pneu types on motos whose only pneu data lives in the legacy motos.pneu_av/pneu_ar columns", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "27-03 and 27-04 executed as parallel isolated-worktree agents (Wave 3), then merged into master with --no-ff merges", "rationale": "Disjoint file sets (app.html+CLAUDE.md vs MotoKey_Client.html) meant zero code-conflict risk; only .planning/STATE.md and .planning/ROADMAP.md conflicted (both agents updated tracking docs independently) and were reconciled by hand", "phase": "27"},
+    {"decision": "Garage Consommables tab reuses the exact old Pneus tab slot (tabDefs 2nd entry) and existing score-badge CSS classes", "rationale": "Minimizes UI churn, keeps nav position stable for garage users", "phase": "27"},
+    {"decision": "Client gauge section title capitalized 'Usure des Consommables'", "rationale": "Cosmetic-only, required to satisfy the frontend-structure test's case-sensitive 'Consommables' marker assertion", "phase": "27"},
+    {"decision": "MotoKey_Client.html upload uses raw fetch+FormData (uploadConsoPhoto), not the existing apiFetch JSON helper, and deliberately not the carte-grise CLOUDINARY_PRESET unsigned flow", "rationale": "First multipart pattern in this file; the unsigned Cloudinary preset flow would skip vision-stub analysis which is required for the gauge pipeline", "phase": "27"},
+    {"decision": "Phase verifier set VERIFICATION.md status: passed despite listing 5 human-verification items, rather than status: human_needed (which Phase 25's verifier used for a similar situation)", "rationale": "Verifier's own reasoning: all 5 observable truths and all required artifacts are code-verified; the flagged items are visual/prod-manual and explicitly stated as non-blocking to the phase goal. Orchestrator followed the frontmatter status field as authoritative per the execute-phase workflow routing table.", "phase": "27"}
+  ],
+  "uncommitted_files": [],
+  "next_action": "Run /gsd:discuss-phase 28 (or /gsd:plan-phase 28 directly) to start Phase 28: UI Mobile Client (jauges, lecture seule) — last phase of v1.6. No phase 28 directory exists yet (not yet planned).",
+  "context_notes": "This is a CLEAN PHASE BOUNDARY, not a mid-task pause. Phase 27 is fully complete: 4/4 plans done, merged to master, verified (5/5 must-haves passed), pushed to origin/master (997095a), and Railway prod responds 200 post-push. Working tree is clean, no uncommitted changes. v1.6 milestone is now 5/6 phases complete (23-27 done, 28 remaining). The user explicitly confirmed the push ('yes push it') before this pause-work was invoked. Nothing is blocked or in-progress — the next session can go straight to planning Phase 28, or first walk through the 5 human_actions_pending items above if they want visual/live QA before moving on."
+}
