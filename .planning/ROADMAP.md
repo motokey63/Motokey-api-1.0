@@ -174,7 +174,11 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
   3. Le garage et le client voient une jauge générale égale au consommable en plus mauvais état (maillon le plus faible), jamais une moyenne
   4. Les données `pneu_av`/`pneu_ar`/`pneu_km_montage` existantes ont été migrées vers les nouvelles lignes `consommables`, et la section Pneus legacy n'apparaît plus dans la navigation garage
   5. `CLAUDE.md` est corrigé pour refléter l'état réel (retrait Pneus effectif) — plus de contradiction entre la doc et le code
-**Plans**: TBD
+**Plans**: 4 plans (3 waves)
+  - [ ] 27-01-PLAN.md — Wave 0 harness scripts/test-consommables-jauges.js (5 cases, GAUGE-01/02, CONSO-04)
+  - [ ] 27-02-PLAN.md — Backend: GET /motos/:id/consommables + services/jaugeConsommables.js (maillon faible) + migration 25 pneus→consommables
+  - [ ] 27-03-PLAN.md — Garage app.html: onglet Consommables + jauge générale + chip dashboard + retrait Pneus legacy + CLAUDE.md
+  - [ ] 27-04-PLAN.md — Client MotoKey_Client.html: section jauges (wording grand public) + upload photo multipart (D-10)
 **UI hint**: yes
 
 ### Phase 28: UI Mobile Client (jauges, lecture seule)
@@ -220,8 +224,8 @@ Phases execute in numeric order: 18 → 19 → 20 → 21 → 22 → 23 → 24 �
 | Phase 24 | v1.6 | 0/2 | Not started | - |
 | Phase 25 | v1.6 | 0/5 | Not started | - |
 | Phase 26 | v1.6 | 0/4 | Not started | - |
-| Phase 27 | v1.6 | 0/TBD | Not started | - |
+| Phase 27 | v1.6 | 0/4 | Not started | - |
 | Phase 28 | v1.6 | 0/TBD | Not started | - |
 
 ---
-*Roadmap updated: 2026-07-15 — Phase 26 planifiée (4 plans, 4 vagues ; GAUGE-03/GAUGE-04 couverts). Next: /gsd:execute-phase 26.*
+*Roadmap updated: 2026-07-15 — Phase 27 planifiée (4 plans, 3 vagues ; GAUGE-01/GAUGE-02/CONSO-04 couverts). Next: /gsd:execute-phase 27.*
