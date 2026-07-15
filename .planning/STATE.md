@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: executing
-stopped_at: Completed 27-02-PLAN.md
-last_updated: "2026-07-15T21:54:20.362Z"
+stopped_at: Completed 27-04-PLAN.md
+last_updated: "2026-07-15T22:11:02.260Z"
 last_activity: 2026-07-15
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 19
-  completed_plans: 17
+  completed_plans: 18
 ---
 
 # MotoKey API — Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 ## Current Position
 
 Phase: 27 of 28 (ui web garage + client (jauges, retrait pneus legacy))
-Plan: 2 of 4 complete (27-01 Wave 0 test harness)
+Plan: 3 of 4 complete (27-01 Wave 0 test harness)
 Status: Ready to execute
 Last activity: 2026-07-15
 
@@ -58,6 +58,7 @@ v1.6 [█████░░░░░] IN PROGRESS — Phase 23/24/25/26 COMPLETE
 | Phase 26 P04 | 15min | 2 tasks | 0 files |
 | Phase 27 P01 | 12min | 1 tasks | 1 files |
 | Phase 27 P02 | 20min | 3 tasks | 4 files |
+| Phase 27 P04 | 15min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,8 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - [Phase 26, plan 26-04]: Migration 24 appliquée en prod par Mehdi, GAUGE-03/GAUGE-04 vérifiés réellement verts (15/15 assertions actives, 0 KO), régression racine intacte (9/9). **Phase 26 complète (4/4 plans).** Note opérationnelle non bloquante : à confirmer avec Mehdi si le scheduler externe a besoin d'une entrée pour `POST /cron/rappels-photo-consommables`.
 - [Phase 27]: [Phase 27, plan 27-01]: endpoint-shape structural case matches the exact M('GET','/motos/:id/consommables') router literal (not a bare path substring) to avoid a false PASS against the pre-existing POST route on the same path (CONSO-01, Phase 25)
 - [Phase 27]: [Phase 27, plan 27-02]: computeJaugeGenerale never averages pct_usure across consommables — returns the single item with max pct_usure (D-03), matching weakest-link framing; migration 25 does not DROP COLUMN, legacy pneu_* columns stay on motos until Mehdi validates the copy in prod
+- [Phase 27]: [Phase 27, plan 27-04]: Client gauge section title capitalized 'Usure des Consommables' to satisfy the frontend-structure test's case-sensitive 'Consommables' marker assertion -- cosmetic only
+- [Phase 27]: [Phase 27, plan 27-04]: MotoKey_Client.html multipart upload (uploadConsoPhoto) built on raw fetch+FormData rather than the existing apiFetch JSON helper -- first multipart pattern in this file, deliberately not reusing the carte-grise CLOUDINARY_PRESET unsigned flow which would skip vision-stub analysis
 
 ### Blockers/Concerns
 
@@ -115,5 +118,5 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ## Session Continuity
 
-Last session: 2026-07-15T21:54:20.357Z
-Stopped at: Completed 27-02-PLAN.md
+Last session: 2026-07-15T22:11:02.256Z
+Stopped at: Completed 27-04-PLAN.md
