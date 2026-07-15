@@ -646,6 +646,40 @@ function jaugesSectionClient(moto) {
   </div>`;
 }
 
+async function uploadConsoPhoto(motoId, typeConsommable, file, token) {
+  const fd = new FormData();
+  fd.append('photo', file);
+  fd.append('type_consommable', typeConsommable);
+  const res = await fetch(API_BASE + '/motos/' + motoId + '/photos-consommables', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token }, // NO Content-Type
+    body: fd
+  });
+  let data; try { data = await res.json(); } catch { data = {}; }
+  return { ok: res.ok, status: res.status, data };
+}
+
+function triggerConsoPhoto(motoId, typeConsommable) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/jpeg,image/png,image/webp';
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const at = localStorage.getItem(LS_AT);
+    const r = await uploadConsoPhoto(motoId, typeConsommable, file, at);
+    if (r.ok) {
+      alert('Photo envoyée — analyse en cours.');
+      loadMotos(); // refresh gauges
+    } else if (r.status === 503) {
+      alert("Envoi de photo temporairement indisponible (stockage non configuré). Réessayez plus tard.");
+    } else {
+      alert('Échec de l\'envoi : ' + ((r.data && (r.data.error || r.data.message)) || r.status));
+    }
+  };
+  input.click();
+}
+
 function renderMotoCard(moto) {
   const couleur    = moto.couleur_dossier || 'rouge';
   const garageName = moto.garage?.nom  || moto.garage_nom  || '—';
