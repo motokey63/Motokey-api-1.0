@@ -34,8 +34,8 @@ Requirements for milestone v1.6 (Suivi usure consommables + anti-fraude km). Eac
 
 - [ ] **GAUGE-01**: Le garage et le client voient une jauge % par consommable pour chaque moto
 - [ ] **GAUGE-02**: Le garage et le client voient une jauge générale égale au consommable en plus mauvais état (maillon le plus faible), jamais une moyenne
-- [ ] **GAUGE-03**: Un client reçoit une notification push de rappel photo quand le km parcouru depuis la dernière photo d'un consommable atteint 3000 km OU que 6 mois se sont écoulés (le premier des deux déclenche)
-- [ ] **GAUGE-04**: Le garage voit un badge/indicateur équivalent au rappel pour les motos garage/non réclamées (sans compte client à notifier)
+- [x] **GAUGE-03**: Un client reçoit une notification push de rappel photo quand le km parcouru depuis la dernière photo d'un consommable atteint 3000 km OU que 6 mois se sont écoulés (le premier des deux déclenche)
+- [x] **GAUGE-04**: Le garage voit un badge/indicateur équivalent au rappel pour les motos garage/non réclamées (sans compte client à notifier)
 - [ ] **GAUGE-05**: Un client voit sur l'app mobile native une jauge % par consommable pour sa moto (lecture seule — pas de capture photo depuis mobile ce milestone)
 - [ ] **GAUGE-06**: Un client voit sur l'app mobile native une jauge générale égale au consommable en plus mauvais état (maillon le plus faible), et un tap sur la notification de rappel photo (GAUGE-03) navigue vers cet écran
 
@@ -75,8 +75,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLOUD-01 | Phase 25 | Complete |
 | GAUGE-01 | Phase 27 | Pending |
 | GAUGE-02 | Phase 27 | Pending |
-| GAUGE-03 | Phase 26 | Pending |
-| GAUGE-04 | Phase 26 | Pending |
+| GAUGE-03 | Phase 26 | Complete |
+| GAUGE-04 | Phase 26 | Complete |
 | GAUGE-05 | Phase 28 | Pending |
 | GAUGE-06 | Phase 28 | Pending |
 

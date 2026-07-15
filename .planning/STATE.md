@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
-status: verifying
-stopped_at: Completed 25-05-PLAN.md (Phase 25 complete, 5/5 plans)
-last_updated: "2026-07-14T21:48:18.621Z"
-last_activity: 2026-07-14
+status: executing
+stopped_at: Completed 26-01-PLAN.md
+last_updated: "2026-07-15T08:53:47.494Z"
+last_activity: 2026-07-15
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 15
+  completed_plans: 12
 ---
 
 # MotoKey API — Project State
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-13)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 25 — endpoints-backend-km-photos-remplacement-compteur-cloudinary — COMPLETE, ready for next phase (26)
+**Current focus:** Phase 26 — cron-de-rappel-push-badge
 
 ## Current Position
 
-Phase: 26 of 28 (cron de rappel + push/badge)
-Plan: Not started
-Status: Phase 25 fully complete (5/5 plans). CONSO-03 (upload photo consommable) + CLOUD-01 (round-trip Cloudinary réel, skippable sans credentials) livrés et live-vérifiés (18/18 assertions, garage path). Ready for /gsd:verify-phase or Phase 26.
-Last activity: 2026-07-14
+Phase: 26 (cron-de-rappel-push-badge) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-07-15
 
 ```
 v1.0 ████████████ SHIPPED
@@ -52,6 +52,7 @@ v1.6 [████░░░░░░] IN PROGRESS — Phase 23/24/25 COMPLETE (s
 | Phase 25 P03 | 25min | 3 tasks | 3 files |
 | Phase 25 P04 | 8min | 2 tasks | 2 files |
 | Phase 25 P05 | 35min | 2 tasks | 2 files |
+| Phase 26 P01 | 5min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,7 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - [Phase 25, plan 25-04]: CONSO-01 (PATCH unitaire + POST bulk consommables) exécuté sans déviation — les deux endpoints réutilisent exactement le pattern MECANO+/`resolveMotoForCtx()` déjà établi en 25-03, aucun nouveau helper
 - [Phase 25, plan 25-05]: CONSO-03 (`POST /motos/:id/photos-consommables`) livré — 3e intercept multipart (après KM-02/KM-03), pipeline multer→Cloudinary→D-05 auto-création consommable→analyzePhoto stub→PhotosConsommables.insert, live-vérifié 18/18 (garage path) sans credentials Cloudinary (503 D-02 prouvé). **Phase 25 complète (5/5 plans).**
 - [Phase 25, plan 25-05]: ~~Gap RBAC pré-existant et transverse découvert...~~ → **RÉSOLU 2026-07-15, diagnostic corrigé** : n'était pas un gap `rbac.inferLegacyRole()` affectant 60+ endpoints prod. Vraie cause : fixture `sophie@email.com` (Phase 18) sans `app_metadata.role`, + scripts de test utilisant l'ancien `/auth/login` au lieu du vrai `/auth/client/login`. Vrais clients (inscrits via `/auth/client/register`) tous corrects (6/6 sondés live). Corrigé : `setup-supabase.js` pose le rôle (appliqué live), tests basculés sur `/auth/client/login`. `tests/test-km-photos-cloudinary.js` 19/19, `tests/test-client-device-tokens.js` 15/15 (était 3/15). Détail dans `deferred-items.md` Phase 25.
+- [Phase 26]: 26-01: aucun trigger DB ajoute pour D-05 (reset dernier_rappel_envoye_at) -- reste une decision applicative JS cablee en 26-02, pas un trigger Postgres
 
 ### Blockers/Concerns
 
@@ -101,5 +103,5 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ## Session Continuity
 
-Last session: 2026-07-14T21:24:58.619Z
-Stopped at: Completed 25-05-PLAN.md (Phase 25 complete, 5/5 plans)
+Last session: 2026-07-15T08:53:47.491Z
+Stopped at: Completed 26-01-PLAN.md
