@@ -19,7 +19,7 @@ Requirements for milestone v1.6 (Suivi usure consommables + anti-fraude km). Eac
 - [x] **CONSO-01**: Chaque moto a une fiche consommables avec les 9 types donnés (pneu_av/ar, chaîne, plaquettes_av/ar, disque_av/ar, huile_moteur, liquide_frein), chacun avec km_montage/date_montage/référence saisis par le mécano
 - [x] **CONSO-02**: Le schéma consommables permet d'ajouter un nouveau type de consommable plus tard sans migration lourde
 - [x] **CONSO-03**: Un client ou un membre du garage peut uploader une photo d'un consommable, historisée avec sa date et son analyse
-- [ ] **CONSO-04**: Les données `pneu_av`/`pneu_ar`/`pneu_km_montage` existantes sont migrées vers les nouvelles lignes consommables, puis la section Pneus legacy est retirée de la navigation garage et `CLAUDE.md` corrigé
+- [x] **CONSO-04**: Les données `pneu_av`/`pneu_ar`/`pneu_km_montage` existantes sont migrées vers les nouvelles lignes consommables, puis la section Pneus legacy est retirée de la navigation garage et `CLAUDE.md` corrigé
 
 ### Stub IA Vision (VISION)
 
@@ -32,8 +32,8 @@ Requirements for milestone v1.6 (Suivi usure consommables + anti-fraude km). Eac
 
 ### Jauges & rappels (GAUGE)
 
-- [ ] **GAUGE-01**: Le garage et le client voient une jauge % par consommable pour chaque moto
-- [ ] **GAUGE-02**: Le garage et le client voient une jauge générale égale au consommable en plus mauvais état (maillon le plus faible), jamais une moyenne
+- [x] **GAUGE-01**: Le garage et le client voient une jauge % par consommable pour chaque moto
+- [x] **GAUGE-02**: Le garage et le client voient une jauge générale égale au consommable en plus mauvais état (maillon le plus faible), jamais une moyenne
 - [x] **GAUGE-03**: Un client reçoit une notification push de rappel photo quand le km parcouru depuis la dernière photo d'un consommable atteint 3000 km OU que 6 mois se sont écoulés (le premier des deux déclenche)
 - [x] **GAUGE-04**: Le garage voit un badge/indicateur équivalent au rappel pour les motos garage/non réclamées (sans compte client à notifier)
 - [ ] **GAUGE-05**: Un client voit sur l'app mobile native une jauge % par consommable pour sa moto (lecture seule — pas de capture photo depuis mobile ce milestone)
@@ -69,12 +69,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONSO-01 | Phase 25 | Complete |
 | CONSO-02 | Phase 23 | Complete |
 | CONSO-03 | Phase 25 | Complete |
-| CONSO-04 | Phase 27 | Pending |
+| CONSO-04 | Phase 27 | Complete |
 | VISION-01 | Phase 24 | Complete |
 | VISION-02 | Phase 24 | Complete |
 | CLOUD-01 | Phase 25 | Complete |
-| GAUGE-01 | Phase 27 | Pending |
-| GAUGE-02 | Phase 27 | Pending |
+| GAUGE-01 | Phase 27 | Complete |
+| GAUGE-02 | Phase 27 | Complete |
 | GAUGE-03 | Phase 26 | Complete |
 | GAUGE-04 | Phase 26 | Complete |
 | GAUGE-05 | Phase 28 | Pending |

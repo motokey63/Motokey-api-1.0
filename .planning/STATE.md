@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: executing
-stopped_at: Completed 27-01-PLAN.md
-last_updated: "2026-07-15T20:42:34.124Z"
-last_activity: 2026-07-15 -- Phase 27 execution started, Wave 1 (27-01) complete
+stopped_at: Completed 27-02-PLAN.md
+last_updated: "2026-07-15T21:54:20.362Z"
+last_activity: 2026-07-15
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 19
-  completed_plans: 16
+  completed_plans: 17
 ---
 
 # MotoKey API — Project State
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 ## Current Position
 
 Phase: 27 of 28 (ui web garage + client (jauges, retrait pneus legacy))
-Plan: 1 of 4 complete (27-01 Wave 0 test harness)
-Status: Executing Wave 2 (27-02 backend endpoint + migration)
+Plan: 2 of 4 complete (27-01 Wave 0 test harness)
+Status: Ready to execute
 Last activity: 2026-07-15
 
 ```
@@ -57,6 +57,7 @@ v1.6 [█████░░░░░] IN PROGRESS — Phase 23/24/25/26 COMPLETE
 | Phase 26 P03 | 11min | 2 tasks | 2 files |
 | Phase 26 P04 | 15min | 2 tasks | 0 files |
 | Phase 27 P01 | 12min | 1 tasks | 1 files |
+| Phase 27 P02 | 20min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,7 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - [Phase 26]: GAUGE-04 skip proprement en mode RAM fallback (Supabase non configure localement) plutot que d'echouer -- champ calcule uniquement via SBLayer.Motos.list/getById
 - [Phase 26, plan 26-04]: Migration 24 appliquée en prod par Mehdi, GAUGE-03/GAUGE-04 vérifiés réellement verts (15/15 assertions actives, 0 KO), régression racine intacte (9/9). **Phase 26 complète (4/4 plans).** Note opérationnelle non bloquante : à confirmer avec Mehdi si le scheduler externe a besoin d'une entrée pour `POST /cron/rappels-photo-consommables`.
 - [Phase 27]: [Phase 27, plan 27-01]: endpoint-shape structural case matches the exact M('GET','/motos/:id/consommables') router literal (not a bare path substring) to avoid a false PASS against the pre-existing POST route on the same path (CONSO-01, Phase 25)
+- [Phase 27]: [Phase 27, plan 27-02]: computeJaugeGenerale never averages pct_usure across consommables — returns the single item with max pct_usure (D-03), matching weakest-link framing; migration 25 does not DROP COLUMN, legacy pneu_* columns stay on motos until Mehdi validates the copy in prod
 
 ### Blockers/Concerns
 
@@ -109,8 +111,9 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - **NOUVEAU 2026-07-14 (plan 25-03) — `releves_km_rejets` non alimentée en prod par le trigger déployé** : en vérifiant KM-03 en conditions réelles contre prod (serveur local branché sur `rzbqbaccjyxvtlnfitrr`), le rejet anti-fraude fonctionne (le trigger `verifier_km_monotone` bloque bien tout km régressif — cœur de KM-01 intact), mais la ligne d'audit qu'il est censé insérer dans `releves_km_rejets` n'apparaît jamais, alors qu'un insert direct dans cette même table via le même client service-role fonctionne et est immédiatement visible (RLS écarté comme cause). Root cause non déterminée — probablement une divergence entre le corps de fonction réellement appliqué en prod via le Dashboard SQL Editor et `sql/migrations/23_consommables_km.sql` (la validation prod du 2026-07-14 n'a testé que l'existence des tables via sonde REST `200 []`, pas le chemin de rejet réel). Mitigation applicative posée dans ce plan (`RelevesKm.enregistrer()` retombe sur `motos.km`) — mais l'audit trail lui-même reste à vérifier/re-déployer par Mehdi via Dashboard. Détail complet : `.planning/phases/25-endpoints-backend-km-photos-remplacement-compteur-cloudinary/deferred-items.md`. Non bloquant pour la suite de Phase 25.
 - **BLOQUANT EXTERNE avant usage prod réel de CONSO-03/CLOUD-01 — credentials Cloudinary absents** : `CLOUDINARY_CLOUD_NAME`/`CLOUDINARY_API_KEY`/`CLOUDINARY_API_SECRET` toujours non provisionnés (ni `.env` local, ni Railway `motokey1.1`) à la clôture de Phase 25. Le endpoint renvoie 503 `CLOUDINARY_NOT_CONFIGURED` sur toute tentative d'upload réel (comportement voulu, D-02 — jamais de placeholder), mais bloque de fait tout usage produit de CONSO-03/photos compteur tant que Mehdi n'a pas provisionné les 3 vars (Cloudinary Dashboard → Settings → Account/API Keys, puis Railway service `motokey1.1`). Ne bloque pas la complétion de Phase 25 (assertions D-02/CLOUD-01 skippables, plan autonomous) mais bloque potentiellement les jauges Phase 27/28 si aucune vraie photo n'a été uploadée en prod avant cette phase.
 - ~~**NOUVEAU 2026-07-14 (plan 25-05) — gap RBAC transverse pré-existant, comptes CLIENT non reconnus via JWT legacy**~~ → **RÉSOLU 2026-07-15** — diagnostic corrigé, n'était pas un gap RBAC prod (voir entrée Decisions ci-dessus + `deferred-items.md` Phase 25). Aucun impact sur Phase 28 : l'app mobile utilise déjà `/auth/client/login` (le vrai flux), jamais le login legacy.
+- Migration 25 (sql/migrations/25_migrate_pneus_to_consommables.sql) reste a appliquer manuellement en prod par Mehdi via Supabase Dashboard > SQL Editor -- jusque-la, has_data:false pour pneu_av/pneu_ar sur les motos dont les seules donnees pneus vivent dans les colonnes legacy motos.pneu_av/pneu_ar
 
 ## Session Continuity
 
-Last session: 2026-07-15T20:42:34.120Z
-Stopped at: Completed 27-01-PLAN.md
+Last session: 2026-07-15T21:54:20.357Z
+Stopped at: Completed 27-02-PLAN.md
