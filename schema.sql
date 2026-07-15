@@ -567,6 +567,8 @@ CREATE TABLE consommables (
   km_montage        INTEGER,
   date_montage      DATE,
   reference         TEXT,
+  dernier_rappel_envoye_at TIMESTAMPTZ,
+  dernier_rappel_km        INTEGER,
   created_at        TIMESTAMPTZ DEFAULT NOW(),
   updated_at        TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (moto_id, type_consommable)
@@ -580,6 +582,7 @@ CREATE TABLE photos_consommables (
   photo_url         TEXT NOT NULL,
   analyse_ia        JSONB,           -- rempli par le stub vision (Phase 24/25) — nommé analyse_ia (pas "analyse", mot réservé Postgres/ANALYZE)
   analyse_status    TEXT,            -- ok / incertain / echec (Phase 24)
+  km_a_la_photo     INTEGER,
   created_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
