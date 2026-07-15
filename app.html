@@ -893,7 +893,7 @@ function renderFiche() {
   const clientNom = mo.clients?.nom || mo.client_nom || '';
   const tabDefs = [
     {id:'infos',    label:'Infos'},
-    {id:'pneus',    label:'Pneus'},
+    {id:'consommables', label:'Consommables'},
     {id:'entretien',label:'Carnet d\'entretien'},
     {id:'or',       label:'OR liés'}
   ];
@@ -953,9 +953,9 @@ function renderFicheTabContent() {
         <div style="font-size:13px;color:var(--text2)">Propriétaire actuel : <strong>${proprio}</strong></div>
         <div style="font-size:12px;color:var(--text2);margin-top:6px;font-style:italic">Historique complet des cessions disponible prochainement.</div>
       </div>`;
-  } else if (ficheTab === 'pneus') {
-    c.innerHTML = '<div id="pneusContent"><div class="loading">Chargement…</div></div>';
-    loadPneus(mo.id);
+  } else if (ficheTab === 'consommables') {
+    c.innerHTML = '<div id="consommablesContent"><div class="loading">Chargement…</div></div>';
+    loadConsommables(mo.id);
   } else if (ficheTab === 'entretien') {
     c.innerHTML = `
       <div id="entretienContent"><div class="loading">Chargement plan entretien…</div></div>
@@ -1014,6 +1014,48 @@ async function loadFicheORList(motoId) {
   } catch(e) {
     c.innerHTML = '<div class="alert alert-warn">Erreur : '+e.message+'</div>';
   }
+}
+
+// ── CONSOMMABLES ──
+const LABELS_CONSO = {
+  pneu_av:'Pneu avant', pneu_ar:'Pneu arrière', chaine:'Chaîne',
+  plaquettes_av:'Plaquettes avant', plaquettes_ar:'Plaquettes arrière',
+  disque_av:'Disque avant', disque_ar:'Disque arrière',
+  huile_moteur:'Huile moteur', liquide_frein:'Liquide de frein'
+};
+const ETAT_CLASS = { bon:'score-vert', moyen:'score-bleu', 'usé':'score-jaune', critique:'score-rouge' };
+
+function jaugeBarConso(item) {
+  const label = LABELS_CONSO[item.type_consommable] || item.type_consommable;
+  if (!item.has_data) {
+    return `<div class="pneu-stat"><span class="pneu-label">${label}</span><span class="score-badge score-jaune" style="opacity:.55">Non renseigné</span></div>`;
+  }
+  const cls = ETAT_CLASS[item.etat] || 'score-bleu';
+  return `<div class="pneu-stat">
+    <span class="pneu-label" style="min-width:130px">${label}</span>
+    <div style="flex:1;margin:0 12px;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+      <div class="${cls}" style="width:${item.pct_usure}%;height:100%;background:currentColor"></div>
+    </div>
+    <span class="score-badge ${cls}">${item.pct_usure}% · ${item.etat}</span>
+  </div>`;
+}
+
+function renderConsommables(data) {
+  const items = (data && data.consommables) || [];
+  const jg = data ? data.jauge_generale : null;
+  const generalHtml = jg
+    ? `<div class="card" style="margin-bottom:16px"><div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">État général (maillon le plus faible)</div><span class="score-badge ${ETAT_CLASS[jg.etat]||'score-bleu'}">${LABELS_CONSO[jg.type_consommable]||jg.type_consommable} · ${jg.pct_usure}% · ${jg.etat}</span></div>`
+    : `<div class="card" style="margin-bottom:16px"><span class="score-badge score-jaune" style="opacity:.7">Pas encore suivi</span><div style="font-size:12px;color:var(--text2);margin-top:8px">Aucune photo/analyse de consommable pour cette moto. Le client peut ajouter une photo depuis son espace.</div></div>`;
+  return `${generalHtml}<div class="card"><div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">Détail par consommable</div>${items.map(jaugeBarConso).join('')}</div>`;
+}
+
+async function loadConsommables(id) {
+  const c = document.getElementById('consommablesContent');
+  if (!c) return;
+  try {
+    const data = await api('/motos/'+id+'/consommables');
+    c.innerHTML = renderConsommables(data);
+  } catch(e) { c.innerHTML = '<div class="alert alert-warn">Erreur : '+e.message+'</div>'; }
 }
 
 async function saveMoto() {
