@@ -395,8 +395,8 @@ const Motos = {
   },
 
   async update(id, garage_id, payload) {
-    // km retiré (KM-04) : le km ne s'écrit plus que via RelevesKm.enregistrer() → releves_km → trigger de sync. pneu_* restent (retrait = Phase 27).
-    const allowed = ['pneu_av','pneu_ar','pneu_km_montage','couleur','photo_url'];
+    // km retiré (KM-04) via RelevesKm ; pneu_* retirés (CONSO-04, Phase 27) — plus aucune écriture pneus côté app, données migrées vers consommables (migration 25).
+    const allowed = ['couleur','photo_url'];
     const clean   = Object.fromEntries(Object.entries(payload).filter(([k]) => allowed.includes(k)));
     const { data, error } = await supabase.from('motos').update(clean).eq('id', id).eq('garage_id', garage_id).select().single();
     if (error) throw new Error(error.message);
