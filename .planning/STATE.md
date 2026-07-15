@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
-status: verifying
-stopped_at: Completed 26-04-PLAN.md (Phase 26 complete, 4/4 plans)
-last_updated: "2026-07-15T17:21:26.569Z"
+status: executing
+stopped_at: Completed 27-01-PLAN.md
+last_updated: "2026-07-15T20:42:34.124Z"
 last_activity: 2026-07-15
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 15
-  completed_plans: 15
+  completed_plans: 16
 ---
 
 # MotoKey API — Project State
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 ## Current Position
 
 Phase: 27 of 28 (ui web garage + client (jauges, retrait pneus legacy))
-Plan: Not started
-Status: Migration 24 appliquée en prod, GAUGE-03/GAUGE-04 vérifiés de bout en bout (15/15 assertions actives, 0 skip inattendu), régression racine intacte (9/9). Ready for /gsd:verify-phase or Phase 27.
+Plan: 2 of 4
+Status: Ready to execute
 Last activity: 2026-07-15
 
 ```
@@ -56,6 +56,7 @@ v1.6 [█████░░░░░] IN PROGRESS — Phase 23/24/25/26 COMPLETE
 | Phase 26 P02 | 12min | 2 tasks | 3 files |
 | Phase 26 P03 | 11min | 2 tasks | 2 files |
 | Phase 26 P04 | 15min | 2 tasks | 0 files |
+| Phase 27 P01 | 12min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,7 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - [Phase 26]: Lazy require du service dans supabase.js (pas en tete de fichier) pour eviter le cycle supabase.js<->consommableRappelService.js
 - [Phase 26]: GAUGE-04 skip proprement en mode RAM fallback (Supabase non configure localement) plutot que d'echouer -- champ calcule uniquement via SBLayer.Motos.list/getById
 - [Phase 26, plan 26-04]: Migration 24 appliquée en prod par Mehdi, GAUGE-03/GAUGE-04 vérifiés réellement verts (15/15 assertions actives, 0 KO), régression racine intacte (9/9). **Phase 26 complète (4/4 plans).** Note opérationnelle non bloquante : à confirmer avec Mehdi si le scheduler externe a besoin d'une entrée pour `POST /cron/rappels-photo-consommables`.
+- [Phase 27]: [Phase 27, plan 27-01]: endpoint-shape structural case matches the exact M('GET','/motos/:id/consommables') router literal (not a bare path substring) to avoid a false PASS against the pre-existing POST route on the same path (CONSO-01, Phase 25)
 
 ### Blockers/Concerns
 
@@ -110,5 +112,5 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ## Session Continuity
 
-Last session: 2026-07-15T09:38:00.000Z
-Stopped at: Completed 26-04-PLAN.md (Phase 26 complete, 4/4 plans)
+Last session: 2026-07-15T20:42:34.120Z
+Stopped at: Completed 27-01-PLAN.md
