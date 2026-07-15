@@ -256,6 +256,29 @@ const Motos = {
     }
     const byMoto = {};
     for (const op of plans) (byMoto[op.moto_id] = byMoto[op.moto_id] || []).push(op);
+
+    // GAUGE-04 : rappel_photo_en_retard (calculé au read-time, aucun champ DB) —
+    // réutilise la MÊME fonction pure que le cron via lazy require (évite le cycle
+    // supabase<->service : un require en tête de fichier créerait une dépendance circulaire).
+    const { isConsommableEnRetard } = require('./services/consommableRappelService');
+    let consosByMoto = {};
+    let latestPhotoByConso = {};
+    if (ids.length) {
+      const { data: consos, error: consosErr } = await supabase.from('consommables')
+        .select('*').in('moto_id', ids);
+      if (consosErr) throw new Error(consosErr.message);
+      for (const c of consos || []) (consosByMoto[c.moto_id] = consosByMoto[c.moto_id] || []).push(c);
+
+      const { data: photos, error: photosErr } = await supabase.from('photos_consommables')
+        .select('consommable_id, km_a_la_photo, created_at')
+        .in('moto_id', ids)
+        .order('created_at', { ascending: false });
+      if (photosErr) throw new Error(photosErr.message);
+      for (const p of photos || []) {
+        if (p.consommable_id && !(p.consommable_id in latestPhotoByConso)) latestPhotoByConso[p.consommable_id] = p;
+      }
+    }
+
     return rows.map(m => {
       const ops = byMoto[m.id] || [];
       let pctMax = 0;
@@ -264,7 +287,15 @@ const Motos = {
         const pct = op.km_interval > 0 ? Math.round((since / op.km_interval) * 100) : 0;
         if (pct > pctMax) pctMax = pct;
       }
-      return { ...m, pct_max_usage: pctMax, alerte_entretien: ops.length > 0 && pctMax >= 80 };
+      const consos = consosByMoto[m.id] || [];
+      const enRetard = consos.filter(c => isConsommableEnRetard(c, m.km, latestPhotoByConso[c.id] || null));
+      return {
+        ...m,
+        pct_max_usage: pctMax,
+        alerte_entretien: ops.length > 0 && pctMax >= 80,
+        rappel_photo_en_retard: enRetard.length > 0,
+        consommables_en_retard: enRetard.map(c => c.type_consommable)
+      };
     });
   },
 
@@ -275,7 +306,23 @@ const Motos = {
       .eq('garage_id', garage_id)
       .single();
     if (error) throw new Error(error.message);
-    return data;
+    if (!data) return data;
+
+    // GAUGE-04 : même fonction pure que Motos.list/le cron, via lazy require.
+    const { isConsommableEnRetard } = require('./services/consommableRappelService');
+    const consos = await Consommables.listByMoto(id);
+    const enRetard = [];
+    for (const conso of consos) {
+      const photos = await PhotosConsommables.listByConsommable(conso.id);
+      const latestPhoto = (photos && photos.length) ? photos[0] : null;
+      if (isConsommableEnRetard(conso, data.km, latestPhoto)) enRetard.push(conso);
+    }
+
+    return {
+      ...data,
+      rappel_photo_en_retard: enRetard.length > 0,
+      consommables_en_retard: enRetard.map(c => c.type_consommable)
+    };
   },
 
   async create(garage_id, payload) {
@@ -1367,7 +1414,7 @@ const PhotosConsommables = {
   // (pct_usure/etat/confiance/analyse_status/engine) ; analyse_status dupliqué en colonne
   // dédiée pour requêtes rapides. type_consommable dénormalisé DOIT être fourni (pas de CHECK
   // sur cette colonne — pitfall dénormalisation).
-  async insert({ moto_id, consommable_id, type_consommable, photo_url, analyse_ia, analyse_status }) {
+  async insert({ moto_id, consommable_id, type_consommable, photo_url, analyse_ia, analyse_status, km_a_la_photo }) {
     if (!moto_id) throw new Error('[PhotosConsommables.insert] moto_id requis');
     if (!photo_url) throw new Error('[PhotosConsommables.insert] photo_url requis');
     const payload = {
@@ -1376,11 +1423,21 @@ const PhotosConsommables = {
       type_consommable: type_consommable || null,
       photo_url,
       analyse_ia: analyse_ia || null,
-      analyse_status: analyse_status || null
+      analyse_status: analyse_status || null,
+      km_a_la_photo: (km_a_la_photo !== undefined && km_a_la_photo !== null && km_a_la_photo !== '') ? parseInt(km_a_la_photo) : null,
     };
     const { data, error } = await supabase
       .from('photos_consommables').insert(payload).select().single();
     if (error) throw new Error(`[PhotosConsommables.insert] ${error.message}`);
+
+    // D-05 : toute nouvelle photo rearme le rappel du consommable lie (reset a NULL)
+    if (consommable_id) {
+      const { error: rErr } = await supabase.from('consommables')
+        .update({ dernier_rappel_envoye_at: null, dernier_rappel_km: null })
+        .eq('id', consommable_id);
+      if (rErr) console.warn('[PhotosConsommables.insert] reset D-05 echoue:', rErr.message); // non bloquant
+    }
+
     return data;
   },
 
