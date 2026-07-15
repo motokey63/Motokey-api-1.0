@@ -87,6 +87,7 @@ const planLimits = require('./auth/planLimits');
 const multer = require('multer');
 const cloudinaryService = require('./services/cloudinaryService');
 const { analyzePhoto } = require('./services/visionAnalysisService');
+const jaugeConsommables = require('./services/jaugeConsommables');
 
 // Couche Supabase (supabase.js) — chargée si SUPABASE_URL + SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_KEY) présents
 let SBLayer = null;
@@ -1124,6 +1125,19 @@ const server = http.createServer(async function(req, res){
       const rows = [];
       for (const it of items) { rows.push(await SBLayer.Consommables.upsert(p.id, { type_consommable: it.type_consommable, km_montage: it.km_montage, date_montage: it.date_montage, reference: it.reference })); }
       return ok(res, { consommables: rows }, rows.length+' consommables enregistrés', 201);
+    } catch (e) { return fail(res, e.message, 500, 'SERVER_ERROR'); }
+  }
+
+  /* JAUGES CONSOMMABLES (GAUGE-01/02) — lecture, ouverte CLIENT + MECANO+ via resolveMotoForCtx */
+  if((p=M('GET','/motos/:id/consommables'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res,'Non authentifié',401,'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const r = await resolveMotoForCtx(ctx, p.id, a);
+    if (!r) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
+    try {
+      const { items, jaugeGenerale } = await jaugeConsommables.buildConsommablesJauges(p.id);
+      return ok(res, { consommables: items, jauge_generale: jaugeGenerale });
     } catch (e) { return fail(res, e.message, 500, 'SERVER_ERROR'); }
   }
 
