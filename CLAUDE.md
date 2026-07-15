@@ -80,8 +80,11 @@ Système de gestion de garage moto pour Garage Motolab. Concept : "3ème clé di
 - `declare` = **0.3** (déclaration sans preuve)
 - **Cœur du système d'intégrité** — ne pas modifier sans validation explicite de Mehdi.
 
-### Pneus
-- Vivent **dans la fiche moto uniquement**. La nav principale n'a pas de section Pneus. La fonction `renderPneus()` historique a été supprimée.
+### Pneus (retiré en Phase 27, remplacé par Consommables)
+- L'ancien onglet "Pneus" (heuristique km grossière, un seul type de pneu suivi) a été **retiré en Phase 27** (`renderPneus()`/`loadPneus()`/`changerMotoPneus()` supprimées de `app.html`, route nav et libellé associés retirés).
+- Il est remplacé par un onglet **"Consommables"** dans la fiche moto (même emplacement), qui affiche une jauge % par consommable pour les 9 types suivis (pneus avant/arrière, chaîne, plaquettes avant/arrière, disques avant/arrière, huile moteur, liquide de frein) + une jauge générale = maillon le plus faible, alimentées par `GET /motos/:id/consommables`.
+- Le dashboard garage affiche aussi un chip "Photo consommable à faire" (`consoChip()`) sur les motos avec `consommables_en_retard`/`rappel_photo_en_retard`.
+- Vivent **dans la fiche moto uniquement** — la nav principale n'a pas de section Consommables dédiée.
 
 ---
 
