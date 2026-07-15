@@ -606,6 +606,46 @@ function fmtStatut(s) {
   return { urgent:'URGENT', warning:'À faire', due:'Dûe', ok:'OK', future:'À venir' }[s] || s || '';
 }
 
+/* ═══════════════════════════════════════════════════════
+   JAUGES CONSOMMABLES (GAUGE-01/02, CONSO-04)
+═══════════════════════════════════════════════════════ */
+const CONSO_LABELS_CLIENT = {
+  pneu_av:'Pneu avant', pneu_ar:'Pneu arrière', chaine:'Chaîne',
+  plaquettes_av:'Plaquettes avant', plaquettes_ar:'Plaquettes arrière',
+  disque_av:'Disque avant', disque_ar:'Disque arrière',
+  huile_moteur:'Huile moteur', liquide_frein:'Liquide de frein'
+};
+const ETAT_WORDING_CLIENT = { bon:'Très bon état', moyen:'À surveiller', 'usé':'À changer bientôt', critique:'À changer maintenant' };
+const ETAT_COLOR_CLIENT = { bon:'vert', moyen:'bleu', 'usé':'jaune', critique:'rouge' };
+
+function jaugeRowClient(motoId, item) {
+  const label = CONSO_LABELS_CLIENT[item.type_consommable] || item.type_consommable;
+  const uploadBtn = `<button class="btn btn-secondary" style="font-size:11px;padding:4px 8px" onclick="triggerConsoPhoto('${esc(motoId)}','${esc(item.type_consommable)}')">📸 Ajouter une photo</button>`;
+  if (!item.has_data) {
+    return `<div class="conso-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="flex:1;font-size:13px">${label}</span><span class="score-num jaune" style="opacity:.55;font-size:12px;padding:2px 8px">Non renseigné</span>${uploadBtn}</div>`;
+  }
+  const color = ETAT_COLOR_CLIENT[item.etat] || 'bleu';
+  const wording = ETAT_WORDING_CLIENT[item.etat] || item.etat;
+  return `<div class="conso-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
+    <span style="flex:1;font-size:13px">${label}</span>
+    <div style="width:80px;height:6px;background:var(--line);border-radius:3px;overflow:hidden"><div class="${color}" style="width:${item.pct_usure}%;height:100%;background:currentColor"></div></div>
+    <span class="score-num ${color}" style="font-size:12px;padding:2px 8px">${wording}</span>${uploadBtn}
+  </div>`;
+}
+
+function jaugesSectionClient(moto) {
+  const items = Array.isArray(moto.consommables) ? moto.consommables : [];
+  const jg = moto.jaugeGenerale || null;
+  const general = jg
+    ? `<div style="margin-bottom:10px"><span class="score-num ${ETAT_COLOR_CLIENT[jg.etat]||'bleu'}" style="font-size:13px;padding:4px 10px">État général : ${ETAT_WORDING_CLIENT[jg.etat]||jg.etat}</span></div>`
+    : `<div style="margin-bottom:10px;font-size:13px;color:var(--tx3)">Pas encore suivi — ajoutez une photo pour lancer le suivi d'usure.</div>`;
+  return `<div class="moto-section">
+    <div class="moto-section-title">Usure des Consommables</div>
+    ${general}
+    ${items.map(i => jaugeRowClient(moto.id, i)).join('')}
+  </div>`;
+}
+
 function renderMotoCard(moto) {
   const couleur    = moto.couleur_dossier || 'rouge';
   const garageName = moto.garage?.nom  || moto.garage_nom  || '—';
@@ -650,16 +690,6 @@ function renderMotoCard(moto) {
       </div>`;
   }
 
-  /* ── Pneumatiques ── */
-  const pneusHtml = (moto.pneu_av || moto.pneu_ar) ? `
-    <div class="moto-section">
-      <div class="moto-section-title">Pneumatiques</div>
-      <div style="display:flex;gap:24px;flex-wrap:wrap;">
-        ${moto.pneu_av ? `<div><div style="font-size:12px;color:var(--tx3);margin-bottom:2px">Avant</div><div style="font-size:13px;font-weight:600">${esc(moto.pneu_av)}</div></div>` : ''}
-        ${moto.pneu_ar ? `<div><div style="font-size:12px;color:var(--tx3);margin-bottom:2px">Arrière</div><div style="font-size:13px;font-weight:600">${esc(moto.pneu_ar)}</div></div>` : ''}
-      </div>
-    </div>` : '';
-
   return `
     <div class="moto-card">
       <div class="moto-header">
@@ -684,7 +714,7 @@ function renderMotoCard(moto) {
         <div class="interv-list">${intervHtml}</div>
       </div>
 
-      ${planHtml}${pneusHtml}
+      ${planHtml}${jaugesSectionClient(moto)}
     </div>`;
 }
 
@@ -712,9 +742,10 @@ async function loadMotos() {
 
   /* Charger interventions + alertes entretien en parallèle pour chaque moto */
   const enriched = await Promise.all(motos.map(async moto => {
-    const [ivRes, alRes] = await Promise.all([
+    const [ivRes, alRes, coRes] = await Promise.all([
       apiGet(`/motos/${moto.id}/interventions`, at),
-      apiGet(`/motos/${moto.id}/entretien/alertes`, at)
+      apiGet(`/motos/${moto.id}/entretien/alertes`, at),
+      apiGet(`/motos/${moto.id}/consommables`, at)
     ]);
     const interventions = ivRes.ok
       ? (Array.isArray(ivRes.data) ? ivRes.data : (ivRes.data.interventions || ivRes.data.data || []))
@@ -722,7 +753,9 @@ async function loadMotos() {
     const alertes = alRes.ok
       ? (Array.isArray(alRes.data) ? alRes.data : (alRes.data.alertes || alRes.data.data || []))
       : null; // null = non accessible (403 RBAC) → section masquée
-    return { ...moto, interventions, alertes };
+    const consommables = coRes.ok ? (coRes.data.consommables || []) : [];
+    const jaugeGenerale = coRes.ok ? coRes.data.jauge_generale : null;
+    return { ...moto, interventions, alertes, consommables, jaugeGenerale };
   }));
 
   content.innerHTML = enriched.map(renderMotoCard).join('');
