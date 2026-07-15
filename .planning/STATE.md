@@ -4,7 +4,7 @@ milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: verifying
 stopped_at: Completed 26-04-PLAN.md (Phase 26 complete, 4/4 plans)
-last_updated: "2026-07-15T09:38:00.000Z"
+last_updated: "2026-07-15T17:21:26.569Z"
 last_activity: 2026-07-15
 progress:
   total_phases: 6
@@ -24,8 +24,8 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 
 ## Current Position
 
-Phase: 26 of 28 (cron de rappel + push/badge)
-Plan: Not started (Phase 26 fully complete, 4/4 plans)
+Phase: 27 of 28 (ui web garage + client (jauges, retrait pneus legacy))
+Plan: Not started
 Status: Migration 24 appliquée en prod, GAUGE-03/GAUGE-04 vérifiés de bout en bout (15/15 assertions actives, 0 skip inattendu), régression racine intacte (9/9). Ready for /gsd:verify-phase or Phase 27.
 Last activity: 2026-07-15
 
