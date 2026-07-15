@@ -80,6 +80,7 @@ const clientAuth  = require('./auth/client_auth');
 const emailService = require('./services/emailService');
 const pushService  = require('./services/pushService');
 const maintenanceAlertService = require('./services/maintenanceAlertService');
+const consommableRappelService = require('./services/consommableRappelService');
 const rbac        = require('./auth/rbac');
 const { stripe: stripeClient, handleWebhookEvent, createCheckoutSession, createAutoTrial, createPortalSession } = require('./services/stripeService');
 const planLimits = require('./auth/planLimits');
@@ -568,7 +569,7 @@ async function handlePhotoConsommable(req, res, motoId) {
     const analyse = await analyzePhoto({ photoUrl: secure_url, consommableId: conso.id, typeConsommable: type, kmActuel, kmMontage: conso.km_montage ?? null });
 
     // Persistance historisée
-    const photo = await SBLayer.PhotosConsommables.insert({ moto_id: motoId, consommable_id: conso.id, type_consommable: type, photo_url: secure_url, analyse_ia: analyse, analyse_status: analyse.analyse_status });
+    const photo = await SBLayer.PhotosConsommables.insert({ moto_id: motoId, consommable_id: conso.id, type_consommable: type, photo_url: secure_url, analyse_ia: analyse, analyse_status: analyse.analyse_status, km_a_la_photo: kmActuel });
 
     return ok(res, { photo, analyse, consommable: conso }, 'Photo consommable enregistrée', 201);
   } catch (e) {
@@ -757,6 +758,21 @@ const server = http.createServer(async function(req, res){
       return ok(res, result, 'Cron entretien exécuté');
     } catch (e) {
       console.error('[cron] maintenance-alerts échoué:', e.message);
+      return fail(res, e.message, 500, 'CRON_ERROR');
+    }
+  }
+
+  /* CRON — rappel photo consommables (GAUGE-03), même auth X-Cron-Secret que ci-dessus */
+  if ((p = M('POST', '/cron/rappels-photo-consommables')) !== null) {
+    const secret = req.headers['x-cron-secret'];
+    if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+      return fail(res, 'Non autorisé', 401, 'UNAUTHORIZED');
+    }
+    try {
+      const result = await consommableRappelService.runConsommableRappelCron();
+      return ok(res, result, 'Cron rappels photo consommables exécuté');
+    } catch (e) {
+      console.error('[cron] rappels-photo-consommables échoué:', e.message);
       return fail(res, e.message, 500, 'CRON_ERROR');
     }
   }
