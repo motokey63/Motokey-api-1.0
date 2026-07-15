@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: executing
-stopped_at: Completed 27-03-PLAN.md
-last_updated: "2026-07-15T22:08:45.664Z"
+stopped_at: Completed 27-03-PLAN.md and 27-04-PLAN.md (Wave 3, parallel)
+last_updated: "2026-07-15T22:11:02.260Z"
 last_activity: 2026-07-15
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 19
-  completed_plans: 18
+  completed_plans: 19
 ---
 
 # MotoKey API — Project State
@@ -20,13 +20,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-13)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 27 — ui-web-garage-client-jauges-retrait-pneus-legacy — EXECUTING (Wave 1/3 complete)
+**Current focus:** Phase 27 — ui-web-garage-client-jauges-retrait-pneus-legacy — Wave 3/3 complete (4/4 plans), pending phase verification
 
 ## Current Position
 
 Phase: 27 of 28 (ui web garage + client (jauges, retrait pneus legacy))
-Plan: 3 of 4 complete (27-01 Wave 0 test harness)
-Status: Ready to execute
+Plan: 4 of 4 complete (27-01 Wave 0 harness, 27-02 backend endpoint, 27-03 garage UI, 27-04 client UI)
+Status: Ready for phase verification
 Last activity: 2026-07-15
 
 ```
@@ -59,6 +59,7 @@ v1.6 [█████░░░░░] IN PROGRESS — Phase 23/24/25/26 COMPLETE
 | Phase 27 P01 | 12min | 1 tasks | 1 files |
 | Phase 27 P02 | 20min | 3 tasks | 4 files |
 | Phase 27 P03 | 20min | 3 tasks | 2 files |
+| Phase 27 P04 | 15min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -102,6 +103,9 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - [Phase 27]: [Phase 27, plan 27-01]: endpoint-shape structural case matches the exact M('GET','/motos/:id/consommables') router literal (not a bare path substring) to avoid a false PASS against the pre-existing POST route on the same path (CONSO-01, Phase 25)
 - [Phase 27]: [Phase 27, plan 27-02]: computeJaugeGenerale never averages pct_usure across consommables — returns the single item with max pct_usure (D-03), matching weakest-link framing; migration 25 does not DROP COLUMN, legacy pneu_* columns stay on motos until Mehdi validates the copy in prod
 - [Phase 27]: Garage Consommables tab reuses the exact Pneus tab slot (tabDefs 2nd entry) and score-badge CSS classes; general weakest-link gauge exposed at top of tab per D-07; consoChip reads pre-computed GAUGE-04 fields with zero N+1 fetch
+- [Phase 27]: [Phase 27, plan 27-04]: Client gauge section title capitalized 'Usure des Consommables' to satisfy the frontend-structure test's case-sensitive 'Consommables' marker assertion -- cosmetic only
+- [Phase 27]: [Phase 27, plan 27-04]: MotoKey_Client.html multipart upload (uploadConsoPhoto) built on raw fetch+FormData rather than the existing apiFetch JSON helper -- first multipart pattern in this file, deliberately not reusing the carte-grise CLOUDINARY_PRESET unsigned flow which would skip vision-stub analysis
+- [Phase 27]: **Phase 27 complète (4/4 plans, Wave 3 exécutée en parallèle 27-03/27-04).**
 
 ### Blockers/Concerns
 
@@ -117,5 +121,5 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ## Session Continuity
 
-Last session: 2026-07-15T22:08:45.661Z
-Stopped at: Completed 27-03-PLAN.md
+Last session: 2026-07-15T22:11:02.256Z
+Stopped at: Completed 27-03-PLAN.md and 27-04-PLAN.md — Phase 27 complete (4/4 plans)
