@@ -177,7 +177,7 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
 **Plans**: 4 plans (3 waves)
   - [x] 27-01-PLAN.md — Wave 0 harness scripts/test-consommables-jauges.js (5 cases, GAUGE-01/02, CONSO-04)
   - [x] 27-02-PLAN.md — Backend: GET /motos/:id/consommables + services/jaugeConsommables.js (maillon faible) + migration 25 pneus→consommables
-  - [ ] 27-03-PLAN.md — Garage app.html: onglet Consommables + jauge générale + chip dashboard + retrait Pneus legacy + CLAUDE.md
+  - [x] 27-03-PLAN.md — Garage app.html: onglet Consommables + jauge générale + chip dashboard + retrait Pneus legacy + CLAUDE.md
   - [ ] 27-04-PLAN.md — Client MotoKey_Client.html: section jauges (wording grand public) + upload photo multipart (D-10)
 **UI hint**: yes
 
