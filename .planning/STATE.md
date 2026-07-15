@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: executing
-stopped_at: Completed 26-02-PLAN.md
-last_updated: "2026-07-15T09:08:03.071Z"
+stopped_at: Completed 26-03-PLAN.md
+last_updated: "2026-07-15T09:22:33.217Z"
 last_activity: 2026-07-15
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 15
-  completed_plans: 13
+  completed_plans: 14
 ---
 
 # MotoKey API — Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 ## Current Position
 
 Phase: 26 (cron-de-rappel-push-badge) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-07-15
 
@@ -54,6 +54,7 @@ v1.6 [████░░░░░░] IN PROGRESS — Phase 23/24/25 COMPLETE (s
 | Phase 25 P05 | 35min | 2 tasks | 2 files |
 | Phase 26 P01 | 5min | 2 tasks | 3 files |
 | Phase 26 P02 | 12min | 2 tasks | 3 files |
+| Phase 26 P03 | 11min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,7 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - [Phase 26]: 26-01: aucun trigger DB ajoute pour D-05 (reset dernier_rappel_envoye_at) -- reste une decision applicative JS cablee en 26-02, pas un trigger Postgres
 - [Phase 26]: GAUGE-04 (badge garage) calcule au read-time dans Motos.list/getById, jamais par le cron -- le cron ne scanne que proprietaire_type=client
 - [Phase 26]: Lazy require du service dans supabase.js (pas en tete de fichier) pour eviter le cycle supabase.js<->consommableRappelService.js
+- [Phase 26]: GAUGE-04 skip proprement en mode RAM fallback (Supabase non configure localement) plutot que d'echouer -- champ calcule uniquement via SBLayer.Motos.list/getById
 
 ### Blockers/Concerns
 
@@ -106,5 +108,5 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ## Session Continuity
 
-Last session: 2026-07-15T09:08:03.068Z
-Stopped at: Completed 26-02-PLAN.md
+Last session: 2026-07-15T09:22:33.213Z
+Stopped at: Completed 26-03-PLAN.md
