@@ -19,6 +19,9 @@ const CREDS = {
 // Secret cron (les tests d'intégration cron de 26-03 seront skippables si absent).
 const CRON_SECRET = process.env.CRON_SECRET || null;
 
+// Fonction pure de retard (26-02) — aucun serveur/DB requis pour ces assertions.
+const { isConsommableEnRetard, moisEcoules } = require('../services/consommableRappelService');
+
 let OK = 0, KO = 0;
 function check(label, cond, detail = '') {
   if (cond) { console.log(`  ✅ ${label}`); OK++; }
@@ -75,6 +78,31 @@ async function run() {
 
   // ─── [UNIT] fonction pure de retard (26-02) ─────────────────────────────
   console.log('\n── [UNIT] fonction pure de retard (26-02) ──────────────────────');
+
+  check(
+    'pneu_ar retard km',
+    isConsommableEnRetard({ type_consommable: 'pneu_ar', km_montage: 10000, date_montage: null }, 12600, null) === true
+  );
+  check(
+    'pneu_ar pas retard',
+    isConsommableEnRetard({ type_consommable: 'pneu_ar', km_montage: 10000, date_montage: null }, 12000, null) === false
+  );
+  check(
+    'D-08 aucune ref exclu',
+    isConsommableEnRetard({ type_consommable: 'chaine', km_montage: null, date_montage: null }, 99999, null) === false
+  );
+  check(
+    'type inconnu false',
+    isConsommableEnRetard({ type_consommable: 'inconnu', km_montage: 0 }, 99999, null) === false
+  );
+  check(
+    'moisEcoules calendaire',
+    moisEcoules(new Date('2026-01-15'), new Date('2026-07-15')) === 6
+  );
+  check(
+    'photo plus recente prime km_montage',
+    isConsommableEnRetard({ type_consommable: 'huile_moteur', km_montage: 0 }, 4000, { km_a_la_photo: 1000, created_at: '2026-07-01' }) === false
+  );
 
   // ─── [GAUGE-03] cron push + idempotence + reset D-05 (26-03) ───────────
   console.log('\n── [GAUGE-03] cron push + idempotence + reset D-05 (26-03) ─────');
