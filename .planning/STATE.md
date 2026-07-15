@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
-status: executing
-stopped_at: Completed 27-03-PLAN.md and 27-04-PLAN.md (Wave 3, parallel)
-last_updated: "2026-07-15T22:11:02.260Z"
+status: verifying
+stopped_at: Completed 27-03-PLAN.md and 27-04-PLAN.md — Phase 27 complete (4/4 plans)
+last_updated: "2026-07-15T22:19:51.883Z"
 last_activity: 2026-07-15
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 19
   completed_plans: 19
 ---
@@ -24,8 +24,8 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 
 ## Current Position
 
-Phase: 27 of 28 (ui web garage + client (jauges, retrait pneus legacy))
-Plan: 4 of 4 complete (27-01 Wave 0 harness, 27-02 backend endpoint, 27-03 garage UI, 27-04 client UI)
+Phase: 28 of 28 (ui mobile client (jauges, lecture seule))
+Plan: Not started
 Status: Ready for phase verification
 Last activity: 2026-07-15
 

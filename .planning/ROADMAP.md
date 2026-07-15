@@ -99,7 +99,7 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
 - [x] **Phase 24: Helpers supabase.js + Contrat Stub Vision** - Helpers CRUD des 3 nouvelles tables + `visionAnalysisService.js` flag-gated dont le contrat de réponse est verrouillé avant tout consommateur (completed 2026-07-14)
 - [x] **Phase 25: Endpoints Backend (km, photos, remplacement compteur, Cloudinary)** - Relevé km, changement de compteur PRO+, saisie consommables, upload photo avec stockage Cloudinary réel (completed 2026-07-14)
 - [x] **Phase 26: Cron de Rappel + Push/Badge** - Rappel photo 3000km OU 6 mois, idempotent, avec équivalent badge garage pour motos non réclamées (completed 2026-07-15)
-- [ ] **Phase 27: UI Web Garage + Client (jauges, retrait Pneus legacy)** - Jauges % par consommable + jauge générale maillon faible, migration et retrait de la section Pneus historique
+- [x] **Phase 27: UI Web Garage + Client (jauges, retrait Pneus legacy)** - Jauges % par consommable + jauge générale maillon faible, migration et retrait de la section Pneus historique (completed 2026-07-15)
 - [ ] **Phase 28: UI Mobile Client (jauges, lecture seule)** - Écran jauges consommables sur l'app mobile native + deep link depuis la notification de rappel photo
 
 ## Phase Details
