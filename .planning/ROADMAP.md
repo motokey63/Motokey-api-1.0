@@ -158,7 +158,11 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
   1. Un client reçoit une notification push quand le km parcouru depuis la dernière photo d'un consommable atteint 3000 km OU que 6 mois se sont écoulés, le premier des deux déclenchant l'alerte
   2. Le cron ne renvoie pas de notification en double pour le même franchissement de seuil (idempotence, même pattern de persistance que `services/maintenanceAlertService.js`)
   3. Le garage voit un badge/indicateur équivalent au rappel sur les motos garage/non réclamées (sans compte client à notifier)
-**Plans**: TBD
+**Plans**: 4 plans (4 vagues séquentielles — fichiers partagés motokey-api.js/supabase.js)
+  - [ ] 26-01-PLAN.md — Migration 24 (colonnes rappel + km_a_la_photo) + parité schema.sql + squelette test Wave 0
+  - [ ] 26-02-PLAN.md — Service consommableRappelService (seuils D-01, fonction pure) + supabase.js (reset D-05, km_a_la_photo, champ badge GAUGE-04)
+  - [ ] 26-03-PLAN.md — Endpoint POST /cron/rappels-photo-consommables (X-Cron-Secret) + capture km_a_la_photo + assertions intégration GAUGE-03/04
+  - [ ] 26-04-PLAN.md — Gate : application migration 24 prod + suite intégration GAUGE-03/04 réellement verte
 
 ### Phase 27: UI Web Garage + Client (jauges, retrait Pneus legacy)
 **Goal**: Le garage et le client voient l'état d'usure de chaque consommable et l'état général de la moto (maillon le plus faible), et la section Pneus historique n'existe plus en doublon contradictoire.
@@ -215,9 +219,9 @@ Phases execute in numeric order: 18 → 19 → 20 → 21 → 22 → 23 → 24 �
 | Phase 23 | v1.6 | 0/4 | Not started | - |
 | Phase 24 | v1.6 | 0/2 | Not started | - |
 | Phase 25 | v1.6 | 0/5 | Not started | - |
-| Phase 26 | v1.6 | 0/TBD | Not started | - |
+| Phase 26 | v1.6 | 0/4 | Not started | - |
 | Phase 27 | v1.6 | 0/TBD | Not started | - |
 | Phase 28 | v1.6 | 0/TBD | Not started | - |
 
 ---
-*Roadmap updated: 2026-07-14 — Phase 25 planifiée (5 plans, 4 vagues ; KM-02/KM-03/CONSO-01/CONSO-03/CLOUD-01 couverts). Next: /gsd:execute-phase 25.*
+*Roadmap updated: 2026-07-15 — Phase 26 planifiée (4 plans, 4 vagues ; GAUGE-03/GAUGE-04 couverts). Next: /gsd:execute-phase 26.*
