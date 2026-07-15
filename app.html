@@ -746,7 +746,6 @@ function nav(section, btn) {
   if (section === 'dashboard') loadDashboard();
   else if (section === 'fiche') renderFiche();
   else if (section === 'entretien') renderEntretien();
-  else if (section === 'pneus') renderPneus();
   else if (section === 'or')   loadOR();
   else if (section === 'devis') loadDevis();
   else if (section === 'params') renderParams();
@@ -789,6 +788,7 @@ function renderDashboard() {
       <div class="moto-km">🔧 ${(mo.km||0).toLocaleString('fr-FR')} km</div>
       <span class="score-badge score-${mo.couleur_dossier||'bleu'}">${scoreDot(mo.couleur_dossier)} ${scoreLabel(mo.couleur_dossier)} · ${mo.score||0}/100</span>
       ${alerteEntretienChip(mo)}
+      ${consoChip(mo)}
     </div>`).join('') : '<div class="empty"><div class="empty-icon">🏍️</div><div class="empty-text">Aucune moto trouvée</div><div class="empty-sub">Modifiez votre recherche ou créez un dossier</div></div>';
 
   document.getElementById('main').innerHTML = `
@@ -808,6 +808,10 @@ function alerteEntretienChip(mo){
   const cls = pct>=100 ? 'score-rouge' : 'score-jaune';
   const lbl = pct>=100 ? '⚠️ Révision dépassée' : '⚠️ Révision à planifier';
   return `<div><span class="score-badge ${cls}">${lbl}</span></div>`;
+}
+function consoChip(mo){
+  if(!mo.consommables_en_retard && !mo.rappel_photo_en_retard) return '';
+  return `<div><span class="score-badge score-jaune">📸 Photo consommable à faire</span></div>`;
 }
 function badgeStatut(s){
   const cls={brouillon:'badge-jaune',en_cours:'badge-bleu',termine:'badge-vert',annule:'badge-rouge'}[s]||'badge-bleu';
@@ -834,7 +838,7 @@ function selectMoto(id) {
 }
 
 function highlightNav(section) {
-  const labels = {dashboard:'Tableau de bord',fiche:'Fiche moto',entretien:'Entretien',pneus:'Pneus',devis:'Devis'};
+  const labels = {dashboard:'Tableau de bord',fiche:'Fiche moto',entretien:'Entretien',devis:'Devis'};
   document.querySelectorAll('.nav-btn').forEach(b => {
     b.classList.toggle('active', b.textContent.trim() === labels[section]);
   });
@@ -1184,43 +1188,6 @@ async function saveInter() {
     await loadEntretien(motoId);
     await loadDashboard();
   } catch(e) { err.textContent = e.message; err.style.display='block'; }
-}
-
-// ── PNEUS ──
-async function renderPneus() {
-  const m = document.getElementById('main');
-  const selHtml = motoSelect('pSelMoto','changerMotoPneus');
-  m.innerHTML = `
-    <div class="section-header"><div><div class="section-title">Pneus</div><div class="section-sub">Suivi d'usure et alertes</div></div></div>
-    <div class="field" style="max-width:300px"><label>Moto</label>${selHtml}</div>
-    <div id="pneusContent"><div class="empty"><div class="empty-icon">🏍️</div><div class="empty-text">Sélectionnez une moto</div></div></div>`;
-  if (selectedMoto) { document.getElementById('pSelMoto').value = selectedMoto.id; await loadPneus(selectedMoto.id); }
-}
-
-async function changerMotoPneus() {
-  const id = document.getElementById('pSelMoto').value;
-  if (id) { selectedMoto = motos.find(m=>m.id===id)||selectedMoto; await loadPneus(id); }
-}
-
-async function loadPneus(id) {
-  const c = document.getElementById('pneusContent');
-  c.innerHTML = '<div class="loading">Chargement…</div>';
-  try {
-    const data = await api('/motos/'+id);
-    const mo = data.moto || data;
-    const kmMontage = mo.pneu_km_montage || 0;
-    const kmParcourus = (mo.km||0) - kmMontage;
-    const usure = kmParcourus >= 8000;
-    c.innerHTML = `
-      ${usure ? '<div class="alert alert-warn">⚠️ Usure estimée : '+kmParcourus.toLocaleString('fr-FR')+' km depuis le montage — inspection recommandée</div>' : '<div class="alert alert-success">✅ Pneus en bon état ('+kmParcourus.toLocaleString('fr-FR')+' km depuis montage)</div>'}
-      <div style="max-width:480px">
-        <div class="pneu-stat"><span class="pneu-label">Pneu monté</span><span class="pneu-val">${mo.pneu_actuel||'Non renseigné'}</span></div>
-        <div class="pneu-stat"><span class="pneu-label">Km au montage</span><span class="pneu-val">${kmMontage.toLocaleString('fr-FR')} km</span></div>
-        <div class="pneu-stat"><span class="pneu-label">Km actuels</span><span class="pneu-val">${(mo.km||0).toLocaleString('fr-FR')} km</span></div>
-        <div class="pneu-stat"><span class="pneu-label">Km parcourus depuis montage</span><span class="pneu-val" style="color:${usure?'var(--danger)':'var(--success)'}">${kmParcourus.toLocaleString('fr-FR')} km</span></div>
-        <div class="pneu-stat"><span class="pneu-label">Statut</span><span class="pneu-val"><span class="badge ${usure?'badge-rouge':'badge-vert'}">${usure?'⚠️ Vérification recommandée':'✅ OK'}</span></span></div>
-      </div>`;
-  } catch(e) { c.innerHTML = '<div class="alert alert-warn">Erreur : '+e.message+'</div>'; }
 }
 
 // ── DEVIS ──
