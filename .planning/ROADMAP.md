@@ -160,7 +160,7 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
   3. Le garage voit un badge/indicateur équivalent au rappel sur les motos garage/non réclamées (sans compte client à notifier)
 **Plans**: 4 plans (4 vagues séquentielles — fichiers partagés motokey-api.js/supabase.js)
   - [x] 26-01-PLAN.md — Migration 24 (colonnes rappel + km_a_la_photo) + parité schema.sql + squelette test Wave 0
-  - [ ] 26-02-PLAN.md — Service consommableRappelService (seuils D-01, fonction pure) + supabase.js (reset D-05, km_a_la_photo, champ badge GAUGE-04)
+  - [x] 26-02-PLAN.md — Service consommableRappelService (seuils D-01, fonction pure) + supabase.js (reset D-05, km_a_la_photo, champ badge GAUGE-04)
   - [ ] 26-03-PLAN.md — Endpoint POST /cron/rappels-photo-consommables (X-Cron-Secret) + capture km_a_la_photo + assertions intégration GAUGE-03/04
   - [ ] 26-04-PLAN.md — Gate : application migration 24 prod + suite intégration GAUGE-03/04 réellement verte
 
