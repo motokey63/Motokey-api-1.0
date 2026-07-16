@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: verifying
-stopped_at: Completed 27-03-PLAN.md and 27-04-PLAN.md — Phase 27 complete (4/4 plans)
-last_updated: "2026-07-15T22:19:51.883Z"
+stopped_at: Phase 28 context gathered
+last_updated: "2026-07-16T10:02:37.666Z"
 last_activity: 2026-07-15
 progress:
   total_phases: 6
@@ -121,5 +121,5 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ## Session Continuity
 
-Last session: 2026-07-15T22:11:02.256Z
-Stopped at: Completed 27-03-PLAN.md and 27-04-PLAN.md — Phase 27 complete (4/4 plans)
+Last session: 2026-07-16T10:02:37.663Z
+Stopped at: Phase 28 context gathered
