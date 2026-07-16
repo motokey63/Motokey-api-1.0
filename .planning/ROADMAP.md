@@ -227,7 +227,7 @@ Phases execute in numeric order: 18 → 19 → 20 → 21 → 22 → 23 → 24 �
 | Phase 25 | v1.6 | 0/5 | Not started | - |
 | Phase 26 | v1.6 | 0/4 | Not started | - |
 | Phase 27 | v1.6 | 0/4 | Not started | - |
-| Phase 28 | v1.6 | 0/2 | Not started | - |
+| Phase 28 | v1.6 | 2/2 | ✅ Complete | 2026-07-16 |
 
 ---
 *Roadmap updated: 2026-07-16 — Phase 28 planifiée (2 plans, 2 vagues ; GAUGE-05/GAUGE-06 couverts). Next: /gsd:execute-phase 28.*
