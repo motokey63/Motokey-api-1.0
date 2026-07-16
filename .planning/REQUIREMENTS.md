@@ -38,16 +38,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DEVIS-01 | TBD | Pending |
-| DEVIS-02 | TBD | Pending |
-| DEVIS-03 | TBD | Pending |
-| DEVIS-04 | TBD | Pending |
+| DEVIS-01 | Phase 29 | Pending |
+| DEVIS-02 | Phase 29 | Pending |
+| DEVIS-03 | Phase 29 | Pending |
+| DEVIS-04 | Phase 29 | Pending |
 
 **Coverage:**
 - v1 requirements: 4 total
-- Mapped to phases: 0
-- Unmapped: 4 ⚠️ (pending roadmap creation)
+- Mapped to phases: 4
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-16*
-*Last updated: 2026-07-16 after initial definition*
+*Last updated: 2026-07-16 after roadmap creation — 4/4 requirements mapped to Phase 29 (single-phase milestone).*
