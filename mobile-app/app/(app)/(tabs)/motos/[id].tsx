@@ -3,18 +3,20 @@ import { View, ScrollView, Text, StyleSheet, ActivityIndicator } from 'react-nat
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { apiGet, errMsg } from '../../../../lib/api';
 import { useAuth } from '../../../../hooks/useAuth';
-import { parseInterventions, parseAlertes, fmtStatut, Moto, Intervention, Alerte } from '../../../../lib/motoParse';
-import { couleurColor, fmtDate } from '../../../../lib/motoDisplay';
+import { parseInterventions, parseAlertes, fmtStatut, Moto, Intervention, Alerte, parseConsommables, ConsommableJauge } from '../../../../lib/motoParse';
+import { couleurColor, fmtDate, CONSO_LABELS, ETAT_WORDING, etatColor } from '../../../../lib/motoDisplay';
 import { ScoreBadge } from '../../../../components/ScoreBadge';
 import { StatutBadge } from '../../../../components/StatutBadge';
 import { Button } from '../../../../components/Button';
+import { GaugeBar } from '../../../../components/GaugeBar';
 import { colors } from '../../../../theme/colors';
 
 /**
  * Fiche Moto detail (MPARITY-03, D-07/D-09): historique interventions +
  * plan d'entretien (hidden, not errored, on 403 for CLIENT — RESEARCH
- * Pitfall 1) + pneumatiques. ONLINE-ONLY — no AsyncStorage cache fallback
- * (D-09 narrows cache scope to the motos list only).
+ * Pitfall 1) + consommables gauges (GAUGE-05/06, Phase 28 — replaces the
+ * legacy tire-only section, D-02). ONLINE-ONLY — no AsyncStorage cache
+ * fallback (D-09 narrows cache scope to the motos list only).
  */
 export default function FicheMotoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,15 +26,18 @@ export default function FicheMotoScreen() {
   const [moto, setMoto] = useState<Moto | null>(null);
   const [interventions, setInterventions] = useState<Intervention[]>([]);
   const [alertes, setAlertes] = useState<Alerte[] | null>(null);
+  const [consommables, setConsommables] = useState<ConsommableJauge[]>([]);
+  const [jaugeGenerale, setJaugeGenerale] = useState<ConsommableJauge | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     const token = await getValidAccessToken();
-    const [motoRes, ivRes, alRes] = await Promise.all([
+    const [motoRes, ivRes, alRes, coRes] = await Promise.all([
       apiGet('/motos/' + id, token ?? undefined),
       apiGet('/motos/' + id + '/interventions', token ?? undefined),
       apiGet('/motos/' + id + '/entretien/alertes', token ?? undefined),
+      apiGet('/motos/' + id + '/consommables', token ?? undefined),
     ]);
     if (!motoRes.ok) {
       setError(errMsg(motoRes.data) || "Serveur inaccessible — l'API est-elle démarrée ?");
@@ -43,6 +48,9 @@ export default function FicheMotoScreen() {
     setMoto(m);
     setInterventions(parseInterventions(ivRes));
     setAlertes(parseAlertes(alRes));
+    const co = parseConsommables(coRes);
+    setConsommables(co.items);
+    setJaugeGenerale(co.jaugeGenerale);
     setLoading(false);
   }, [id, getValidAccessToken]);
 
@@ -72,7 +80,6 @@ export default function FicheMotoScreen() {
 
   const garageName = moto.garage?.nom || moto.garage_nom || '—';
   const garageTel = moto.garage?.tel || moto.garage_tel;
-  const showPneus = !!(moto.pneu_av || moto.pneu_ar);
   const showAlertes = !!(alertes && alertes.length > 0);
 
   return (
@@ -90,6 +97,17 @@ export default function FicheMotoScreen() {
         </View>
         <ScoreBadge score={moto.score} couleurDossier={moto.couleur_dossier} size="lg" />
       </View>
+
+      {jaugeGenerale ? (
+        <View style={styles.generalRow}>
+          <StatutBadge
+            label={'État général : ' + (ETAT_WORDING[jaugeGenerale.etat ?? ''] ?? jaugeGenerale.etat ?? '')}
+            color={etatColor(jaugeGenerale.etat ?? undefined)}
+          />
+        </View>
+      ) : (
+        <Text style={styles.generalEmpty}>Pas encore suivi</Text>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Garage de référence</Text>
@@ -118,6 +136,19 @@ export default function FicheMotoScreen() {
         )}
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Usure des Consommables</Text>
+        {consommables.map((c) => (
+          <GaugeBar
+            key={c.type_consommable}
+            label={CONSO_LABELS[c.type_consommable] ?? c.type_consommable}
+            pctUsure={c.pct_usure}
+            etat={c.etat}
+            hasData={c.has_data}
+          />
+        ))}
+      </View>
+
       {showAlertes ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Plan d'entretien</Text>
@@ -134,18 +165,6 @@ export default function FicheMotoScreen() {
               </View>
             </View>
           ))}
-        </View>
-      ) : null}
-
-      {showPneus ? (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pneumatiques</Text>
-          {moto.pneu_av ? (
-            <Text style={styles.bodyText}>Avant : {moto.pneu_av}</Text>
-          ) : null}
-          {moto.pneu_ar ? (
-            <Text style={styles.bodyText}>Arrière : {moto.pneu_ar}</Text>
-          ) : null}
         </View>
       ) : null}
     </ScrollView>
@@ -248,5 +267,13 @@ const styles = StyleSheet.create({
   },
   alerteText: {
     flexShrink: 1,
+  },
+  generalRow: {
+    marginTop: 8,
+  },
+  generalEmpty: {
+    marginTop: 8,
+    fontSize: 13,
+    color: colors.tx3,
   },
 });
