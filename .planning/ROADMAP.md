@@ -189,7 +189,9 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
   1. Le client voit, dans l'app mobile, une jauge % par consommable pour chacune de ses motos (même source de données que Phase 27, lecture seule — pas de capture photo depuis mobile ce milestone)
   2. Le client voit une jauge générale égale au consommable en plus mauvais état (maillon le plus faible), cohérente avec ce qu'affiche le web
   3. Un tap sur la notification push de rappel photo (Phase 26) navigue directement vers l'écran jauges de la moto concernée, via `mapNotificationDataToRoute()`
-**Plans**: TBD
+**Plans**: 2 plans (2 waves)
+  - [ ] 28-01-PLAN.md — Fondation lecture seule : etatColor + maps parité web + parseConsommables + composant GaugeBar (jest/tsc)
+  - [ ] 28-02-PLAN.md — Wiring fiche moto [id].tsx : fetch consommables + jauge générale + section 9 jauges + retrait Pneumatiques + checkpoint device/deep link
 **UI hint**: yes
 
 ## Progress
@@ -225,7 +227,7 @@ Phases execute in numeric order: 18 → 19 → 20 → 21 → 22 → 23 → 24 �
 | Phase 25 | v1.6 | 0/5 | Not started | - |
 | Phase 26 | v1.6 | 0/4 | Not started | - |
 | Phase 27 | v1.6 | 0/4 | Not started | - |
-| Phase 28 | v1.6 | 0/TBD | Not started | - |
+| Phase 28 | v1.6 | 0/2 | Not started | - |
 
 ---
-*Roadmap updated: 2026-07-15 — Phase 27 planifiée (4 plans, 3 vagues ; GAUGE-01/GAUGE-02/CONSO-04 couverts). Next: /gsd:execute-phase 27.*
+*Roadmap updated: 2026-07-16 — Phase 28 planifiée (2 plans, 2 vagues ; GAUGE-05/GAUGE-06 couverts). Next: /gsd:execute-phase 28.*
