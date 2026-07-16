@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
-status: executing
-stopped_at: Completed 28-01-PLAN.md
-last_updated: "2026-07-16T10:25:22.974Z"
+status: verifying
+stopped_at: Completed 28-02-PLAN.md
+last_updated: "2026-07-16T10:57:14.664Z"
 last_activity: 2026-07-16
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 21
-  completed_plans: 20
+  completed_plans: 21
 ---
 
 # MotoKey API — Project State
@@ -20,13 +20,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-13)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Phase 27 — ui-web-garage-client-jauges-retrait-pneus-legacy — Wave 3/3 complete (4/4 plans), pending phase verification
+**Current focus:** Phase 28 — ui-mobile-client-jauges-lecture-seule — complete (2/2 plans), on-device checkpoint approved — last phase of v1.6, milestone ready for verification
 
 ## Current Position
 
 Phase: 28 of 28 (ui mobile client (jauges, lecture seule))
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-16
 
 ```
@@ -36,7 +36,7 @@ v1.2 [█████████░] SHIPPED 2026-07-01 (86%, Phase 8 known gap
 v1.3 ████████████ SHIPPED 2026-07-08 (MSTORE-02 known gap — carried forward)
 v1.4 ████████████ SHIPPED 2026-07-09 (undocumented schema drift known gap — carried forward)
 v1.5 ████████████ SHIPPED 2026-07-11 (Gap A/B schema.sql drift fully resolved, SCHEMA-02→07)
-v1.6 [█████░░░░░] IN PROGRESS — Phase 23/24/25/26 COMPLETE (schéma+anti-fraude km, helpers+stub vision, endpoints backend+Cloudinary, cron rappel), Phase 27 (UI web) next
+v1.6 ████████████ IN PROGRESS — Phase 23/24/25/26/27/28 COMPLETE (schéma+anti-fraude km, helpers+stub vision, endpoints backend+Cloudinary, cron rappel, UI web garage+client, UI mobile lecture seule) — all 6 phases done, ready for milestone verification
 ```
 
 ## Performance Metrics
@@ -45,7 +45,7 @@ v1.6 [█████░░░░░] IN PROGRESS — Phase 23/24/25/26 COMPLETE
 |--------|-------|
 | Milestones shipped | 6 (v1.0 + v1.1 + v1.2 + v1.3 + v1.4 + v1.5) |
 | Known gaps carried forward | Phase 8/BILL-06 (Stripe live mode, since v1.2), MSTORE-02 (store submission, since v1.3) — both blocked on Mehdi's external account/dashboard actions |
-| Next action | Phase 26 complete (4/4 plans) — start Phase 27 (UI web garage + client, jauges). |
+| Next action | Phase 28 complete (2/2 plans) — v1.6 all 6 phases done, run milestone verification (`/gsd:complete-milestone`). |
 | Phase 23 P04 | 25min | 2 tasks | 3 files |
 | Phase 25 P01 | 20min | 3 tasks | 4 files |
 | Phase 25 P02 | 17min | 2 tasks | 2 files |
@@ -61,6 +61,7 @@ v1.6 [█████░░░░░] IN PROGRESS — Phase 23/24/25/26 COMPLETE
 | Phase 27 P03 | 20min | 3 tasks | 2 files |
 | Phase 27 P04 | 15min | 2 tasks | 1 files |
 | Phase 28 P01 | 15min | 2 tasks | 5 files |
+| Phase 28 P02 | 12min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,7 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - [Phase 27]: **Phase 27 complète (4/4 plans, Wave 3 exécutée en parallèle 27-03/27-04).**
 - [Phase 28]: [Phase 28, plan 28-01]: etatColor() defaults unknown/absent etat to neutral colors.bl (not red) — unmeasured wear state must not visually read as critical
 - [Phase 28]: [Phase 28, plan 28-01]: GaugeBar omits any upload affordance (D-04) — mobile stays read-only this milestone, unlike web client's jaugeRowClient
+- [Phase 28]: [Phase 28, plan 28-02] Fiche Moto wired to consommables gauges: 4th parallel fetch, general weakest-link pill near score, Usure des Consommables section (9 GaugeBar rows), legacy Pneumatiques removed; on-device checkpoint approved by Mehdi
 
 ### Blockers/Concerns
 
@@ -124,5 +126,5 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ## Session Continuity
 
-Last session: 2026-07-16T10:25:22.970Z
-Stopped at: Completed 28-01-PLAN.md
+Last session: 2026-07-16T10:57:14.661Z
+Stopped at: Completed 28-02-PLAN.md
