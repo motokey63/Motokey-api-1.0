@@ -4,7 +4,7 @@ milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
 status: verifying
 stopped_at: Completed 28-02-PLAN.md
-last_updated: "2026-07-16T10:57:14.664Z"
+last_updated: "2026-07-16T11:07:12.567Z"
 last_activity: 2026-07-16
 progress:
   total_phases: 6
@@ -24,8 +24,8 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 
 ## Current Position
 
-Phase: 28 of 28 (ui mobile client (jauges, lecture seule))
-Plan: 2 of 2
+Phase: 28 of 28 (ui mobile client (jauges, lecture seule)
+Plan: Not started
 Status: Phase complete — ready for verification
 Last activity: 2026-07-16
 
