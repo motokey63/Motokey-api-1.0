@@ -1,5 +1,17 @@
 # MotoKey — Milestones
 
+## v1.6 Suivi usure consommables + anti-fraude km (Shipped: 2026-07-16)
+
+**Phases completed:** 6 phases, 21 plans, 45 tasks
+
+**Key accomplishments:**
+
+- Service `analyzePhoto()` flag-gated par `VISION_ENABLED` renvoyant un contrat verrouillé (pct_usure/etat/confiance/analyse_status/engine) via un stub déterministe SHA-256+mulberry32, avec harnais de test autonome 30/30 vert.
+- Thin CRUD helpers (upsert-based Consommables, insert/list PhotosConsommables) added to supabase.js, persisting the vision-analysis contract's analyse_ia JSONB + analyse_status fields — the sole DB access frontier for both new tables, live-verified 22/22 against a disposable Supabase project.
+- Migration 24 appliquée en prod par Mehdi ; suite d'intégration GAUGE-03/GAUGE-04 tourne réellement au vert (15 OK / 0 KO) contre la base réelle ; régression racine intacte (9/9).
+
+---
+
 ## v1.5 Résolution dérive schema.sql (Shipped: 2026-07-11)
 
 **Phases completed:** 3 phases, 9 plans, 20 tasks
