@@ -190,7 +190,7 @@ See [milestones/v1.5-ROADMAP.md](milestones/v1.5-ROADMAP.md) for full phase deta
   2. Le client voit une jauge générale égale au consommable en plus mauvais état (maillon le plus faible), cohérente avec ce qu'affiche le web
   3. Un tap sur la notification push de rappel photo (Phase 26) navigue directement vers l'écran jauges de la moto concernée, via `mapNotificationDataToRoute()`
 **Plans**: 2 plans (2 waves)
-  - [ ] 28-01-PLAN.md — Fondation lecture seule : etatColor + maps parité web + parseConsommables + composant GaugeBar (jest/tsc)
+  - [x] 28-01-PLAN.md — Fondation lecture seule : etatColor + maps parité web + parseConsommables + composant GaugeBar (jest/tsc)
   - [ ] 28-02-PLAN.md — Wiring fiche moto [id].tsx : fetch consommables + jauge générale + section 9 jauges + retrait Pneumatiques + checkpoint device/deep link
 **UI hint**: yes
 

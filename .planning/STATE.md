@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.6
 milestone_name: Suivi usure consommables + anti-fraude km
-status: verifying
-stopped_at: Phase 28 context gathered
-last_updated: "2026-07-16T10:02:37.666Z"
-last_activity: 2026-07-15
+status: executing
+stopped_at: Completed 28-01-PLAN.md
+last_updated: "2026-07-16T10:25:22.974Z"
+last_activity: 2026-07-16
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 19
-  completed_plans: 19
+  total_plans: 21
+  completed_plans: 20
 ---
 
 # MotoKey API — Project State
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 ## Current Position
 
 Phase: 28 of 28 (ui mobile client (jauges, lecture seule))
-Plan: Not started
-Status: Ready for phase verification
-Last activity: 2026-07-15
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-07-16
 
 ```
 v1.0 ████████████ SHIPPED
@@ -60,6 +60,7 @@ v1.6 [█████░░░░░] IN PROGRESS — Phase 23/24/25/26 COMPLETE
 | Phase 27 P02 | 20min | 3 tasks | 4 files |
 | Phase 27 P03 | 20min | 3 tasks | 2 files |
 | Phase 27 P04 | 15min | 2 tasks | 1 files |
+| Phase 28 P01 | 15min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,8 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 - [Phase 27]: [Phase 27, plan 27-04]: Client gauge section title capitalized 'Usure des Consommables' to satisfy the frontend-structure test's case-sensitive 'Consommables' marker assertion -- cosmetic only
 - [Phase 27]: [Phase 27, plan 27-04]: MotoKey_Client.html multipart upload (uploadConsoPhoto) built on raw fetch+FormData rather than the existing apiFetch JSON helper -- first multipart pattern in this file, deliberately not reusing the carte-grise CLOUDINARY_PRESET unsigned flow which would skip vision-stub analysis
 - [Phase 27]: **Phase 27 complète (4/4 plans, Wave 3 exécutée en parallèle 27-03/27-04).**
+- [Phase 28]: [Phase 28, plan 28-01]: etatColor() defaults unknown/absent etat to neutral colors.bl (not red) — unmeasured wear state must not visually read as critical
+- [Phase 28]: [Phase 28, plan 28-01]: GaugeBar omits any upload affordance (D-04) — mobile stays read-only this milestone, unlike web client's jaugeRowClient
 
 ### Blockers/Concerns
 
@@ -121,5 +124,5 @@ v1.6 scope decisions (2026-07-13/14, gathered via `/gsd:new-milestone` + researc
 
 ## Session Continuity
 
-Last session: 2026-07-16T10:02:37.663Z
-Stopped at: Phase 28 context gathered
+Last session: 2026-07-16T10:25:22.970Z
+Stopped at: Completed 28-01-PLAN.md
