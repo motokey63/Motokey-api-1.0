@@ -229,6 +229,52 @@
 
 ---
 
+## Milestone: v1.6 — Suivi usure consommables + anti-fraude km
+
+**Shipped:** 2026-07-16
+**Phases:** 6 (23→28) | **Plans:** 21 | **Tasks:** 45 | **Files:** 95 (+12709/-182) | **Timeline:** 3 jours (2026-07-14 → 2026-07-16)
+
+### What Was Built
+
+1. Anti-fraude km au niveau DB (Phase 23) — `releves_km` devient la source de vérité unique du kilométrage, trigger `verifier_km_monotone` rejette toute régression, les 3 anciens chemins d'écriture applicatifs fermés au profit d'un seul validateur partagé
+2. Contrat vision stub verrouillé + helpers CRUD (Phase 24) — `visionAnalysisService.js` flag-gated (`VISION_ENABLED`) avec un contrat de réponse fixe consommé identiquement par tous les futurs endpoints/jauges
+3. 5 endpoints backend (Phase 25) — relevé km, remplacement de compteur PRO+, saisie consommables, upload photo avec stockage Cloudinary réel (jamais de placeholder)
+4. Cron de rappel + badge (Phase 26) — push client à 3000km OU 6 mois (premier des deux), badge garage équivalent pour motos non réclamées, logique de seuil jamais dupliquée entre les deux
+5. Jauges web garage + client (Phase 27) — jauge % par consommable + jauge générale (maillon le plus faible, jamais une moyenne), retrait complet de la section Pneus legacy sur les 2 surfaces web
+6. Jauges mobile lecture seule + deep link (Phase 28) — même source de données que le web, composant `GaugeBar` réutilisable, retrait Pneumatiques côté mobile aussi, deep link de notification déjà correct (aucun changement backend requis)
+
+### What Worked
+
+- **Exécution en worktrees isolés pour les plans parallèles** (27-03/27-04, 28-01/28-02) : aucun conflit de merge car fichiers disjoints par plan — le pattern établi en v1.2 (phases 9-11) continue de bien fonctionner à mesure que le nombre de plans par phase augmente
+- **Gate de fin de phase = exécution réelle contre DB/environnement jetable, jamais revue statique seule** : confirmé une nouvelle fois en Phase 23 (mot réservé Postgres `analyse`, violation CHECK L8 sur les fixtures de test) — seule l'exécution live les a révélés, la revue SQL ne les avait pas attrapés
+- **Contrat de données verrouillé une fois (Phase 24) puis répliqué sans redéfinition** sur 3 surfaces différentes (garage web, client web, mobile) — même mapping état→couleur, même wording public, aucune dérive entre les 3 implémentations
+- **CONTEXT.md très détaillé avant planification** (Phase 28) a permis de sauter la recherche formelle sans perte de qualité — décisions D-01 à D-06 déjà verrouillées avec refs fichier/ligne exactes, le planner n'a eu qu'à les traduire en tâches
+
+### What Was Inefficient
+
+- **`mobile-app/node_modules` s'est retrouvé vide dans le checkout principal** pendant l'exécution de la Phase 28 — effet de bord des exécutions en worktree isolé (chaque exécuteur crée son propre lien/copie de `node_modules`, une opération dans ce processus a fini par vider celui du checkout principal). Découvert seulement quand l'utilisateur a tenté de lancer `npx expo start` pour le checkpoint human-verify — a coûté un `npm install` complet + une normalisation cosmétique du lockfile avant de pouvoir continuer
+- **Aucun `v1.6-MILESTONE-AUDIT.md` n'a été produit avant la clôture** — le milestone a été clôturé directement sur la base de 17/17 requirements cochées + VERIFICATION.md individuelles par phase, sans passe d'audit croisé inter-phases dédiée (accepté explicitement par Mehdi, risque jugé faible vu la couverture déjà solide phase par phase)
+- **De nombreux dossiers `.claude/worktrees/agent-*` de sessions précédentes restent non nettoyés** dans le repo (visible via `git worktree list`/`git branch`) — dette d'hygiène git accumulée au fil des milestones, jamais traitée en fin de session
+
+### Patterns Established
+
+- Jauge d'usure : `GaugeBar`/équivalent = barre horizontale + pastille wording, couleur dérivée d'un mapping état→couleur verrouillé une seule fois (Phase 24) et répliqué (jamais redéfini) sur chaque nouvelle surface
+- Retrait d'une fonctionnalité legacy (Pneus) : toujours accompagné d'un remplacement fonctionnellement équivalent au même emplacement nav, jamais une suppression sèche
+- Merge de branche worktree vers master en fast-forward après spot-check (SUMMARY.md + commits + tests) plutôt que d'attendre une étape de merge dédiée dans le workflow — nécessaire car le workflow execute-phase ne documente pas explicitement cette étape pour l'orchestrateur
+
+### Key Lessons
+
+- L'isolation en worktree protège le contexte de l'exécuteur mais peut avoir des effets de bord sur le checkout principal partagé (`node_modules`) qui ne sont détectés qu'au moment où un humain essaie d'utiliser ce checkout — vérifier l'état du checkout principal avant un checkpoint human-verify qui dépend d'un serveur dev éviterait la surprise
+- Un CONTEXT.md exhaustif (décisions verrouillées + refs fichier/ligne précises) peut légitimement remplacer une passe de recherche formelle sans perte de qualité de plan — mais seulement quand la phase est une extension directe de patterns déjà établis (ici : répliquer un pattern jauge déjà prouvé côté web vers mobile), pas pour un territoire technique inconnu
+- Clôturer un milestone sans `/gsd:audit-milestone` est un compromis raisonnable quand chaque phase a déjà sa propre VERIFICATION.md passée et que la traceability REQUIREMENTS.md est 100% cochée — mais ça reste un pari sur l'absence de lacune inter-phases, à ne pas généraliser aux milestones futurs sans cette même couverture phase-par-phase
+
+### Cost Observations
+
+- Sessions : au moins 3 (2026-07-14 phases 23-25, 2026-07-15 phases 26-27, 2026-07-16 phase 28 + clôture milestone)
+- Notable : la Phase 28 (2 plans, 6 tâches) a nécessité 2 agents exécuteurs supplémentaires au-delà du plan/check standard à cause du checkpoint human-verify + de l'incident node_modules — la clôture d'un simple checkpoint humain a fini par coûter presque autant d'orchestration que l'exécution des 2 plans eux-mêmes
+
+---
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Sessions | Shipped |
