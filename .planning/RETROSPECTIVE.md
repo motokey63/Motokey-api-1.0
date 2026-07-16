@@ -285,3 +285,4 @@
 | v1.3 App Client Mobile | 6 (12→17) | ~7 | 2026-07-08 (MSTORE-02 known gap) |
 | v1.4 Maintenance | 2 (18→19) | 1 | 2026-07-09 (undocumented schema drift known gap) |
 | v1.5 Résolution dérive schema.sql | 3 (20→22) | ~2 | 2026-07-11 |
+| v1.6 Suivi usure consommables + anti-fraude km | 6 (23→28) | ~3 | 2026-07-16 |
