@@ -1,4 +1,4 @@
-import { parseMotosList, parseInterventions, parseAlertes, fmtStatut } from '../motoParse';
+import { parseMotosList, parseInterventions, parseAlertes, fmtStatut, parseConsommables } from '../motoParse';
 
 describe('parseMotosList', () => {
   it('unwraps the REAL two-level envelope into an array', () => {
@@ -96,5 +96,47 @@ describe('fmtStatut', () => {
 
   it('passes through unknown values unchanged', () => {
     expect(fmtStatut('xyz')).toBe('xyz');
+  });
+});
+
+describe('parseConsommables', () => {
+  it('unwraps the REAL two-level envelope into items + jaugeGenerale', () => {
+    const result = parseConsommables({
+      ok: true,
+      status: 200,
+      data: {
+        success: true,
+        data: {
+          consommables: new Array(9).fill(null).map((_, i) => ({
+            type_consommable: `type_${i}`,
+            pct_usure: 50,
+            etat: 'moyen',
+            has_data: true,
+          })),
+          jauge_generale: { type_consommable: 'chaine', pct_usure: 80, etat: 'critique', has_data: true },
+        },
+        message: 'OK',
+      },
+    });
+    expect(result.items.length).toBe(9);
+    expect(result.jaugeGenerale).toEqual({ type_consommable: 'chaine', pct_usure: 80, etat: 'critique', has_data: true });
+  });
+
+  it('falls back to a flat { consommables, jauge_generale } shape', () => {
+    const result = parseConsommables({
+      ok: true,
+      status: 200,
+      data: { consommables: [{ type_consommable: 'chaine', pct_usure: 10, etat: 'bon', has_data: true }], jauge_generale: null },
+    });
+    expect(result.items.length).toBe(1);
+    expect(result.jaugeGenerale).toBeNull();
+  });
+
+  it('returns { items: [], jaugeGenerale: null } on a non-ok response (403/404/network)', () => {
+    expect(parseConsommables({ ok: false, status: 403, data: {} })).toEqual({ items: [], jaugeGenerale: null });
+  });
+
+  it('returns { items: [], jaugeGenerale: null } on null/empty data without throwing', () => {
+    expect(parseConsommables({ ok: true, status: 200, data: null })).toEqual({ items: [], jaugeGenerale: null });
   });
 });

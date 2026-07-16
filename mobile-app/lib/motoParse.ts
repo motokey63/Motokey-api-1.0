@@ -87,6 +87,31 @@ export function parseAlertes(res: ApiResult): Alerte[] | null {
     : [];
 }
 
+export interface ConsommableJauge {
+  type_consommable: string;
+  km_montage?: number | null;
+  date_montage?: string | null;
+  reference?: string | null;
+  pct_usure: number | null;
+  etat: string | null;
+  has_data: boolean;
+}
+
+// Two-level unwrap (data?.data?.consommables) FIRST, flat fallback second —
+// same rule as parseInterventions/parseAlertes above. Backend key is
+// snake_case `jauge_generale`; returned field is camelCase `jaugeGenerale`.
+export function parseConsommables(res: ApiResult): { items: ConsommableJauge[]; jaugeGenerale: ConsommableJauge | null } {
+  if (!res.ok) return { items: [], jaugeGenerale: null };
+  const d = res.data;
+  const items = Array.isArray(d?.data?.consommables)
+    ? d.data.consommables
+    : Array.isArray(d?.consommables)
+    ? d.consommables
+    : [];
+  const jaugeGenerale = d?.data?.jauge_generale ?? d?.jauge_generale ?? null;
+  return { items, jaugeGenerale };
+}
+
 const STATUT_LABEL: Record<string, string> = {
   urgent: 'URGENT',
   warning: 'À faire',
