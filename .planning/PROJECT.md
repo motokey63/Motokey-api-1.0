@@ -8,20 +8,20 @@ MotoKey est un système de gestion de garage moto (DMS) pour Garage Motolab. Con
 
 Le score d'intégrité anti-fraude (pondération 1.0/0.6/0.3 selon la preuve) — sans lui, MotoKey est un simple DMS ; avec lui, c'est une preuve de valeur vérifiable à la revente.
 
-## Current Milestone: v1.6 Suivi usure consommables + anti-fraude km
+## Current Milestone: v1.7 Édition devis brouillon
 
-**Goal:** Donner à MotoKey le suivi d'usure des consommables moto (pneus, chaîne, plaquettes, disques, huile, liquide de frein) par photo + analyse IA, avec anti-fraude sur le kilométrage — cœur produit différenciateur, attaché au passeport moto transmissible à la revente.
+**Goal:** Permettre au garage de modifier un devis en statut brouillon (lignes + remise) avant son envoi au client, en réutilisant le formulaire de création existant en mode édition.
 
 **Target features:**
-- Schéma DB : `consommables` (par moto, extensible), `photos_consommables` (historique + analyses), `releves_km` (historique lectures km) — tout attaché à `moto_id`, jamais à `client_id`
-- Anti-fraude km : croissance monotone stricte, rejet + log garage si régression ; changement de compteur (remplacement totaliseur) réservé aux comptes PRO+ (PRO/CONCESSION/ADMIN), avec archivage de l'ancien relevé + signature garage
-- Endpoints upload photo consommable + relevé km, avec stub IA (fausse analyse structurée : % usure + état + confiance) — point de branchement propre pour la vraie clé Anthropic Claude Vision plus tard
-- Écrans mobile client + garage : jauges % par consommable + jauge générale = maillon le plus faible ; rappel de photo basé sur km parcouru depuis dernière photo + filet de sécurité 6 mois (push mobile + badge garage)
-- Cloudinary (stockage photos réel) et clé Anthropic (analyse Vision réelle) : câblage différé, stub/flag en attendant — même convention que `EMAIL_ENABLED`/`PUSH_ENABLED`
+- Bouton "Modifier" sur les devis brouillon dans `loadDevis()` (`app.html`) → bascule le formulaire "Créer un devis" en mode édition, pré-rempli avec les lignes + remise existantes
+- `saveDevis()` détecte le mode édition et appelle `PUT /devis/:id` (déjà fonctionnel côté backend, `SBLayer.Devis.update()`) au lieu de `POST /devis`
+- Remise (%) éditable en même temps que les lignes
+- Aucun travail backend requis — le endpoint `PUT /devis/:id` supporte déjà `lignes` + `entete.remise_pct` tant que `statut === 'brouillon'`
+- Suppression de devis brouillon explicitement hors scope
 
-v1.5 (Résolution dérive schema.sql) shipped 2026-07-11 — see `.planning/milestones/v1.5-ROADMAP.md` for full detail.
+v1.6 (Suivi usure consommables + anti-fraude km) shipped 2026-07-16 — see `.planning/milestones/v1.6-ROADMAP.md` for full detail.
 
-## Current State (after v1.5 — 2026-07-11)
+## Current State (after v1.6 — 2026-07-16)
 
 - **Shipped:** v1.0 Core Platform (2026-05-29), v1.1 L9 Stripe Billing (2026-06-16), v1.2 Pioneer Program & Production Go-Live (2026-07-01, Phase 8 parked), v1.3 App Client Mobile (2026-07-08, MSTORE-02 parked), v1.4 Maintenance — CLIENT Fixture & Schema Drift (2026-07-09), v1.5 Résolution dérive schema.sql (2026-07-11)
 - **Prod URL:** https://motokey11-production.up.railway.app
@@ -207,4 +207,4 @@ This document evolves at phase transitions and milestone boundaries.
 5. Key Decisions log updated
 
 ---
-*Last updated: 2026-07-16 — v1.6 Phase 28 (UI Mobile Client, jauges lecture seule) complete, GAUGE-05/GAUGE-06 shipped and verified (9/9 must-haves). Mobile Fiche Moto screen now shows per-consommable gauges + general weakest-link gauge, legacy Pneumatiques section removed, notification deep link confirmed unchanged (D-04). Checkpoint approved on-device. **Milestone v1.6 (Suivi usure consommables + anti-fraude km) is now 6/6 phases complete** — ready for `/gsd:complete-milestone`. 1 known gap remains (credentials Cloudinary, since Phase 25), carried forward as before.*
+*Last updated: 2026-07-16 — Milestone v1.7 (Édition devis brouillon) started. Scope confirmed frontend-only: `PUT /devis/:id` and `SBLayer.Devis.update()` already support editing `lignes` + `entete.remise_pct` while `statut === 'brouillon'`; `app.html`'s devis list only exposes an "Envoyer" action, no edit entry point. 1 known gap carried forward from v1.6 (credentials Cloudinary, since Phase 25).*

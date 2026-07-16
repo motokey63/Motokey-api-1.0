@@ -1,33 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.6
-milestone_name: Suivi usure consommables + anti-fraude km
+milestone: v1.7
+milestone_name: Édition devis brouillon
 status: planning
-stopped_at: v1.6 milestone shipped, archived to milestones/v1.6-*
-last_updated: "2026-07-16T11:13:29.483Z"
+stopped_at: v1.7 milestone started — defining requirements
+last_updated: "2026-07-16T00:00:00.000Z"
 last_activity: 2026-07-16
 progress:
-  total_phases: 6
-  completed_phases: 6
-  total_plans: 21
-  completed_plans: 21
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # MotoKey API — Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-13)
+See: .planning/PROJECT.md (updated 2026-07-16)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** Planning next milestone (v1.6 shipped 2026-07-16)
+**Current focus:** v1.7 Édition devis brouillon — defining requirements
 
 ## Current Position
 
-Milestone: v1.6 shipped — awaiting /gsd:new-milestone
-Plan: Not started
-Status: Between milestones
-Last activity: 2026-07-16
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-07-16 — Milestone v1.7 started
 
 ```
 v1.0 ████████████ SHIPPED
