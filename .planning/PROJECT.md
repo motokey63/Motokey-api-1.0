@@ -8,16 +8,18 @@ MotoKey est un système de gestion de garage moto (DMS) pour Garage Motolab. Con
 
 Le score d'intégrité anti-fraude (pondération 1.0/0.6/0.3 selon la preuve) — sans lui, MotoKey est un simple DMS ; avec lui, c'est une preuve de valeur vérifiable à la revente.
 
-## Current Milestone: v1.7 Édition devis brouillon
+## Current Milestone: v1.8 Unification Devis / OR / Facture
 
-**Goal:** Permettre au garage de modifier un devis en statut brouillon (lignes + remise) avant son envoi au client, en réutilisant le formulaire de création existant en mode édition.
+**Goal:** Fusionner devis et OR en un objet unique (`ordres_reparation`, cycle de vie continu brouillon→facturé) pour éliminer la ressaisie manuelle et la confusion entre les deux objets actuels.
 
 **Target features:**
-- Bouton "Modifier" sur les devis brouillon dans `loadDevis()` (`app.html`) → bascule le formulaire "Créer un devis" en mode édition, pré-rempli avec les lignes + remise existantes
-- `saveDevis()` détecte le mode édition et appelle `PUT /devis/:id` (déjà fonctionnel côté backend, `SBLayer.Devis.update()`) au lieu de `POST /devis`
-- Remise (%) éditable en même temps que les lignes
-- Aucun travail backend requis — le endpoint `PUT /devis/:id` supporte déjà `lignes` + `entete.remise_pct` tant que `statut === 'brouillon'`
-- Suppression de devis brouillon explicitement hors scope
+- Cycle de vie unifié : `brouillon → envoyé → accepté → en_cours → terminé → facturé` (+ `refusé`, reste modifiable, redevient éditable)
+- Numérotation unique continue (`INT-2026-XXXX`), un seul onglet UI "Interventions" (fusion Devis/OR) — `ordres_reparation` reste le nom canonique en base, "Interventions" n'est qu'un libellé UI (pas de collision avec la table `interventions` du carnet d'entretien anti-fraude)
+- Ligne ajoutée en cours d'exécution (`ajoutee_en_cours`) bloquée jusqu'à acceptation client explicite (`en_attente_acceptation_client`, horodatage + identité — valeur probatoire, obligation légale FR)
+- Table `devis` dépréciée en lecture seule après migration — `DROP` différé à une livraison ultérieure une fois confirmé qu'aucune dépendance ne subsiste
+- Démarrage toujours par un devis (`brouillon`/`envoyé`) — jamais de création directe en `en_cours`
+
+v1.7 (Édition devis brouillon) — **mis ON HOLD 2026-07-17, jamais shippé** : scope devenu obsolète suite à la décision produit d'unification du 16/07/2026, remplacé par v1.8. Code Phase 29 implémenté et vérifié GREEN (15/15) mais non committé — détail dans `.planning/STATE.md`.
 
 v1.6 (Suivi usure consommables + anti-fraude km) shipped 2026-07-16 — see `.planning/milestones/v1.6-ROADMAP.md` for full detail.
 
@@ -207,4 +209,4 @@ This document evolves at phase transitions and milestone boundaries.
 5. Key Decisions log updated
 
 ---
-*Last updated: 2026-07-16 — Milestone v1.7 (Édition devis brouillon) started. Scope confirmed frontend-only: `PUT /devis/:id` and `SBLayer.Devis.update()` already support editing `lignes` + `entete.remise_pct` while `statut === 'brouillon'`; `app.html`'s devis list only exposes an "Envoyer" action, no edit entry point. 1 known gap carried forward from v1.6 (credentials Cloudinary, since Phase 25).*
+*Last updated: 2026-07-17 — Milestone v1.7 (Édition devis brouillon) put ON HOLD, never shipped — scope superseded by product decision to unify Devis/OR/Facture (2026-07-16). Milestone v1.8 (Unification Devis / OR / Facture) started. Schema audit (2026-07-17) found undocumented drift on `ordres_reparation.statut` (Postgres ENUM `or_statut` missing `valide_client`/`attente`/`facture`, already used in code) — must be reconciled before any migration. 1 known gap carried forward from v1.6 (credentials Cloudinary, since Phase 25).*
