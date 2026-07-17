@@ -199,7 +199,9 @@ Plans:
   2. L'écart entre les valeurs réelles et les 7 statuts nécessaires (`brouillon, envoye, accepte, en_cours, termine, facture, refuse`) est explicite — chaque valeur manquante ou à renommer est listée
   3. Un plan de réconciliation est documenté (ordre des `ALTER TYPE ... ADD VALUE`, contraintes de transaction Postgres sur les enums, ou stratégie de recréation d'enum si nécessaire)
   4. Ce plan est la base de départ de la Phase 31 — aucune écriture DDL sur `or_statut` n'a lieu avant que ce plan existe
-**Plans**: TBD
+**Plans**: 1 plan (single wave)
+Plans:
+- [ ] 30-01-PLAN.md — Audit live or_statut (introspect-or-statut.js) + doc de reconciliation 30-FINDINGS.md + checkpoint arbitrage produit
 
 ### Phase 31: Migration Schéma — Fusion devis → ordres_reparation
 **Goal**: Les données `devis` et `ordres_reparation` existantes sont fusionnées dans le modèle unifié sans perte, et `devis` passe en lecture seule côté application.
