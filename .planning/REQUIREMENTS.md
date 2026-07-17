@@ -30,7 +30,7 @@ Requirements for milestone v1.8 (Unification Devis / OR / Facture). Each maps to
 ### Migration & dépréciation
 
 - [ ] **MIGR-01**: Les données existantes de `devis` et `ordres_reparation` sont migrées vers le modèle unifié sans perte (données de test uniquement, confirmé par comptage prod 2026-07-17 : 8 devis, 6 OR)
-- [ ] **MIGR-02**: L'enum Postgres `or_statut` réel en prod est audité (`pg_enum`) et réconcilié avec les 7 statuts nécessaires (`brouillon, envoye, accepte, en_cours, termine, facture, refuse`) avant toute écriture de migration DDL — dérive non documentée déjà détectée (voir STATE.md)
+- [x] **MIGR-02**: L'enum Postgres `or_statut` réel en prod est audité (`pg_enum`) et réconcilié avec les 7 statuts nécessaires (`brouillon, envoye, accepte, en_cours, termine, facture, refuse`) avant toute écriture de migration DDL — dérive non documentée déjà détectée (voir STATE.md)
 - [ ] **MIGR-03**: La table `devis` passe en lecture seule après migration (plus aucune écriture applicative) ; `DROP` explicitement différé à une livraison ultérieure
 
 ## v2 Requirements
@@ -69,7 +69,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INTERV-02 | Phase 34 | Pending |
 | INTERV-03 | Phase 34 | Pending |
 | MIGR-01 | Phase 31 | Pending |
-| MIGR-02 | Phase 30 | Pending |
+| MIGR-02 | Phase 30 | Complete |
 | MIGR-03 | Phase 31 | Pending |
 
 **Coverage:**

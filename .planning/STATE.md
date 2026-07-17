@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Unification Devis / OR / Facture
-status: executing
-stopped_at: Phase 30-01 Task 1+2 committed (script + FINDINGS.md), en attente checkpoint Task 3 (cross-check pg_enum + arbitrage produit valide_client/attente/annule par Mehdi)
-last_updated: "2026-07-17T13:48:02.817Z"
-last_activity: 2026-07-17 -- Phase 30 execution started
+status: verifying
+stopped_at: Completed 30-01-PLAN.md
+last_updated: "2026-07-17T15:20:15.517Z"
+last_activity: 2026-07-17
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 0
+  completed_plans: 1
 ---
 
 # MotoKey API — Project State
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-07-17)
 
 Phase: 30 (audit-sch-ma-or-statut) — EXECUTING
 Plan: 1 of 1
-Status: Executing Phase 30
-Last activity: 2026-07-17 -- Phase 30 execution started
+Status: Phase complete — ready for verification
+Last activity: 2026-07-17
 
 ```
 v1.0 ████████████ SHIPPED
@@ -50,6 +50,7 @@ v1.8 [░░░░░░░░░░] 0% — Unification Devis / OR / Facture �
 | Next action | `/gsd:plan-phase 30` — Audit Schéma `or_statut` (requête `pg_enum` live + plan de réconciliation) |
 
 Per-plan timing history for v1.6 archived in `.planning/milestones/v1.6-phases/*/*-SUMMARY.md`.
+| Phase 30 P01 | ~1h33 (4min actif + attente checkpoint) | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -60,6 +61,11 @@ Décisions complètes et à jour dans `.planning/PROJECT.md` (Key Decisions tabl
 v1.8 kickoff decision (2026-07-17): unify `devis` and `ordres_reparation` into a single object — canonical table stays `ordres_reparation` (name "Interventions" is UI-only label, avoids collision with the pre-existing `interventions` table used by the anti-fraude carnet d'entretien). Unified lifecycle: brouillon→envoyé→accepté→en_cours→terminé→facturé (+refusé, stays editable). Extra work added mid-`en_cours` = new line on the same OR flagged `ajoutee_en_cours`+`en_attente_acceptation_client`, blocked until client accepts (legal timestamp requirement, FR). `devis` table deprecated read-only post-migration, `DROP` deferred to a later delivery.
 
 v1.8 roadmap decision (2026-07-17): 5 phases derived directly from the 4 requirement categories, with MIGR-02 (schema audit) split into its own phase (30) ahead of the schema migration (31), mirroring this project's established schema-first-with-live-verification precedent (v1.5 tech-debt milestone, v1.6 Phase 23 gate). Sequencing: 30 audit → 31 schema migration (MIGR-01/03) → 32 backend lifecycle+numbering (UNIF-01→04) → 33 backend lignes complémentaires (LIGNE-01→04) → 34 frontend fusion (INTERV-01→03). Phase 34 depends on both 32 and 33 (needs both lifecycle actions and ligne-acceptance endpoints for the status banner + badge UI).
+
+- [Phase 30]: valide_client -> accepte (renommage, pas de nouveau statut envoye)
+- [Phase 30]: attente conserve comme 8e statut global, complementaire a un futur flag ligne (Phase 32/33)
+- [Phase 30]: annule conserve distinct de refuse (annulation garage vs refus client)
+- [Phase 30]: Set cible reconcilie corrige a 8 statuts (pas 7) pour la Phase 31 : brouillon/accepte/en_cours/attente/termine/facture/annule/refuse
 
 ### Pending Todos
 
@@ -79,5 +85,5 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-17T13:48:02.815Z
-Stopped at: Phase 30-01 Task 1+2 committed (script + FINDINGS.md), en attente checkpoint Task 3 (cross-check pg_enum + arbitrage produit valide_client/attente/annule par Mehdi)
+Last session: 2026-07-17T15:20:15.514Z
+Stopped at: Completed 30-01-PLAN.md
