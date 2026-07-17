@@ -1,9 +1,9 @@
 'use strict';
 // Test E2E SBLayer — Ordres de Réparation (L3a)
-// Usage : node test-or-e2e.js
+// Usage : node tests/test-or-e2e.js (depuis la racine du repo)
 // Prérequis : migration 08 exécutée, .env présent avec SUPABASE_URL + SUPABASE_SERVICE_KEY
 
-const sb = require('./supabase');
+const sb = require('../supabase');
 
 if (!sb) {
   console.error('❌ supabase.js a retourné null — vérifie SUPABASE_URL et SUPABASE_SERVICE_KEY dans .env');
