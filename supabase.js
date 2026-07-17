@@ -910,14 +910,19 @@ const Fraude = {
 // ══════════════════════════════════════════════════════════
 
 // Matrice de transitions autorisées pour PATCH /statut (L3a-ter)
+// Migration 26 (L10) : 'valide_client' renommé 'accepte', 'refuse' ajouté.
+// Transition brouillon -> refuse = proposition non confirmée par Mehdi
+// (client refuse le devis avant travaux, distinct de 'annule' = garage
+// annule) — à valider avant déploiement conjoint avec la migration SQL.
 const _OR_TRANS = {
-  brouillon:     ['valide_client', 'annule'],
-  valide_client: ['brouillon', 'en_cours', 'annule'],
-  en_cours:      ['attente', 'annule'],          // termine via /cloturer
-  attente:       ['en_cours', 'annule'],
-  termine:       ['en_cours', 'annule'],          // facture via /facturer ; en_cours = correction
-  facture:       ['annule'],                      // terminal sauf annulation ADMIN/CONCESSION
-  annule:        []                               // terminal absolu
+  brouillon: ['accepte', 'refuse', 'annule'],
+  accepte:   ['brouillon', 'en_cours', 'annule'],
+  en_cours:  ['attente', 'annule'],          // termine via /cloturer
+  attente:   ['en_cours', 'annule'],
+  termine:   ['en_cours', 'annule'],          // facture via /facturer ; en_cours = correction
+  facture:   ['annule'],                      // terminal sauf annulation ADMIN/CONCESSION
+  annule:    [],                              // terminal absolu
+  refuse:    []                               // terminal absolu (client a refusé)
 };
 
 const OrdresReparation = {
@@ -1096,7 +1101,7 @@ const OrdresReparation = {
     }
   },
 
-  async changerStatut(id, garage_id, ctx, { nouveau_statut, attente_motif, km_sortie, signature_base64 }) {
+  async changerStatut(id, garage_id, ctx, { nouveau_statut, attente_motif, km_sortie, signature_base64, annulation_motif, refus_motif }) {
     const or = await OrdresReparation._getOrRaw(id, garage_id);
     const ancien = or.statut;
 
@@ -1117,6 +1122,8 @@ const OrdresReparation = {
     if (attente_motif)    patch.attente_motif    = attente_motif;
     if (km_sortie)        patch.km_sortie        = parseInt(km_sortie);
     if (signature_base64) patch.signature_client = signature_base64;
+    if (annulation_motif) patch.annulation_motif = annulation_motif;
+    if (refus_motif)      patch.refus_motif      = refus_motif;
 
     const { data: orMaj, error } = await supabase.from('ordres_reparation')
       .update(patch).eq('id', id).eq('garage_id', garage_id).select('*').single();

@@ -2979,14 +2979,19 @@ const server = http.createServer(async function(req, res){
   }
 
   /* ── L3a-ter helpers RAM (mirror de supabase.js) ── */
+  // Migration 26 (L10) : 'valide_client' renommé 'accepte', 'refuse' ajouté.
+  // Transition brouillon -> refuse = proposition non confirmée par Mehdi
+  // (client refuse le devis avant travaux, distinct de 'annule' = garage
+  // annule) — à valider avant déploiement conjoint avec la migration SQL.
   const _OR_TRANS_RAM = {
-    brouillon:     ['valide_client', 'annule'],
-    valide_client: ['brouillon', 'en_cours', 'annule'],
-    en_cours:      ['attente', 'annule'],
-    attente:       ['en_cours', 'annule'],
-    termine:       ['en_cours', 'annule'],
-    facture:       ['annule'],
-    annule:        []
+    brouillon: ['accepte', 'refuse', 'annule'],
+    accepte:   ['brouillon', 'en_cours', 'annule'],
+    en_cours:  ['attente', 'annule'],
+    attente:   ['en_cours', 'annule'],
+    termine:   ['en_cours', 'annule'],
+    facture:   ['annule'],
+    annule:    [],
+    refuse:    []
   };
 
   function _validerTransitionRAM(ancien, nouveau) {
@@ -3130,11 +3135,11 @@ const server = http.createServer(async function(req, res){
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
-    const { nouveau_statut, attente_motif, signature_base64 } = b;
+    const { nouveau_statut, attente_motif, signature_base64, annulation_motif, refus_motif } = b;
     if (!nouveau_statut) return fail(res, 'nouveau_statut requis', 400, 'MISSING_FIELD');
     if (USE_SUPABASE && SBLayer) {
       try {
-        const orMaj = await SBLayer.OrdresReparation.changerStatut(p.id, garageId, ctx, { nouveau_statut, attente_motif, signature_base64 });
+        const orMaj = await SBLayer.OrdresReparation.changerStatut(p.id, garageId, ctx, { nouveau_statut, attente_motif, signature_base64, annulation_motif, refus_motif });
         return ok(res, { ordre_reparation: orMaj }, 'Statut mis à jour : ' + nouveau_statut);
       } catch(e) {
         if (e.message && e.message.startsWith('NOT_FOUND:'))
@@ -3156,8 +3161,11 @@ const server = http.createServer(async function(req, res){
     const patchSt = { statut: nouveau_statut, updated_at: nowISO() };
     if (attente_motif)    patchSt.attente_motif    = attente_motif;
     if (signature_base64) patchSt.signature_client = signature_base64;
+    if (annulation_motif) patchSt.annulation_motif = annulation_motif;
+    if (refus_motif)      patchSt.refus_motif      = refus_motif;
     DB.ordres_reparation[iSt] = Object.assign({}, orSt, patchSt);
-    _logOrHistoriqueRam(p.id, orSt.statut, nouveau_statut, 'statut_change', attente_motif ? { attente_motif } : null, ctx);
+    const motifPayload = attente_motif ? { attente_motif } : annulation_motif ? { annulation_motif } : refus_motif ? { refus_motif } : null;
+    _logOrHistoriqueRam(p.id, orSt.statut, nouveau_statut, 'statut_change', motifPayload, ctx);
     return ok(res, { ordre_reparation: DB.ordres_reparation[iSt] }, 'Statut mis à jour : ' + nouveau_statut);
   }
 

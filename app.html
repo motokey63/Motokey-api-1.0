@@ -133,12 +133,13 @@ input,select,textarea{font-family:inherit}
 /* ── OR FICHE (L3a-quater) ── */
 .or-badge{display:inline-flex;align-items:center;padding:5px 13px;border-radius:14px;font-size:12px;font-weight:700;white-space:nowrap}
 .or-badge-brouillon{background:#f3f4f6;color:#9ba3b4}
-.or-badge-valide_client{background:#eff6ff;color:#2563eb}
+.or-badge-accepte{background:#eff6ff;color:#2563eb}
 .or-badge-en_cours{background:#fffbeb;color:#d97706}
 .or-badge-attente{background:#f5f3ff;color:#7c3aed}
 .or-badge-termine{background:#f0fdf4;color:#16a34a}
 .or-badge-facture{background:#fff4ee;color:#1a1d23;border:1px solid #ff6b00}
 .or-badge-annule{background:#fef2f2;color:#dc2626;text-decoration:line-through}
+.or-badge-refuse{background:#fdf2f8;color:#db2777;text-decoration:line-through}
 
 .or-header{background:linear-gradient(135deg,#1a1d23 0%,#2d3340 100%);color:#fff;border-radius:14px;padding:20px 24px;margin-bottom:14px}
 .or-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
@@ -174,6 +175,7 @@ input,select,textarea{font-family:inherit}
 .or-stepper-line{flex:1;height:2px;background:var(--border);min-width:14px;align-self:flex-start;margin-top:13px}
 .or-stepper-line.done{background:var(--primary)}
 .or-stepper-annule{color:#dc2626;font-weight:700;font-size:13px}
+.or-stepper-refuse{color:#db2777;font-weight:700;font-size:13px}
 .or-stepper-sub{font-size:10px;color:#7c3aed;white-space:nowrap;font-style:italic;margin-left:8px;align-self:flex-start;margin-top:4px}
 
 /* ── OR EDIT + MODALS (L3a-quinquies) ── */
@@ -308,6 +310,8 @@ let reclamCount = 0;
 let selectedMoto = null;
 let ficheTab = 'infos';
 let devisLines = [];
+let devisListCache = [];
+let devisEditId = null; // null = mode création ; sinon id du devis brouillon en cours d'édition
 let ordresList = [];
 let orMode     = 'comptoir';
 let orFilters  = { statut: '', search: '', periode: '30j' };
@@ -1197,24 +1201,15 @@ async function loadDevis() {
   try {
     const data = await api('/devis');
     const liste = data.devis || data || [];
+    devisListCache = liste;
+    devisEditId = null;
     devisLines = [{designation:'',qte:1,prix_ht:0}];
     m.innerHTML = `
       <div class="section-header">
         <div><div class="section-title">Devis</div><div class="section-sub">${liste.length} devis</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
-        <div>
-          <div class="card">
-            <div style="font-size:13px;font-weight:700;margin-bottom:14px">Créer un devis</div>
-            <div id="devisErr" class="alert alert-warn" style="display:none"></div>
-            <div class="field"><label>Moto</label>${motoSelect('dSelMoto',null)}</div>
-            <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Lignes</div>
-            <div id="devisLines">${renderDevisLines()}</div>
-            <button class="btn btn-secondary btn-sm" style="margin-bottom:14px" onclick="addDevisLine()">+ Ligne</button>
-            <div class="field"><label>Remise (%)</label><input id="dRemise" type="number" value="0" min="0" max="100"></div>
-            <button class="btn btn-primary" onclick="saveDevis()">Créer le devis</button>
-          </div>
-        </div>
+        <div id="devisFormZone">${renderDevisFormCard()}</div>
         <div>
           ${liste.length ? `<table class="table"><thead><tr><th>Réf.</th><th>Date</th><th>Moto</th><th>Statut</th><th>Total TTC</th><th></th></tr></thead><tbody>
             ${liste.map(d=>{
@@ -1229,14 +1224,54 @@ async function loadDevis() {
                 <td>${motoLabel}</td>
                 <td><span class="badge ${statutBadge}">${statutLabel}</span></td>
                 <td>${total} €</td>
-                <td>${d.statut==='brouillon' ? `<button class="btn btn-primary btn-sm" onclick="envoyerDevis('${d.id}')">Envoyer au client</button>` : ''}</td>
+                <td>${d.statut==='brouillon' ? `<button class="btn btn-secondary btn-sm" onclick="startEditDevis('${d.id}')">Modifier</button> <button class="btn btn-primary btn-sm" onclick="envoyerDevis('${d.id}')">Envoyer au client</button>` : ''}</td>
               </tr>`;
             }).join('')}
           </tbody></table>` : '<div class="empty"><div class="empty-icon">📄</div><div class="empty-text">Aucun devis</div></div>'}
         </div>
       </div>`;
-    if (selectedMoto) document.getElementById('dSelMoto').value = selectedMoto.id;
+    const selEl = document.getElementById('dSelMoto');
+    if (selectedMoto && selEl) selEl.value = selectedMoto.id;
   } catch(e) { m.innerHTML = '<div class="card"><div class="alert alert-warn">Erreur : '+e.message+'</div></div>'; }
+}
+
+function renderDevisFormCard() {
+  const editing = !!devisEditId;
+  const dv = editing ? devisListCache.find(d=>d.id===devisEditId) : null;
+  const remiseVal = editing && dv ? (dv.remise_pct||0) : 0;
+  const motoLabel = editing && dv ? (dv.motos ? [dv.motos.marque,dv.motos.modele,dv.motos.plaque].filter(Boolean).join(' ') : (dv.moto_label||dv.moto_info||'—')) : '';
+  return `
+    <div class="card">
+      <div style="font-size:13px;font-weight:700;margin-bottom:14px">${editing ? 'Modifier le devis '+(dv?dv.numero:'') : 'Créer un devis'}</div>
+      <div id="devisErr" class="alert alert-warn" style="display:none"></div>
+      ${editing
+        ? `<div class="field"><label>Moto</label><input value="${motoLabel}" disabled style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg2);color:var(--text2)"></div>`
+        : `<div class="field"><label>Moto</label>${motoSelect('dSelMoto',null)}</div>`}
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Lignes</div>
+      <div id="devisLines">${renderDevisLines()}</div>
+      <button class="btn btn-secondary btn-sm" style="margin-bottom:14px" onclick="addDevisLine()">+ Ligne</button>
+      <div class="field"><label>Remise (%)</label><input id="dRemise" type="number" value="${remiseVal}" min="0" max="100"></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="saveDevis()">${editing ? 'Enregistrer les modifications' : 'Créer le devis'}</button>
+        ${editing ? `<button class="btn btn-secondary" onclick="cancelEditDevis()">Annuler</button>` : ''}
+      </div>
+    </div>`;
+}
+
+function startEditDevis(id) {
+  const dv = devisListCache.find(x=>x.id===id);
+  if (!dv) { toast('❌ Devis introuvable'); return; }
+  devisEditId = id;
+  devisLines = (dv.lignes && dv.lignes.length) ? JSON.parse(JSON.stringify(dv.lignes)) : [{designation:'',qte:1,prix_ht:0}];
+  const zone = document.getElementById('devisFormZone');
+  if (zone) zone.innerHTML = renderDevisFormCard();
+}
+
+function cancelEditDevis() {
+  devisEditId = null;
+  devisLines = [{designation:'',qte:1,prix_ht:0}];
+  const zone = document.getElementById('devisFormZone');
+  if (zone) zone.innerHTML = renderDevisFormCard();
 }
 
 function renderDevisLines() {
@@ -1257,15 +1292,27 @@ function addDevisLine() {
 async function saveDevis() {
   const err = document.getElementById('devisErr');
   err.style.display = 'none';
-  const motoId = document.getElementById('dSelMoto').value;
-  if (!motoId) { err.textContent = 'Sélectionnez une moto.'; err.style.display='block'; return; }
   const lignes = devisLines.filter(l=>l.designation.trim());
   if (!lignes.length) { err.textContent = 'Ajoutez au moins une ligne.'; err.style.display='block'; return; }
+  const remise_pct = parseFloat(document.getElementById('dRemise').value)||0;
+  const motoId = devisEditId ? null : document.getElementById('dSelMoto').value;
+  if (!devisEditId && !motoId) { err.textContent = 'Sélectionnez une moto.'; err.style.display='block'; return; }
+  const btn = document.querySelector('#devisFormZone .btn-primary');
+  const btnLabel = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement…'; }
   try {
-    await api('/devis','POST',{moto_id:motoId, lignes, remise:parseFloat(document.getElementById('dRemise').value)||0});
-    toast('✅ Devis créé');
+    if (devisEditId) {
+      await api('/devis/'+devisEditId,'PUT',{entete:{remise_pct}, lignes});
+      toast('✅ Devis modifié');
+    } else {
+      await api('/devis','POST',{moto_id:motoId, lignes, remise_pct});
+      toast('✅ Devis créé');
+    }
     await loadDevis();
-  } catch(e) { err.textContent = e.message; err.style.display='block'; }
+  } catch(e) {
+    err.textContent = e.message; err.style.display='block';
+    if (btn) { btn.disabled = false; btn.textContent = btnLabel; }
+  }
 }
 
 async function envoyerDevis(id) {
@@ -1559,13 +1606,14 @@ function selectCataloguePieceById(id) {
 
 function orStatutMeta(statut) {
   return ({
-    brouillon:     {label:'Brouillon',     cls:'or-badge-brouillon'},
-    valide_client: {label:'Validé client', cls:'or-badge-valide_client'},
-    en_cours:      {label:'En cours',      cls:'or-badge-en_cours'},
-    attente:       {label:'En attente',    cls:'or-badge-attente'},
-    termine:       {label:'Terminé',       cls:'or-badge-termine'},
-    facture:       {label:'Facturé',       cls:'or-badge-facture'},
-    annule:        {label:'Annulé',        cls:'or-badge-annule'}
+    brouillon: {label:'Brouillon',     cls:'or-badge-brouillon'},
+    accepte:   {label:'Validé client', cls:'or-badge-accepte'},
+    en_cours:  {label:'En cours',      cls:'or-badge-en_cours'},
+    attente:   {label:'En attente',    cls:'or-badge-attente'},
+    termine:   {label:'Terminé',       cls:'or-badge-termine'},
+    facture:   {label:'Facturé',       cls:'or-badge-facture'},
+    annule:    {label:'Annulé',        cls:'or-badge-annule'},
+    refuse:    {label:'Refusé',        cls:'or-badge-refuse'}
   })[statut] || {label: statut || '—', cls: 'or-badge-brouillon'};
 }
 
@@ -1575,7 +1623,7 @@ function _ab(label, onclick, cls) {
 
 function buildORActionBar(or) {
   const s = or.statut;
-  const locked = s === 'facture' || s === 'annule';
+  const locked = s === 'facture' || s === 'annule' || s === 'refuse';
   let h = '<div class="or-action-bar">';
 
   if (orEditState.editing) {
@@ -1584,9 +1632,10 @@ function buildORActionBar(or) {
     if (orEditState.dirty) h += '<span style="font-size:11px;color:var(--warn);margin-left:4px">● Modifications non sauvegardées</span>';
   } else {
     if (s === 'brouillon') {
-      h += _ab('Valider client', 'directTransition(\'valide_client\')', 'btn-primary');
+      h += _ab('Valider client', 'directTransition(\'accepte\')', 'btn-primary');
+      h += _ab('✕ Refuser', 'openTransitionModal(\'refuse\')', 'btn-secondary');
     }
-    if (s === 'valide_client') {
+    if (s === 'accepte') {
       h += _ab('↩ Brouillon', 'directTransition(\'brouillon\')', 'btn-secondary');
       h += _ab('▶ Démarrer', 'directTransition(\'en_cours\')', 'btn-primary');
     }
@@ -1874,12 +1923,15 @@ function buildORStatusStepper(or) {
   if (s === 'annule') {
     return '<div class="or-stepper"><span class="or-stepper-annule">✕ OR Annulé</span></div>';
   }
+  if (s === 'refuse') {
+    return '<div class="or-stepper"><span class="or-stepper-refuse">✕ Devis refusé</span></div>';
+  }
   const steps = [
-    { key: 'brouillon',     lbl: 'Brouillon' },
-    { key: 'valide_client', lbl: 'Validé' },
-    { key: 'en_cours',      lbl: 'En cours' },
-    { key: 'termine',       lbl: 'Terminé' },
-    { key: 'facture',       lbl: 'Facturé' }
+    { key: 'brouillon', lbl: 'Brouillon' },
+    { key: 'accepte',   lbl: 'Validé' },
+    { key: 'en_cours',  lbl: 'En cours' },
+    { key: 'termine',   lbl: 'Terminé' },
+    { key: 'facture',   lbl: 'Facturé' }
   ];
   const isAttente = s === 'attente';
   const activeKey = isAttente ? 'en_cours' : s;
@@ -2326,11 +2378,12 @@ function eanScannerKeyHandler(e) {
 
 function openTransitionModal(nouveau_statut) {
   const titles = {
-    brouillon:     'Repasser en brouillon',
-    valide_client: 'Valider côté client',
-    en_cours:      'Démarrer / reprendre',
-    attente:       'Mettre en attente',
-    annule:        'Annuler l\'OR'
+    brouillon: 'Repasser en brouillon',
+    accepte:   'Valider côté client',
+    en_cours:  'Démarrer / reprendre',
+    attente:   'Mettre en attente',
+    annule:    'Annuler l\'OR',
+    refuse:    'Refuser le devis'
   };
   const nextMeta = orStatutMeta(nouveau_statut);
   let h = '<h3>' + (titles[nouveau_statut] || nextMeta.label) + '</h3>';
@@ -2341,6 +2394,9 @@ function openTransitionModal(nouveau_statut) {
   } else if (nouveau_statut === 'annule') {
     h += '<div class="or-modal-sub">L\'OR sera marqué annulé.</div>';
     h += '<div class="field"><label>Motif (optionnel)</label><input id="mAnnuleMotif" class="or-edit-input" style="width:100%;padding:8px 10px" placeholder="Motif d\'annulation…"></div>';
+  } else if (nouveau_statut === 'refuse') {
+    h += '<div class="or-modal-sub">Le devis sera marqué refusé par le client. Action définitive (statut terminal, comme Annulé).</div>';
+    h += '<div class="field"><label>Motif (optionnel)</label><input id="mRefuseMotif" class="or-edit-input" style="width:100%;padding:8px 10px" placeholder="Motif de refus…"></div>';
   } else {
     h += '<div class="or-modal-sub">Confirmer le passage au statut <strong>' + nextMeta.label + '</strong>&nbsp;?</div>';
   }
@@ -2368,6 +2424,10 @@ async function submitTransition(nouveau_statut) {
   if (nouveau_statut === 'annule') {
     const m = (document.getElementById('mAnnuleMotif')?.value || '').trim();
     if (m) payload.annulation_motif = m;
+  }
+  if (nouveau_statut === 'refuse') {
+    const m = (document.getElementById('mRefuseMotif')?.value || '').trim();
+    if (m) payload.refus_motif = m;
   }
   try {
     await api('/ordres-reparation/' + curORId + '/statut', 'PATCH', payload);
