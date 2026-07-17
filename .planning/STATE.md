@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.8
 milestone_name: Unification Devis / OR / Facture
-status: roadmap_created
-stopped_at: "ROADMAP.md créé (Phases 30-34) et REQUIREMENTS.md traceability mise à jour — prêt pour /gsd:plan-phase 30"
-last_updated: "2026-07-17T00:00:00.000Z"
-last_activity: 2026-07-17 -- ROADMAP v1.8 créé (5 phases, 14/14 requirements mappés)
+status: executing
+stopped_at: Phase 30-01 Task 1+2 committed (script + FINDINGS.md), en attente checkpoint Task 3 (cross-check pg_enum + arbitrage produit valide_client/attente/annule par Mehdi)
+last_updated: "2026-07-17T13:48:02.817Z"
+last_activity: 2026-07-17 -- Phase 30 execution started
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 0
-  total_plans: 0
+  total_plans: 2
   completed_plans: 0
 ---
 
@@ -20,14 +20,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-17)
 
 **Core value:** Score d'intégrité anti-fraude (pondération 1.0/0.6/0.3) — sans lui, MotoKey est un simple DMS.
-**Current focus:** v1.8 Unification Devis / OR / Facture — Phase 30 (Audit Schéma `or_statut`) prête à planifier
+**Current focus:** Phase 30 — audit-sch-ma-or-statut
 
 ## Current Position
 
-Phase: 30 of 34 (Audit Schéma `or_statut`)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-07-17 — ROADMAP.md v1.8 créé (Phases 30→34), 14/14 requirements mappés, REQUIREMENTS.md traceability mise à jour
+Phase: 30 (audit-sch-ma-or-statut) — EXECUTING
+Plan: 1 of 1
+Status: Executing Phase 30
+Last activity: 2026-07-17 -- Phase 30 execution started
 
 ```
 v1.0 ████████████ SHIPPED
@@ -79,5 +79,5 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-07-17T00:00:00.000Z
-Stopped at: ROADMAP.md v1.8 créé (Phases 30-34, 14/14 requirements mappés), REQUIREMENTS.md traceability mise à jour — prêt pour `/gsd:plan-phase 30`
+Last session: 2026-07-17T13:48:02.815Z
+Stopped at: Phase 30-01 Task 1+2 committed (script + FINDINGS.md), en attente checkpoint Task 3 (cross-check pg_enum + arbitrage produit valide_client/attente/annule par Mehdi)
