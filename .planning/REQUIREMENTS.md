@@ -57,26 +57,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UNIF-01 | TBD | Pending |
-| UNIF-02 | TBD | Pending |
-| UNIF-03 | TBD | Pending |
-| UNIF-04 | TBD | Pending |
-| LIGNE-01 | TBD | Pending |
-| LIGNE-02 | TBD | Pending |
-| LIGNE-03 | TBD | Pending |
-| LIGNE-04 | TBD | Pending |
-| INTERV-01 | TBD | Pending |
-| INTERV-02 | TBD | Pending |
-| INTERV-03 | TBD | Pending |
-| MIGR-01 | TBD | Pending |
-| MIGR-02 | TBD | Pending |
-| MIGR-03 | TBD | Pending |
+| UNIF-01 | Phase 32 | Pending |
+| UNIF-02 | Phase 32 | Pending |
+| UNIF-03 | Phase 32 | Pending |
+| UNIF-04 | Phase 32 | Pending |
+| LIGNE-01 | Phase 33 | Pending |
+| LIGNE-02 | Phase 33 | Pending |
+| LIGNE-03 | Phase 33 | Pending |
+| LIGNE-04 | Phase 33 | Pending |
+| INTERV-01 | Phase 34 | Pending |
+| INTERV-02 | Phase 34 | Pending |
+| INTERV-03 | Phase 34 | Pending |
+| MIGR-01 | Phase 31 | Pending |
+| MIGR-02 | Phase 30 | Pending |
+| MIGR-03 | Phase 31 | Pending |
 
 **Coverage:**
 - v1 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14 (roadmap not yet created)
+- Mapped to phases: 14
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-07-17*
 *Superseded v1.7 REQUIREMENTS.md (DEVIS-01→05, Édition Devis Brouillon) — jamais livré, scope absorbé par l'unification. Historique préservé dans git (commit avant celui-ci).*
+*Traceability updated: 2026-07-17 — ROADMAP.md v1.8 created (Phases 30→34), 14/14 requirements mapped, 0 orphans.*
