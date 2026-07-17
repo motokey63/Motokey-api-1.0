@@ -2980,9 +2980,10 @@ const server = http.createServer(async function(req, res){
 
   /* ── L3a-ter helpers RAM (mirror de supabase.js) ── */
   // Migration 26 (L10) : 'valide_client' renommé 'accepte', 'refuse' ajouté.
-  // Transition brouillon -> refuse = proposition non confirmée par Mehdi
-  // (client refuse le devis avant travaux, distinct de 'annule' = garage
-  // annule) — à valider avant déploiement conjoint avec la migration SQL.
+  // §3 spec L10 (décision 16/07, confirmé par Mehdi) : 'refuse' reste
+  // MODIFIABLE (retour brouillon possible) — c'est un refus de prix/devis,
+  // réversible par nature, PAS un état terminal. 'annule' reste terminal :
+  // le garage a physiquement arrêté le dossier, décision définitive.
   const _OR_TRANS_RAM = {
     brouillon: ['accepte', 'refuse', 'annule'],
     accepte:   ['brouillon', 'en_cours', 'annule'],
@@ -2990,8 +2991,8 @@ const server = http.createServer(async function(req, res){
     attente:   ['en_cours', 'annule'],
     termine:   ['en_cours', 'annule'],
     facture:   ['annule'],
-    annule:    [],
-    refuse:    []
+    annule:    [],                            // terminal absolu (garage a arrêté le dossier)
+    refuse:    ['brouillon']                  // PAS terminal — refus réversible, retour brouillon
   };
 
   function _validerTransitionRAM(ancien, nouveau) {

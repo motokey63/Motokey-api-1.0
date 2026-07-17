@@ -1623,7 +1623,7 @@ function _ab(label, onclick, cls) {
 
 function buildORActionBar(or) {
   const s = or.statut;
-  const locked = s === 'facture' || s === 'annule' || s === 'refuse';
+  const locked = s === 'facture' || s === 'annule';
   let h = '<div class="or-action-bar">';
 
   if (orEditState.editing) {
@@ -1638,6 +1638,9 @@ function buildORActionBar(or) {
     if (s === 'accepte') {
       h += _ab('↩ Brouillon', 'directTransition(\'brouillon\')', 'btn-secondary');
       h += _ab('▶ Démarrer', 'directTransition(\'en_cours\')', 'btn-primary');
+    }
+    if (s === 'refuse') {
+      h += _ab('↩ Repasser en brouillon', 'directTransition(\'brouillon\')', 'btn-secondary');
     }
     if (s === 'en_cours') {
       h += _ab('⏸ En attente', 'openTransitionModal(\'attente\')', 'btn-secondary');
