@@ -1,0 +1,30 @@
+-- ═══════════════════════════════════════════════════════════
+-- Migration 26b — L10 Unification Devis/OR — ajout enum 'refuse'
+-- ═══════════════════════════════════════════════════════════
+-- Extrait de 26_l10_unification_devis_or_schema.sql (Section 1b) dans son
+-- propre fichier — même précédent que 13/14 (mode_acquisition_enum) : une
+-- instruction ALTER TYPE ... ADD VALUE isolée dans son propre fichier pour
+-- forcer une exécution seule, dans sa propre requête au Dashboard SQL
+-- Editor, séparée du reste du script transactionnel (26).
+--
+-- PG 17.6 confirmé (Mehdi, Dashboard) : ADD VALUE est autorisé dans un bloc
+-- de transaction, mais la valeur ajoutée ne peut pas être utilisée dans la
+-- MÊME transaction qui l'a créée (erreur 55P04). Aucun script de cette
+-- migration n'utilise 'refuse' en DML, donc ce risque ne s'applique à
+-- aucun des deux fichiers (26 ou 26b) pris isolément — l'isolation ici est
+-- une discipline de projet (précédent migration 14), pas une nécessité
+-- technique stricte sur cette version de Postgres.
+--
+-- Ordre d'exécution vs 26_l10_unification_devis_or_schema.sql : AUCUNE
+-- dépendance croisée entre ce fichier et l'autre — RENAME VALUE
+-- 'valide_client'->'accepte' (26, section 1a), DROP/ADD COLUMN, DELETE FROM
+-- devis (26, sections 2-5) ne référencent pas 'refuse'. Les deux fichiers
+-- peuvent être exécutés dans n'importe quel ordre l'un par rapport à
+-- l'autre. La SEULE contrainte dure : les deux doivent être appliqués en
+-- prod AVANT le push du commit backend/frontend (supabase.js,
+-- motokey-api.js, app.html référencent littéralement 'accepte' ET
+-- 'refuse' — le code casse si l'un des deux manque encore dans l'enum
+-- prod au moment du déploiement).
+-- ═══════════════════════════════════════════════════════════
+
+ALTER TYPE or_statut ADD VALUE IF NOT EXISTS 'refuse' AFTER 'annule';

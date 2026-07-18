@@ -8,15 +8,23 @@
 -- a produit ces décisions et scripts/introspect-l10-audit.js pour les
 -- vérifications read-only qui précèdent ce script.
 --
--- ⚠️ ORDRE DE DÉPLOIEMENT OBLIGATOIRE :
+-- ⚠️ SPLIT EN 2 FICHIERS (comme 13/14 pour mode_acquisition_enum) :
+-- L'instruction ALTER TYPE ... ADD VALUE 'refuse' vit désormais dans son
+-- propre fichier séparé : 26b_l10_add_refuse_enum_value.sql — à exécuter
+-- seule, dans sa propre requête Dashboard. Ce fichier-ci (26) contient
+-- tout le reste (1a, 2, 3, 4, 5). Aucune dépendance croisée entre les deux
+-- fichiers — voir l'en-tête de 26b pour le détail de l'ordre d'exécution.
+--
+-- ⚠️ ORDRE DE DÉPLOIEMENT OBLIGATOIRE (vs le code applicatif) :
 -- Ce script RENOMME la valeur d'enum 'valide_client' en 'accepte'.
 -- `supabase.js` (_OR_TRANS) et `motokey-api.js` (_OR_TRANS_RAM) référencent
--- LITTÉRALEMENT 'valide_client' aujourd'hui. Si ce script est appliqué en
--- prod AVANT le commit backend qui met à jour ces deux constantes, toute
--- transition de statut OR référençant l'ancienne valeur cassera en prod.
--- NE PAS APPLIQUER CE SCRIPT avant que le commit backend correspondant ne
--- soit prêt à être déployé dans la foulée (même fenêtre, comme pour la
--- migration 13/L8 : script SQL appliqué juste avant le merge du code qui
+-- LITTÉRALEMENT 'valide_client' aujourd'hui, et 'accepte'/'refuse' dans le
+-- commit déjà préparé. Si CE script (26) et 26b ne sont pas TOUS LES DEUX
+-- appliqués en prod AVANT le push du commit backend/frontend, toute
+-- transition de statut OR cassera en prod (valeur enum manquante).
+-- NE PAS APPLIQUER CES SCRIPTS avant que le commit backend correspondant
+-- ne soit prêt à être déployé dans la foulée (même fenêtre, comme pour la
+-- migration 13/L8 : scripts SQL appliqués juste avant le merge du code qui
 -- en dépend).
 --
 -- ✅ PRÉ-REQUIS CONFIRMÉS PAR MEHDI (Dashboard SQL Editor) :
@@ -41,12 +49,13 @@
 --
 -- Sur les données de test (8 devis, 6 ordres_reparation) : `devis.lignes`
 -- (JSONB) a 2 formats de clés incompatibles sur seulement 8 lignes (voir
--- conversation) — décision : TRUNCATE devis plutôt qu'écrire un parseur
--- défensif pour des données jetables. Aucun des 6 OR existants ne
--- référence de devis (devis_id IS NULL sur les 6, or_id IS NULL sur les 8
--- devis, confirmé via scripts/introspect-l10-audit.js) — donc TRUNCATE
--- devis seul suffit, ordres_reparation/or_taches/or_pieces/or_historique
--- ne sont PAS tronqués par ce script.
+-- conversation) — décision : DELETE FROM devis plutôt qu'écrire un parseur
+-- défensif pour des données jetables (TRUNCATE échouerait : devis est
+-- référencée par la FK ordres_reparation.devis_id). Aucun des 6 OR
+-- existants ne référence de devis (devis_id IS NULL sur les 6, or_id IS
+-- NULL sur les 8 devis, confirmé via scripts/introspect-l10-audit.js) —
+-- donc DELETE FROM devis seul suffit, ordres_reparation/or_taches/
+-- or_pieces/or_historique ne sont PAS touchés par ce script.
 -- ═══════════════════════════════════════════════════════════
 
 
@@ -59,20 +68,6 @@
 -- exécuté avec le reste du script.
 
 ALTER TYPE or_statut RENAME VALUE 'valide_client' TO 'accepte';
-
-
--- ───────────────────────────────────────────────────────────
--- SECTION 1b — Enum or_statut : ajout de 'refuse'
--- ───────────────────────────────────────────────────────────
--- ⚠️ EXÉCUTER CETTE INSTRUCTION SEULE, dans sa propre requête au Dashboard
--- SQL Editor — même précaution que migration 14 (mode_acquisition_enum).
--- PG 17.6 confirmé : ADD VALUE est autorisé dans un bloc de transaction,
--- mais la valeur ajoutée ne peut pas être utilisée dans la MÊME
--- transaction qui l'a créée (erreur 55P04) — ce script n'utilise pas
--- 'refuse' plus loin, donc ce risque ne s'applique pas ici. Isolation
--- conservée par cohérence avec le précédent du projet, pas par nécessité.
-
-ALTER TYPE or_statut ADD VALUE IF NOT EXISTS 'refuse' AFTER 'annule';
 
 
 -- ───────────────────────────────────────────────────────────
@@ -151,5 +146,11 @@ ALTER TABLE or_pieces
 -- ordres_reparation/or_taches/or_pieces/or_historique NE sont PAS
 -- tronqués : aucun des 6 OR existants ne référence un devis (devis_id
 -- IS NULL sur les 6), donc rien à nettoyer en cascade de leur côté.
+-- DELETE (pas TRUNCATE) : devis est référencée par la FK
+-- ordres_reparation.devis_id — Postgres refuse TRUNCATE sur une table
+-- référencée par FK sans inclure la table référençante ou CASCADE (qui
+-- viderait ordres_reparation, à exclure). DELETE n'a pas cette
+-- restriction ; devis_id est NULL sur les 6 OR existants donc rien à
+-- gérer côté FK.
 
-TRUNCATE TABLE devis;
+DELETE FROM devis;
