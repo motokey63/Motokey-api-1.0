@@ -3450,8 +3450,13 @@ const server = http.createServer(async function(req, res){
     DB.or_taches = DB.or_taches || [];
     const dh = parseFloat(duree_h) || 0;
     const th = parseFloat(taux_horaire) || 65;
-    // L10 commit 2 (Bloc B point 1) : ligne ajoutée sur un OR déjà en_cours -> attente client
+    // L10 commit 2 (Bloc B point 1) : ligne ajoutée sur OR en_cours -> attente
+    // client. Ligne ajoutée pendant que l'OR est déjà en attente auto (ex:
+    // pièce juste après la tâche qui vient de basculer l'OR) -> aussi
+    // marquée en attente, pas de re-bascule (voir supabase.js OrTaches.create).
     const enCoursDejaLance = or.statut === 'en_cours';
+    const dejaEnAttenteAuto = or.statut === 'attente' && !!or.attente_auto;
+    const requiertAcceptation = enCoursDejaLance || dejaEnAttenteAuto;
     const tache = {
       id: 'ort-'+uid(),
       garage_id: garageId,
@@ -3465,8 +3470,8 @@ const server = http.createServer(async function(req, res){
       technicien_id: technicien_id || null,
       statut: 'a_faire',
       fait_le: null,
-      ajoutee_en_cours: enCoursDejaLance,
-      en_attente_acceptation_client: enCoursDejaLance,
+      ajoutee_en_cours: requiertAcceptation,
+      en_attente_acceptation_client: requiertAcceptation,
       date_acceptation_ligne: null,
       accepte_par_client_id: null,
       created_at: nowISO(),
@@ -3539,8 +3544,10 @@ const server = http.createServer(async function(req, res){
     DB.or_pieces = DB.or_pieces || [];
     const q  = parseFloat(qte) || 1;
     const pu = parseFloat(pu_ht) || 0;
-    // L10 commit 2 (Bloc B point 1) : ligne ajoutée sur un OR déjà en_cours -> attente client
+    // L10 commit 2 (Bloc B point 1) — voir taches ci-dessus pour le rationale.
     const enCoursDejaLance = or.statut === 'en_cours';
+    const dejaEnAttenteAuto = or.statut === 'attente' && !!or.attente_auto;
+    const requiertAcceptation = enCoursDejaLance || dejaEnAttenteAuto;
     const piece = {
       id: 'orp-'+uid(),
       garage_id: garageId,
@@ -3552,8 +3559,8 @@ const server = http.createServer(async function(req, res){
       pu_ht: pu,
       tva_pct: parseFloat(tva_pct) || 20,
       montant_ht: Math.round(q * pu * 100)/100,
-      ajoutee_en_cours: enCoursDejaLance,
-      en_attente_acceptation_client: enCoursDejaLance,
+      ajoutee_en_cours: requiertAcceptation,
+      en_attente_acceptation_client: requiertAcceptation,
       date_acceptation_ligne: null,
       accepte_par_client_id: null,
       created_at: nowISO(),

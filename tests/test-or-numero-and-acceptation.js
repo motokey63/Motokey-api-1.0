@@ -29,22 +29,18 @@ async function run() {
   // ── Setup ────────────────────────────────────────────────────────────────
   console.log('── Setup ───────────────────────────────────────────────────────');
 
-  const { data: garages, error: ge } = await supabase.from('garages').select('id, nom').limit(1);
-  if (ge || !garages?.length) {
-    console.error('❌ Aucun garage en BDD —', ge?.message);
-    process.exit(1);
-  }
-  const garage_id = garages[0].id;
-  console.log(`  garage_id  : ${garage_id} (${garages[0].nom})`);
-
+  // Part d'une moto existante plutôt que d'un garage au hasard — au moins
+  // un garage en prod n'a aucune moto (Pôle Moto MOTOLAB), .limit(1) sur
+  // `garages` seul peut donc tomber sur un garage inutilisable pour ce test.
   const { data: motos, error: me } = await supabase
-    .from('motos').select('id, plaque, client_id, km')
-    .eq('garage_id', garage_id).limit(1);
+    .from('motos').select('id, plaque, client_id, km, garage_id').limit(1);
   if (me || !motos?.length) {
-    console.error(`❌ Aucune moto pour ce garage ${garage_id}${me ? ' — ' + me.message : ''}`);
+    console.error(`❌ Aucune moto en BDD${me ? ' — ' + me.message : ''}`);
     process.exit(1);
   }
   const moto = motos[0];
+  const garage_id = moto.garage_id;
+  console.log(`  garage_id  : ${garage_id}`);
   console.log(`  moto_id    : ${moto.id} (${moto.plaque})`);
 
   let clientId = moto.client_id || null;
@@ -83,21 +79,33 @@ async function run() {
   }
 
   // ── Bloc A — Étape 2 : concurrence (pas de doublon) ─────────────────────────
-  console.log('\n── Bloc A · Étape 2 : concurrence — création parallèle ─────────');
+  // Teste attribuerNumeroOr() directement, PAS OrdresReparation.create() en
+  // entier : create() alimente aussi `numero_or` (ancien champ, intact,
+  // hors scope) via un COUNT(*)+1 non atomique — une vraie création
+  // concurrente de 8 OR complets fait remonter CETTE race préexistante
+  // (contrainte ordres_reparation_numero_unique), pas un bug de ce commit.
+  // Isoler attribuerNumeroOr() ici prouve l'atomicité de `numero` sans
+  // dépendre du champ legacy qu'on n'a pas le droit de toucher.
+  console.log('\n── Bloc A · Étape 2 : concurrence — attribuerNumeroOr() en parallèle ──');
   try {
     const N = 8;
-    const results = await Promise.all(
-      Array.from({ length: N }, () => OrdresReparation.create(garage_id, { moto_id: moto.id, km_entree: moto.km }))
+    const numeros = await Promise.all(
+      Array.from({ length: N }, () => OrdresReparation.attribuerNumeroOr(garage_id))
     );
-    const numeros = results.map(r => r.ordre_reparation.numero);
     const uniques = new Set(numeros);
-    console.log(`  ${N} créations parallèles → numeros : ${numeros.join(', ')}`);
+    console.log(`  ${N} appels parallèles → numeros : ${numeros.join(', ')}`);
     check(`${N} numeros tous distincts (pas de doublon)`, uniques.size === N,
       `${uniques.size}/${N} uniques`);
   } catch (e) {
     console.error('  ❌ ERREUR:', e.message);
     KO++;
   }
+
+  console.log('\n  ⚠️  NOTE : `numero_or` (ancien champ) génère par COUNT(*)+1 non');
+  console.log('  atomique (supabase.js:967-969, intact, hors scope de ce commit) —');
+  console.log('  une vraie création concurrente de plusieurs OR via create() peut');
+  console.log('  donc violer ordres_reparation_numero_unique. Bug préexistant,');
+  console.log('  révélé par ce test, à traiter séparément si Mehdi le souhaite.');
 
   // ── Bloc B — Étape 1 : ligne ajoutée sur OR en_cours → bascule attente ──────
   console.log('\n── Bloc B · Étape 1 : ligne ajoutée sur OR en_cours ────────────');

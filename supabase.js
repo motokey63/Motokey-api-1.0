@@ -1259,11 +1259,20 @@ const OrTaches = {
   // bascule attente auto (L10 commit 2, Bloc B point 1).
   async create(garage_id, or_id, payload, ctx = null) {
     const { data: or, error: oe } = await supabase.from('ordres_reparation')
-      .select('id, statut').eq('id', or_id).eq('garage_id', garage_id).single();
+      .select('id, statut, attente_auto').eq('id', or_id).eq('garage_id', garage_id).single();
     if (oe) throw new Error('Ordre non trouvé');
     const dh = parseFloat(payload.duree_h)     || 0;
     const th = parseFloat(payload.taux_horaire) || 0;
+    // en_cours -> première ligne complémentaire, déclenche la bascule.
+    // attente (déjà auto) -> une ligne ajoutée ENTRE-TEMPS (ex: pièce juste
+    // après la tâche qui vient de basculer l'OR) doit aussi être marquée en
+    // attente d'acceptation, sinon _revenirEnCoursSiPlusDeLigneEnAttente
+    // repasserait l'OR en_cours dès la 1ère ligne acceptée en ignorant
+    // celle-ci. Pas de re-bascule ni de nouveau log historique dans ce cas
+    // (l'OR y est déjà) — seule la ligne elle-même est marquée.
     const enCoursDejaLance = or.statut === 'en_cours';
+    const dejaEnAttenteAuto = or.statut === 'attente' && or.attente_auto === true;
+    const requiertAcceptation = enCoursDejaLance || dejaEnAttenteAuto;
     const tache = await insert('or_taches', {
       garage_id, or_id,
       ordre:         parseInt(payload.ordre) || 0,
@@ -1274,8 +1283,8 @@ const OrTaches = {
       montant_ht:    +(dh * th).toFixed(2),
       technicien_id: payload.technicien_id || null,
       statut:        'a_faire',
-      ajoutee_en_cours:             enCoursDejaLance,
-      en_attente_acceptation_client: enCoursDejaLance
+      ajoutee_en_cours:             requiertAcceptation,
+      en_attente_acceptation_client: requiertAcceptation
     });
     if (enCoursDejaLance) await OrdresReparation._basculerEnAttentePourLigne(or_id, ctx);
     const orMaj = await OrdresReparation.recalculerTotaux(or_id);
@@ -1345,11 +1354,15 @@ const OrPieces = {
   // ctx optionnel (défaut null) — voir OrTaches.create pour le rationale.
   async create(garage_id, or_id, payload, ctx = null) {
     const { data: or, error: oe } = await supabase.from('ordres_reparation')
-      .select('id, statut').eq('id', or_id).eq('garage_id', garage_id).single();
+      .select('id, statut, attente_auto').eq('id', or_id).eq('garage_id', garage_id).single();
     if (oe) throw new Error('Ordre non trouvé');
     const q  = parseFloat(payload.qte)   || 1;
     const pu = parseFloat(payload.pu_ht) || 0;
+    // Voir OrTaches.create pour le rationale (attente déjà auto -> ligne
+    // aussi marquée en attente, pas de re-bascule).
     const enCoursDejaLance = or.statut === 'en_cours';
+    const dejaEnAttenteAuto = or.statut === 'attente' && or.attente_auto === true;
+    const requiertAcceptation = enCoursDejaLance || dejaEnAttenteAuto;
     const piece = await insert('or_pieces', {
       garage_id, or_id,
       piece_id:  payload.piece_id  || null,
@@ -1359,8 +1372,8 @@ const OrPieces = {
       pu_ht:     pu,
       tva_pct:   parseFloat(payload.tva_pct) || 20,
       montant_ht: +(q * pu).toFixed(2),
-      ajoutee_en_cours:              enCoursDejaLance,
-      en_attente_acceptation_client: enCoursDejaLance
+      ajoutee_en_cours:              requiertAcceptation,
+      en_attente_acceptation_client: requiertAcceptation
     });
     if (enCoursDejaLance) await OrdresReparation._basculerEnAttentePourLigne(or_id, ctx);
     const orMaj = await OrdresReparation.recalculerTotaux(or_id);
