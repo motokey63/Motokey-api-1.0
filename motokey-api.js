@@ -2891,10 +2891,12 @@ const server = http.createServer(async function(req, res){
     if (!m) return fail(res, 'Moto non trouvée', 404, 'NOT_FOUND');
     DB.ordres_reparation = DB.ordres_reparation || [];
     const numero_or = 'OR-2026-' + String(DB.ordres_reparation.length + 1).padStart(4, '0');
+    const numero = _attribuerNumeroOrRam(garageId);
     const or = {
       id: 'or-' + uid(),
       garage_id: garageId,
       numero_or,
+      numero,
       moto_id,
       client_id: m.client_id || null,
       devis_id: devis_id || null,
@@ -3027,6 +3029,43 @@ const server = http.createServer(async function(req, res){
     if (!DB._compteur_factures) DB._compteur_factures = {};
     DB._compteur_factures[annee] = (DB._compteur_factures[annee] || 0) + 1;
     return 'FAC-' + annee + '-' + String(DB._compteur_factures[annee]).padStart(4, '0');
+  }
+
+  // L10 commit 2 (Bloc A) — miroir RAM de attribuer_numero_or() (migration 27).
+  // Par garage ET par année, contrairement à _attribuerNumeroFactureRam
+  // (global par année) — voir plan validé. Pas de concurrence réelle en RAM
+  // (mono-thread Node, pas besoin de verrou), le compteur suffit.
+  function _attribuerNumeroOrRam(garageId) {
+    const annee = new Date().getFullYear();
+    DB._compteur_or = DB._compteur_or || {};
+    const key = garageId + ':' + annee;
+    DB._compteur_or[key] = (DB._compteur_or[key] || 0) + 1;
+    return 'INT-' + annee + '-' + String(DB._compteur_or[key]).padStart(4, '0');
+  }
+
+  // L10 commit 2 (Bloc B point 1) — miroir RAM de OrdresReparation._basculerEnAttentePourLigne.
+  function _basculerAttenteRam(orId, ctx) {
+    const motif = "Travaux complémentaires en attente d'acceptation client";
+    const i = (DB.ordres_reparation||[]).findIndex(function(o){ return o.id===orId; });
+    if (i<0) return;
+    const ancien = DB.ordres_reparation[i].statut;
+    DB.ordres_reparation[i] = Object.assign({}, DB.ordres_reparation[i], {
+      statut: 'attente', attente_motif: motif, attente_auto: true, updated_at: nowISO()
+    });
+    _logOrHistoriqueRam(orId, ancien, 'attente', 'ligne_ajoutee_attente', { motif }, ctx);
+  }
+
+  // L10 commit 2 (Bloc B point 2) — miroir RAM de OrdresReparation._revenirEnCoursSiPlusDeLigneEnAttente.
+  function _revenirEnCoursRam(orId, ctx) {
+    const enAttenteTaches = (DB.or_taches||[]).some(function(t){ return t.or_id===orId && t.en_attente_acceptation_client; });
+    const enAttentePieces = (DB.or_pieces||[]).some(function(p){ return p.or_id===orId && p.en_attente_acceptation_client; });
+    if (enAttenteTaches || enAttentePieces) return;
+    const i = (DB.ordres_reparation||[]).findIndex(function(o){ return o.id===orId; });
+    if (i<0) return;
+    const or = DB.ordres_reparation[i];
+    if (or.statut !== 'attente' || !or.attente_auto) return;
+    DB.ordres_reparation[i] = Object.assign({}, or, { statut: 'en_cours', attente_auto: false, updated_at: nowISO() });
+    _logOrHistoriqueRam(orId, 'attente', 'en_cours', 'ligne_acceptee_reprise', null, ctx);
   }
 
   if((p=M('POST','/ordres-reparation/:id/cloturer'))!==null){
@@ -3400,7 +3439,7 @@ const server = http.createServer(async function(req, res){
 
     if (USE_SUPABASE && SBLayer) {
       try {
-        const result = await SBLayer.OrTaches.create(garageId, p.id, { libelle, description, duree_h, taux_horaire, technicien_id, ordre });
+        const result = await SBLayer.OrTaches.create(garageId, p.id, { libelle, description, duree_h, taux_horaire, technicien_id, ordre }, ctx);
         return ok(res, result, 'Tâche ajoutée', 201);
       } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
     }
@@ -3411,6 +3450,8 @@ const server = http.createServer(async function(req, res){
     DB.or_taches = DB.or_taches || [];
     const dh = parseFloat(duree_h) || 0;
     const th = parseFloat(taux_horaire) || 65;
+    // L10 commit 2 (Bloc B point 1) : ligne ajoutée sur un OR déjà en_cours -> attente client
+    const enCoursDejaLance = or.statut === 'en_cours';
     const tache = {
       id: 'ort-'+uid(),
       garage_id: garageId,
@@ -3424,10 +3465,15 @@ const server = http.createServer(async function(req, res){
       technicien_id: technicien_id || null,
       statut: 'a_faire',
       fait_le: null,
+      ajoutee_en_cours: enCoursDejaLance,
+      en_attente_acceptation_client: enCoursDejaLance,
+      date_acceptation_ligne: null,
+      accepte_par_client_id: null,
       created_at: nowISO(),
       updated_at: nowISO()
     };
     DB.or_taches.push(tache);
+    if (enCoursDejaLance) _basculerAttenteRam(p.id, ctx);
     const orMaj = _recalcTotauxOR(p.id, garageId);
     return ok(res, { tache, ordre_reparation: orMaj }, 'Tâche ajoutée', 201);
   }
@@ -3482,7 +3528,7 @@ const server = http.createServer(async function(req, res){
 
     if (USE_SUPABASE && SBLayer) {
       try {
-        const result = await SBLayer.OrPieces.create(garageId, p.id, { piece_id, reference, libelle, qte, pu_ht, tva_pct });
+        const result = await SBLayer.OrPieces.create(garageId, p.id, { piece_id, reference, libelle, qte, pu_ht, tva_pct }, ctx);
         return ok(res, result, 'Pièce ajoutée', 201);
       } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
     }
@@ -3493,6 +3539,8 @@ const server = http.createServer(async function(req, res){
     DB.or_pieces = DB.or_pieces || [];
     const q  = parseFloat(qte) || 1;
     const pu = parseFloat(pu_ht) || 0;
+    // L10 commit 2 (Bloc B point 1) : ligne ajoutée sur un OR déjà en_cours -> attente client
+    const enCoursDejaLance = or.statut === 'en_cours';
     const piece = {
       id: 'orp-'+uid(),
       garage_id: garageId,
@@ -3504,10 +3552,15 @@ const server = http.createServer(async function(req, res){
       pu_ht: pu,
       tva_pct: parseFloat(tva_pct) || 20,
       montant_ht: Math.round(q * pu * 100)/100,
+      ajoutee_en_cours: enCoursDejaLance,
+      en_attente_acceptation_client: enCoursDejaLance,
+      date_acceptation_ligne: null,
+      accepte_par_client_id: null,
       created_at: nowISO(),
       updated_at: nowISO()
     };
     DB.or_pieces.push(piece);
+    if (enCoursDejaLance) _basculerAttenteRam(p.id, ctx);
     const orMaj = _recalcTotauxOR(p.id, garageId);
     return ok(res, { piece, ordre_reparation: orMaj }, 'Pièce ajoutée', 201);
   }
@@ -3535,6 +3588,94 @@ const server = http.createServer(async function(req, res){
     DB.or_pieces.splice(i,1);
     const orMaj = _recalcTotauxOR(orId, garageId);
     return ok(res, { deleted_id: p.id, ordre_reparation: orMaj }, 'Pièce supprimée');
+  }
+
+  /* ── L10 commit 2 (Bloc B point 2) : POST /or-taches/:id/accepter — CLIENT accepte une ligne complémentaire ── */
+  if((p=M('POST','/or-taches/:id/accepter'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Permission refusée — réservé au client propriétaire', 403, 'FORBIDDEN_ROLE');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const { data: clientRow } = await SBLayer.supabase.from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
+        if (!clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
+        const { data: tache } = await SBLayer.supabase.from('or_taches').select('or_id').eq('id', p.id).single();
+        if (!tache) return fail(res, 'Tâche non trouvée', 404, 'NOT_FOUND');
+        const { data: or } = await SBLayer.supabase.from('ordres_reparation').select('moto_id').eq('id', tache.or_id).single();
+        if (!or) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+        const { data: motoCheck } = await SBLayer.supabase.from('motos').select('id').eq('id', or.moto_id).eq('client_id', clientRow.id).limit(1).single();
+        if (!motoCheck) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
+        const result = await SBLayer.OrTaches.accepterLigne(p.id, clientRow.id);
+        return ok(res, result, 'Ligne acceptée');
+      } catch(e) { return fail(res, e.message, 400, 'DB_ERROR'); }
+    }
+
+    // ── RAM fallback ──
+    const cli = DB.clients.find(function(c){ return c.auth_user_id === ctx.user_id; });
+    if (!cli) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
+    const iT = (DB.or_taches||[]).findIndex(function(t){ return t.id===p.id; });
+    if (iT<0) return fail(res, 'Tâche non trouvée', 404, 'NOT_FOUND');
+    const tacheR = DB.or_taches[iT];
+    const orR = (DB.ordres_reparation||[]).find(function(o){ return o.id===tacheR.or_id; });
+    if (!orR) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+    const motoR = (DB.motos||[]).find(function(x){ return x.id===orR.moto_id && x.client_id===cli.id; });
+    if (!motoR) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
+    if (!tacheR.en_attente_acceptation_client) return fail(res, "Cette ligne n'est pas en attente d'acceptation client", 400, 'INVALID_STATE');
+    DB.or_taches[iT] = Object.assign({}, tacheR, {
+      en_attente_acceptation_client: false,
+      date_acceptation_ligne: nowISO(),
+      accepte_par_client_id: cli.id,
+      updated_at: nowISO()
+    });
+    _revenirEnCoursRam(tacheR.or_id, { user_id: cli.id, role: 'CLIENT' });
+    const orMaj = _recalcTotauxOR(tacheR.or_id, orR.garage_id);
+    return ok(res, { tache: DB.or_taches[iT], ordre_reparation: orMaj }, 'Ligne acceptée');
+  }
+
+  /* ── L10 commit 2 (Bloc B point 2) : POST /or-pieces/:id/accepter — CLIENT accepte une ligne complémentaire ── */
+  if((p=M('POST','/or-pieces/:id/accepter'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Permission refusée — réservé au client propriétaire', 403, 'FORBIDDEN_ROLE');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const { data: clientRow } = await SBLayer.supabase.from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
+        if (!clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
+        const { data: piece } = await SBLayer.supabase.from('or_pieces').select('or_id').eq('id', p.id).single();
+        if (!piece) return fail(res, 'Pièce non trouvée', 404, 'NOT_FOUND');
+        const { data: or } = await SBLayer.supabase.from('ordres_reparation').select('moto_id').eq('id', piece.or_id).single();
+        if (!or) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+        const { data: motoCheck } = await SBLayer.supabase.from('motos').select('id').eq('id', or.moto_id).eq('client_id', clientRow.id).limit(1).single();
+        if (!motoCheck) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
+        const result = await SBLayer.OrPieces.accepterLigne(p.id, clientRow.id);
+        return ok(res, result, 'Ligne acceptée');
+      } catch(e) { return fail(res, e.message, 400, 'DB_ERROR'); }
+    }
+
+    // ── RAM fallback ──
+    const cliP = DB.clients.find(function(c){ return c.auth_user_id === ctx.user_id; });
+    if (!cliP) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
+    const iP = (DB.or_pieces||[]).findIndex(function(pp){ return pp.id===p.id; });
+    if (iP<0) return fail(res, 'Pièce non trouvée', 404, 'NOT_FOUND');
+    const pieceR = DB.or_pieces[iP];
+    const orRP = (DB.ordres_reparation||[]).find(function(o){ return o.id===pieceR.or_id; });
+    if (!orRP) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+    const motoRP = (DB.motos||[]).find(function(x){ return x.id===orRP.moto_id && x.client_id===cliP.id; });
+    if (!motoRP) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
+    if (!pieceR.en_attente_acceptation_client) return fail(res, "Cette ligne n'est pas en attente d'acceptation client", 400, 'INVALID_STATE');
+    DB.or_pieces[iP] = Object.assign({}, pieceR, {
+      en_attente_acceptation_client: false,
+      date_acceptation_ligne: nowISO(),
+      accepte_par_client_id: cliP.id,
+      updated_at: nowISO()
+    });
+    _revenirEnCoursRam(pieceR.or_id, { user_id: cliP.id, role: 'CLIENT' });
+    const orMaj = _recalcTotauxOR(pieceR.or_id, orRP.garage_id);
+    return ok(res, { piece: DB.or_pieces[iP], ordre_reparation: orMaj }, 'Ligne acceptée');
   }
 
   /* ── DELETE /or-taches/:id ── */

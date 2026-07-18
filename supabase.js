@@ -959,6 +959,17 @@ const OrdresReparation = {
     return { ordre_reparation: or, moto: motos || null, taches, pieces: or_pieces || [], totaux };
   },
 
+  // L10 commit 2 (Bloc A) : attribution atomique via attribuer_numero_or()
+  // (migration 27 — INSERT ... ON CONFLICT DO UPDATE ... RETURNING, verrou
+  // de ligne implicite sur (garage_id, annee), pas de doublon possible même
+  // sous création concurrente). Ne remplace PAS numero_or (ancien champ,
+  // intact) — alimente uniquement la nouvelle colonne `numero`.
+  async attribuerNumeroOr(garage_id) {
+    const { data, error } = await supabase.rpc('attribuer_numero_or', { p_garage_id: garage_id });
+    if (error) throw new Error('Séquence numéro OR : ' + error.message);
+    return data;
+  },
+
   async create(garage_id, payload) {
     const { moto_id, devis_id, technicien_id, km_entree, notes_atelier, notes_client } = payload;
     const { data: moto, error: me } = await supabase.from('motos')
@@ -967,9 +978,11 @@ const OrdresReparation = {
     const { count } = await supabase.from('ordres_reparation')
       .select('id', { count: 'exact', head: true }).eq('garage_id', garage_id);
     const numero_or = `OR-${new Date().getFullYear()}-${String((count || 0) + 1).padStart(4, '0')}`;
+    const numero = await OrdresReparation.attribuerNumeroOr(garage_id);
     const or = await insert('ordres_reparation', {
       garage_id,
       numero_or,
+      numero,
       moto_id,
       client_id:     moto.client_id || null,
       devis_id:      devis_id      || null,
@@ -1102,6 +1115,47 @@ const OrdresReparation = {
     }
   },
 
+  // L10 commit 2 (Bloc B, point 1) : une ligne (tâche/pièce) ajoutée sur un
+  // OR déjà 'en_cours' bascule l'OR en 'attente' avec attente_auto=TRUE —
+  // ce marqueur (migration 27) distingue cette attente "système" d'une
+  // attente posée manuellement (PATCH /statut, motif humain type "pièce
+  // manquante"), qui reste attente_auto=FALSE. Sert de garde pour
+  // _revenirEnCoursSiPlusDeLigneEnAttente ci-dessous : on ne reprend
+  // jamais automatiquement une attente que le garage a posée lui-même.
+  async _basculerEnAttentePourLigne(or_id, ctx) {
+    const motif = "Travaux complémentaires en attente d'acceptation client";
+    const { error } = await supabase.from('ordres_reparation')
+      .update({ statut: 'attente', attente_motif: motif, attente_auto: true })
+      .eq('id', or_id);
+    if (error) throw new Error(error.message);
+    await OrdresReparation.logHistorique(or_id, 'en_cours', 'attente', 'ligne_ajoutee_attente', { motif }, ctx);
+  },
+
+  // L10 commit 2 (Bloc B, point 2) : appelé après qu'une ligne complémentaire
+  // vient d'être acceptée par le client. Repasse l'OR en 'en_cours'
+  // UNIQUEMENT si (a) plus aucune ligne (tâche ou pièce) n'est en attente
+  // d'acceptation ET (b) l'attente actuelle a été posée automatiquement
+  // (attente_auto=TRUE) — une attente manuelle (pièce manquante, etc.)
+  // n'est jamais levée par cette fonction, même si toutes les lignes sont
+  // acceptées entre-temps.
+  async _revenirEnCoursSiPlusDeLigneEnAttente(or_id, ctx) {
+    const { count: ct } = await supabase.from('or_taches')
+      .select('id', { count: 'exact', head: true }).eq('or_id', or_id).eq('en_attente_acceptation_client', true);
+    const { count: cp } = await supabase.from('or_pieces')
+      .select('id', { count: 'exact', head: true }).eq('or_id', or_id).eq('en_attente_acceptation_client', true);
+    if ((ct || 0) + (cp || 0) > 0) return;
+
+    const { data: or, error: oe } = await supabase.from('ordres_reparation')
+      .select('statut, attente_auto').eq('id', or_id).single();
+    if (oe || !or || or.statut !== 'attente' || !or.attente_auto) return;
+
+    const { error } = await supabase.from('ordres_reparation')
+      .update({ statut: 'en_cours', attente_auto: false })
+      .eq('id', or_id);
+    if (error) throw new Error(error.message);
+    await OrdresReparation.logHistorique(or_id, 'attente', 'en_cours', 'ligne_acceptee_reprise', null, ctx);
+  },
+
   async changerStatut(id, garage_id, ctx, { nouveau_statut, attente_motif, km_sortie, signature_base64, annulation_motif, refus_motif }) {
     const or = await OrdresReparation._getOrRaw(id, garage_id);
     const ancien = or.statut;
@@ -1200,12 +1254,16 @@ const OrdresReparation = {
 // ══════════════════════════════════════════════════════════
 const OrTaches = {
 
-  async create(garage_id, or_id, payload) {
+  // ctx optionnel (défaut null) : ne casse pas tests/test-or-e2e.js qui
+  // appelle create() sans ctx. Uniquement utilisé pour logHistorique côté
+  // bascule attente auto (L10 commit 2, Bloc B point 1).
+  async create(garage_id, or_id, payload, ctx = null) {
     const { data: or, error: oe } = await supabase.from('ordres_reparation')
-      .select('id').eq('id', or_id).eq('garage_id', garage_id).single();
+      .select('id, statut').eq('id', or_id).eq('garage_id', garage_id).single();
     if (oe) throw new Error('Ordre non trouvé');
     const dh = parseFloat(payload.duree_h)     || 0;
     const th = parseFloat(payload.taux_horaire) || 0;
+    const enCoursDejaLance = or.statut === 'en_cours';
     const tache = await insert('or_taches', {
       garage_id, or_id,
       ordre:         parseInt(payload.ordre) || 0,
@@ -1215,9 +1273,34 @@ const OrTaches = {
       taux_horaire:  th,
       montant_ht:    +(dh * th).toFixed(2),
       technicien_id: payload.technicien_id || null,
-      statut:        'a_faire'
+      statut:        'a_faire',
+      ajoutee_en_cours:             enCoursDejaLance,
+      en_attente_acceptation_client: enCoursDejaLance
     });
+    if (enCoursDejaLance) await OrdresReparation._basculerEnAttentePourLigne(or_id, ctx);
     const orMaj = await OrdresReparation.recalculerTotaux(or_id);
+    return { tache, ordre_reparation: orMaj };
+  },
+
+  // L10 commit 2 (Bloc B point 2) : le client accepte une ligne complémentaire
+  // ajoutée en cours d'intervention. Ownership déjà vérifiée par l'appelant
+  // (route handler, même pattern que GET /devis/:id) — pas de garage_id ici,
+  // le client n'a pas de contexte garage.
+  async accepterLigne(id, client_id) {
+    const { data: existing, error: fe } = await supabase.from('or_taches')
+      .select('*').eq('id', id).single();
+    if (fe || !existing) throw new Error('Tâche non trouvée');
+    if (!existing.en_attente_acceptation_client)
+      throw new Error("Cette ligne n'est pas en attente d'acceptation client");
+    const { data: tache, error } = await supabase.from('or_taches')
+      .update({
+        en_attente_acceptation_client: false,
+        date_acceptation_ligne:        new Date().toISOString(),
+        accepte_par_client_id:         client_id
+      }).eq('id', id).select().single();
+    if (error) throw new Error(error.message);
+    await OrdresReparation._revenirEnCoursSiPlusDeLigneEnAttente(existing.or_id, { user_id: client_id, role: 'CLIENT' });
+    const orMaj = await OrdresReparation.recalculerTotaux(existing.or_id);
     return { tache, ordre_reparation: orMaj };
   },
 
@@ -1259,12 +1342,14 @@ const OrTaches = {
 // ══════════════════════════════════════════════════════════
 const OrPieces = {
 
-  async create(garage_id, or_id, payload) {
+  // ctx optionnel (défaut null) — voir OrTaches.create pour le rationale.
+  async create(garage_id, or_id, payload, ctx = null) {
     const { data: or, error: oe } = await supabase.from('ordres_reparation')
-      .select('id').eq('id', or_id).eq('garage_id', garage_id).single();
+      .select('id, statut').eq('id', or_id).eq('garage_id', garage_id).single();
     if (oe) throw new Error('Ordre non trouvé');
     const q  = parseFloat(payload.qte)   || 1;
     const pu = parseFloat(payload.pu_ht) || 0;
+    const enCoursDejaLance = or.statut === 'en_cours';
     const piece = await insert('or_pieces', {
       garage_id, or_id,
       piece_id:  payload.piece_id  || null,
@@ -1273,9 +1358,31 @@ const OrPieces = {
       qte:       q,
       pu_ht:     pu,
       tva_pct:   parseFloat(payload.tva_pct) || 20,
-      montant_ht: +(q * pu).toFixed(2)
+      montant_ht: +(q * pu).toFixed(2),
+      ajoutee_en_cours:              enCoursDejaLance,
+      en_attente_acceptation_client: enCoursDejaLance
     });
+    if (enCoursDejaLance) await OrdresReparation._basculerEnAttentePourLigne(or_id, ctx);
     const orMaj = await OrdresReparation.recalculerTotaux(or_id);
+    return { piece, ordre_reparation: orMaj };
+  },
+
+  // L10 commit 2 (Bloc B point 2) — voir OrTaches.accepterLigne pour le rationale.
+  async accepterLigne(id, client_id) {
+    const { data: existing, error: fe } = await supabase.from('or_pieces')
+      .select('*').eq('id', id).single();
+    if (fe || !existing) throw new Error('Pièce non trouvée');
+    if (!existing.en_attente_acceptation_client)
+      throw new Error("Cette ligne n'est pas en attente d'acceptation client");
+    const { data: piece, error } = await supabase.from('or_pieces')
+      .update({
+        en_attente_acceptation_client: false,
+        date_acceptation_ligne:        new Date().toISOString(),
+        accepte_par_client_id:         client_id
+      }).eq('id', id).select().single();
+    if (error) throw new Error(error.message);
+    await OrdresReparation._revenirEnCoursSiPlusDeLigneEnAttente(existing.or_id, { user_id: client_id, role: 'CLIENT' });
+    const orMaj = await OrdresReparation.recalculerTotaux(existing.or_id);
     return { piece, ordre_reparation: orMaj };
   },
 
