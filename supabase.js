@@ -972,13 +972,16 @@ const OrdresReparation = {
 
   async create(garage_id, payload) {
     const { moto_id, devis_id, technicien_id, km_entree, notes_atelier, notes_client } = payload;
-    const { data: moto, error: me } = await supabase.from('motos')
-      .select('client_id, km').eq('id', moto_id).eq('garage_id', garage_id).single();
+    // Fix review, finding #8 : la recherche moto, le COUNT (numero_or) et le
+    // RPC attribuer_numero_or (numero) ne dépendent que de garage_id/moto_id
+    // — aucun des trois ne dépend du résultat des autres, exécutés en parallèle.
+    const [{ data: moto, error: me }, { count }, numero] = await Promise.all([
+      supabase.from('motos').select('client_id, km').eq('id', moto_id).eq('garage_id', garage_id).single(),
+      supabase.from('ordres_reparation').select('id', { count: 'exact', head: true }).eq('garage_id', garage_id),
+      OrdresReparation.attribuerNumeroOr(garage_id)
+    ]);
     if (me) throw new Error('Moto non trouvée');
-    const { count } = await supabase.from('ordres_reparation')
-      .select('id', { count: 'exact', head: true }).eq('garage_id', garage_id);
     const numero_or = `OR-${new Date().getFullYear()}-${String((count || 0) + 1).padStart(4, '0')}`;
-    const numero = await OrdresReparation.attribuerNumeroOr(garage_id);
     const or = await insert('ordres_reparation', {
       garage_id,
       numero_or,
@@ -1081,8 +1084,11 @@ const OrdresReparation = {
   },
 
   async recalculerTotaux(or_id) {
-    const { data: taches } = await supabase.from('or_taches').select('montant_ht').eq('or_id', or_id);
-    const { data: pieces } = await supabase.from('or_pieces').select('montant_ht, tva_pct').eq('or_id', or_id);
+    // Fix review, finding #8 : les 2 SELECT sont indépendants, exécutés en parallèle.
+    const [{ data: taches }, { data: pieces }] = await Promise.all([
+      supabase.from('or_taches').select('montant_ht').eq('or_id', or_id),
+      supabase.from('or_pieces').select('montant_ht, tva_pct').eq('or_id', or_id)
+    ]);
     const total_mo_ht     = (taches || []).reduce((s, t) => s + (t.montant_ht || 0), 0);
     const total_pieces_ht = (pieces || []).reduce((s, p) => s + (p.montant_ht || 0), 0);
     const total_ht        = total_mo_ht + total_pieces_ht;
@@ -1124,10 +1130,17 @@ const OrdresReparation = {
   // jamais automatiquement une attente que le garage a posée lui-même.
   async _basculerEnAttentePourLigne(or_id, ctx) {
     const motif = "Travaux complémentaires en attente d'acceptation client";
-    const { error } = await supabase.from('ordres_reparation')
+    // Fix review, finding #5 : garde .eq('statut','en_cours') pour rendre
+    // l'écriture conditionnelle à l'état lu par l'appelant — sans ça, un
+    // TOCTOU entre la lecture du statut (dans create()) et cette écriture
+    // pouvait écraser silencieusement un statut changé entre-temps (ex:
+    // clôture concurrente). .select('id') permet de détecter si la garde a
+    // bloqué l'update (aucune ligne retournée = statut déjà changé).
+    const { data, error } = await supabase.from('ordres_reparation')
       .update({ statut: 'attente', attente_motif: motif, attente_auto: true })
-      .eq('id', or_id);
+      .eq('id', or_id).eq('statut', 'en_cours').select('id');
     if (error) throw new Error(error.message);
+    if (!data || data.length === 0) return;
     await OrdresReparation.logHistorique(or_id, 'en_cours', 'attente', 'ligne_ajoutee_attente', { motif }, ctx);
   },
 
@@ -1139,18 +1152,22 @@ const OrdresReparation = {
   // n'est jamais levée par cette fonction, même si toutes les lignes sont
   // acceptées entre-temps.
   async _revenirEnCoursSiPlusDeLigneEnAttente(or_id, ctx) {
-    const { count: ct } = await supabase.from('or_taches')
-      .select('id', { count: 'exact', head: true }).eq('or_id', or_id).eq('en_attente_acceptation_client', true);
-    const { count: cp } = await supabase.from('or_pieces')
-      .select('id', { count: 'exact', head: true }).eq('or_id', or_id).eq('en_attente_acceptation_client', true);
+    // Fix review, finding #8 : les 2 COUNT sont indépendants, exécutés en
+    // parallèle plutôt qu'en séquence.
+    const [{ count: ct }, { count: cp }] = await Promise.all([
+      supabase.from('or_taches').select('id', { count: 'exact', head: true }).eq('or_id', or_id).eq('en_attente_acceptation_client', true),
+      supabase.from('or_pieces').select('id', { count: 'exact', head: true }).eq('or_id', or_id).eq('en_attente_acceptation_client', true)
+    ]);
     if ((ct || 0) + (cp || 0) > 0) return;
 
     const { data: or, error: oe } = await supabase.from('ordres_reparation')
       .select('statut, attente_auto').eq('id', or_id).single();
     if (oe || !or || or.statut !== 'attente' || !or.attente_auto) return;
 
+    // Fix review, finding #6 : attente_motif n'était jamais réinitialisé —
+    // un texte de pause périmé restait affiché sur un OR redevenu actif.
     const { error } = await supabase.from('ordres_reparation')
-      .update({ statut: 'en_cours', attente_auto: false })
+      .update({ statut: 'en_cours', attente_auto: false, attente_motif: null })
       .eq('id', or_id);
     if (error) throw new Error(error.message);
     await OrdresReparation.logHistorique(or_id, 'attente', 'en_cours', 'ligne_acceptee_reprise', null, ctx);
@@ -1279,7 +1296,7 @@ const OrTaches = {
   // bascule attente auto (L10 commit 2, Bloc B point 1).
   async create(garage_id, or_id, payload, ctx = null) {
     const { data: or, error: oe } = await supabase.from('ordres_reparation')
-      .select('id, statut, attente_auto').eq('id', or_id).eq('garage_id', garage_id).single();
+      .select('id, statut').eq('id', or_id).eq('garage_id', garage_id).single();
     if (oe) throw new Error('Ordre non trouvé');
     const dh = parseFloat(payload.duree_h)     || 0;
     const th = parseFloat(payload.taux_horaire) || 0;

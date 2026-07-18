@@ -171,8 +171,9 @@ async function run() {
     console.log(`  OR.statut après 2/2 acceptées : ${resAccP.ordre_reparation.statut}`);
     check("OR repasse 'en_cours' (plus aucune ligne en attente)", resAccP.ordre_reparation.statut === 'en_cours',
       `réel: ${resAccP.ordre_reparation.statut}`);
-    const { data: orFinal } = await supabase.from('ordres_reparation').select('attente_auto').eq('id', or_id).single();
+    const { data: orFinal } = await supabase.from('ordres_reparation').select('attente_auto, attente_motif').eq('id', or_id).single();
     check('attente_auto remis à false', orFinal.attente_auto === false);
+    check('attente_motif réinitialisé (fix #6)', orFinal.attente_motif === null, `réel: ${orFinal.attente_motif}`);
   } catch (e) {
     console.error('  ❌ ERREUR:', e.message);
     KO++;
@@ -231,7 +232,7 @@ async function run() {
     await OrdresReparation.update(or4.id, garage_id, { statut: 'en_cours' });
     const resT4 = await OrTaches.create(garage_id, or4.id, {
       libelle: 'Test fix#1', duree_h: 0.5, taux_horaire: 60
-    });
+    }, { user_id: 'test-mecano', role: 'MECANO' });
     check('OR bascule en attente (setup)', resT4.ordre_reparation.statut === 'attente');
 
     let blocked = false, blockedMsg = '';
@@ -288,9 +289,9 @@ async function run() {
     await OrdresReparation.update(or7.id, garage_id, { statut: 'en_cours' });
     const resT7 = await OrTaches.create(garage_id, or7.id, {
       libelle: 'À supprimer', duree_h: 0.5, taux_horaire: 60
-    });
+    }, { user_id: 'test-mecano', role: 'MECANO' });
     check('OR bascule en attente (setup)', resT7.ordre_reparation.statut === 'attente');
-    const resDel = await OrTaches.remove(resT7.tache.id, garage_id);
+    const resDel = await OrTaches.remove(resT7.tache.id, garage_id, { user_id: 'test-mecano', role: 'MECANO' });
     console.log(`  OR.statut après suppression de la seule ligne en attente : ${resDel.ordre_reparation.statut}`);
     check("OR repasse 'en_cours' après suppression de la dernière ligne en attente",
       resDel.ordre_reparation.statut === 'en_cours', `réel: ${resDel.ordre_reparation.statut}`);
@@ -306,7 +307,7 @@ async function run() {
     await OrdresReparation.update(or8.id, garage_id, { statut: 'en_cours' });
     const resT8 = await OrTaches.create(garage_id, or8.id, {
       libelle: 'Pas encore acceptée', duree_h: 0.5, taux_horaire: 60
-    });
+    }, { user_id: 'test-mecano', role: 'MECANO' });
     let blockedFait = false;
     try {
       await OrTaches.update(resT8.tache.id, garage_id, { statut: 'fait' });

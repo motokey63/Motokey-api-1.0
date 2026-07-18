@@ -3048,6 +3048,10 @@ const server = http.createServer(async function(req, res){
     const motif = "Travaux complémentaires en attente d'acceptation client";
     const i = (DB.ordres_reparation||[]).findIndex(function(o){ return o.id===orId; });
     if (i<0) return;
+    // Fix review, finding #5 — garde de parité avec le chemin Supabase (pas
+    // de race réelle possible en RAM mono-thread, mais garantit le même
+    // comportement si l'état a changé depuis la lecture de l'appelant).
+    if (DB.ordres_reparation[i].statut !== 'en_cours') return;
     const ancien = DB.ordres_reparation[i].statut;
     DB.ordres_reparation[i] = Object.assign({}, DB.ordres_reparation[i], {
       statut: 'attente', attente_motif: motif, attente_auto: true, updated_at: nowISO()
@@ -3064,7 +3068,8 @@ const server = http.createServer(async function(req, res){
     if (i<0) return;
     const or = DB.ordres_reparation[i];
     if (or.statut !== 'attente' || !or.attente_auto) return;
-    DB.ordres_reparation[i] = Object.assign({}, or, { statut: 'en_cours', attente_auto: false, updated_at: nowISO() });
+    // Fix review, finding #6 — voir supabase.js pour le rationale.
+    DB.ordres_reparation[i] = Object.assign({}, or, { statut: 'en_cours', attente_auto: false, attente_motif: null, updated_at: nowISO() });
     _logOrHistoriqueRam(orId, 'attente', 'en_cours', 'ligne_acceptee_reprise', null, ctx);
   }
 
@@ -3612,23 +3617,25 @@ const server = http.createServer(async function(req, res){
   }
 
   /* ── L10 commit 2 (Bloc B point 2) : POST /or-taches/:id/accepter — CLIENT accepte une ligne complémentaire ── */
-  if((p=M('POST','/or-taches/:id/accepter'))!==null){
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Permission refusée — réservé au client propriétaire', 403, 'FORBIDDEN_ROLE');
-
+  // Fix review, findings #7/#8 : les 2 endpoints POST /or-taches/:id/accepter
+  // et /or-pieces/:id/accepter étaient quasi-identiques (chaîne de propriété
+  // client dupliquée, seuls les noms de table/clé différaient) — fusionnés
+  // en un seul handler paramétré. Le lookup clientRow et le lookup de la
+  // ligne sont indépendants, exécutés en parallèle (finding #8).
+  async function _accepterLigneRoute(req, res, p, ctx, { table, keyName, label, ramList, sbAccepter }) {
     if (USE_SUPABASE && SBLayer) {
       try {
-        const { data: clientRow } = await SBLayer.supabase.from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
+        const [{ data: clientRow }, { data: ligne }] = await Promise.all([
+          SBLayer.supabase.from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single(),
+          SBLayer.supabase.from(table).select('or_id').eq('id', p.id).single()
+        ]);
         if (!clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
-        const { data: tache } = await SBLayer.supabase.from('or_taches').select('or_id').eq('id', p.id).single();
-        if (!tache) return fail(res, 'Tâche non trouvée', 404, 'NOT_FOUND');
-        const { data: or } = await SBLayer.supabase.from('ordres_reparation').select('moto_id').eq('id', tache.or_id).single();
+        if (!ligne) return fail(res, label + ' non trouvée', 404, 'NOT_FOUND');
+        const { data: or } = await SBLayer.supabase.from('ordres_reparation').select('moto_id').eq('id', ligne.or_id).single();
         if (!or) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
         const { data: motoCheck } = await SBLayer.supabase.from('motos').select('id').eq('id', or.moto_id).eq('client_id', clientRow.id).limit(1).single();
         if (!motoCheck) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
-        const result = await SBLayer.OrTaches.accepterLigne(p.id, clientRow.id);
+        const result = await sbAccepter(p.id, clientRow.id);
         return ok(res, result, 'Ligne acceptée');
       } catch(e) { return fail(res, e.message, 400, 'DB_ERROR'); }
     }
@@ -3636,23 +3643,35 @@ const server = http.createServer(async function(req, res){
     // ── RAM fallback ──
     const cli = DB.clients.find(function(c){ return c.auth_user_id === ctx.user_id; });
     if (!cli) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
-    const iT = (DB.or_taches||[]).findIndex(function(t){ return t.id===p.id; });
-    if (iT<0) return fail(res, 'Tâche non trouvée', 404, 'NOT_FOUND');
-    const tacheR = DB.or_taches[iT];
-    const orR = (DB.ordres_reparation||[]).find(function(o){ return o.id===tacheR.or_id; });
+    const list = DB[ramList] || [];
+    const idx = list.findIndex(function(x){ return x.id===p.id; });
+    if (idx<0) return fail(res, label + ' non trouvée', 404, 'NOT_FOUND');
+    const ligneR = list[idx];
+    const orR = (DB.ordres_reparation||[]).find(function(o){ return o.id===ligneR.or_id; });
     if (!orR) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
     const motoR = (DB.motos||[]).find(function(x){ return x.id===orR.moto_id && x.client_id===cli.id; });
     if (!motoR) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
-    if (!tacheR.en_attente_acceptation_client) return fail(res, "Cette ligne n'est pas en attente d'acceptation client", 400, 'INVALID_STATE');
-    DB.or_taches[iT] = Object.assign({}, tacheR, {
+    if (!ligneR.en_attente_acceptation_client) return fail(res, "Cette ligne n'est pas en attente d'acceptation client", 400, 'INVALID_STATE');
+    list[idx] = Object.assign({}, ligneR, {
       en_attente_acceptation_client: false,
       date_acceptation_ligne: nowISO(),
       accepte_par_client_id: cli.id,
       updated_at: nowISO()
     });
-    _revenirEnCoursRam(tacheR.or_id, { user_id: cli.id, role: 'CLIENT' });
-    const orMaj = _recalcTotauxOR(tacheR.or_id, orR.garage_id);
-    return ok(res, { tache: DB.or_taches[iT], ordre_reparation: orMaj }, 'Ligne acceptée');
+    _revenirEnCoursRam(ligneR.or_id, { user_id: cli.id, role: 'CLIENT' });
+    const orMaj = _recalcTotauxOR(ligneR.or_id, orR.garage_id);
+    return ok(res, { [keyName]: list[idx], ordre_reparation: orMaj }, 'Ligne acceptée');
+  }
+
+  if((p=M('POST','/or-taches/:id/accepter'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Permission refusée — réservé au client propriétaire', 403, 'FORBIDDEN_ROLE');
+    return await _accepterLigneRoute(req, res, p, ctx, {
+      table: 'or_taches', keyName: 'tache', label: 'Tâche', ramList: 'or_taches',
+      sbAccepter: function(id, clientId){ return SBLayer.OrTaches.accepterLigne(id, clientId); }
+    });
   }
 
   /* ── L10 commit 2 (Bloc B point 2) : POST /or-pieces/:id/accepter — CLIENT accepte une ligne complémentaire ── */
@@ -3661,42 +3680,10 @@ const server = http.createServer(async function(req, res){
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Permission refusée — réservé au client propriétaire', 403, 'FORBIDDEN_ROLE');
-
-    if (USE_SUPABASE && SBLayer) {
-      try {
-        const { data: clientRow } = await SBLayer.supabase.from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
-        if (!clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
-        const { data: piece } = await SBLayer.supabase.from('or_pieces').select('or_id').eq('id', p.id).single();
-        if (!piece) return fail(res, 'Pièce non trouvée', 404, 'NOT_FOUND');
-        const { data: or } = await SBLayer.supabase.from('ordres_reparation').select('moto_id').eq('id', piece.or_id).single();
-        if (!or) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
-        const { data: motoCheck } = await SBLayer.supabase.from('motos').select('id').eq('id', or.moto_id).eq('client_id', clientRow.id).limit(1).single();
-        if (!motoCheck) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
-        const result = await SBLayer.OrPieces.accepterLigne(p.id, clientRow.id);
-        return ok(res, result, 'Ligne acceptée');
-      } catch(e) { return fail(res, e.message, 400, 'DB_ERROR'); }
-    }
-
-    // ── RAM fallback ──
-    const cliP = DB.clients.find(function(c){ return c.auth_user_id === ctx.user_id; });
-    if (!cliP) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
-    const iP = (DB.or_pieces||[]).findIndex(function(pp){ return pp.id===p.id; });
-    if (iP<0) return fail(res, 'Pièce non trouvée', 404, 'NOT_FOUND');
-    const pieceR = DB.or_pieces[iP];
-    const orRP = (DB.ordres_reparation||[]).find(function(o){ return o.id===pieceR.or_id; });
-    if (!orRP) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
-    const motoRP = (DB.motos||[]).find(function(x){ return x.id===orRP.moto_id && x.client_id===cliP.id; });
-    if (!motoRP) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
-    if (!pieceR.en_attente_acceptation_client) return fail(res, "Cette ligne n'est pas en attente d'acceptation client", 400, 'INVALID_STATE');
-    DB.or_pieces[iP] = Object.assign({}, pieceR, {
-      en_attente_acceptation_client: false,
-      date_acceptation_ligne: nowISO(),
-      accepte_par_client_id: cliP.id,
-      updated_at: nowISO()
+    return await _accepterLigneRoute(req, res, p, ctx, {
+      table: 'or_pieces', keyName: 'piece', label: 'Pièce', ramList: 'or_pieces',
+      sbAccepter: function(id, clientId){ return SBLayer.OrPieces.accepterLigne(id, clientId); }
     });
-    _revenirEnCoursRam(pieceR.or_id, { user_id: cliP.id, role: 'CLIENT' });
-    const orMaj = _recalcTotauxOR(pieceR.or_id, orRP.garage_id);
-    return ok(res, { piece: DB.or_pieces[iP], ordre_reparation: orMaj }, 'Ligne acceptée');
   }
 
   /* ── DELETE /or-taches/:id ── */
