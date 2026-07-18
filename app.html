@@ -1967,10 +1967,10 @@ function buildORStatusStepper(or) {
 async function directTransition(nouveau_statut) {
   try {
     await api('/ordres-reparation/' + curORId + '/statut', 'PATCH', { nouveau_statut });
-    showToast('Statut mis à jour');
+    toast('Statut mis à jour');
     await reloadFiche();
   } catch(e) {
-    showToast('⚠️ ' + e.message);
+    toast('⚠️ ' + e.message);
   }
 }
 
@@ -2153,9 +2153,9 @@ async function saveEdit() {
   }
 
   if (errors.length > 0) {
-    showToast('⚠️ ' + errors.length + ' erreur(s) : ' + errors[0]);
+    toast('⚠️ ' + errors.length + ' erreur(s) : ' + errors[0]);
   } else {
-    showToast('Modifications sauvegardées');
+    toast('Modifications sauvegardées');
   }
   orEditState.editing = false;
   orEditState.dirty   = false;
@@ -2435,7 +2435,7 @@ async function submitTransition(nouveau_statut) {
   try {
     await api('/ordres-reparation/' + curORId + '/statut', 'PATCH', payload);
     closeORModal();
-    showToast('Statut mis à jour');
+    toast('Statut mis à jour');
     await reloadFiche();
   } catch(e) {
     const el = document.getElementById('transModalErr');
@@ -2469,7 +2469,7 @@ async function submitCloture() {
   try {
     await api('/ordres-reparation/' + curORId + '/cloturer', 'POST', { km_sortie: km });
     closeORModal();
-    showToast('OR clôturé');
+    toast('OR clôturé');
     await reloadFiche();
   } catch(e) {
     const el = document.getElementById('clotureErr');
@@ -2497,7 +2497,7 @@ async function submitFacturation() {
   try {
     await api('/ordres-reparation/' + curORId + '/facturer', 'POST', {});
     closeORModal();
-    showToast('Facture générée');
+    toast('Facture générée');
     await reloadFiche();
   } catch(e) {
     const el = document.getElementById('factureErr');
