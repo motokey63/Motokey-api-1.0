@@ -224,11 +224,110 @@ async function run() {
     KO++;
   }
 
+  // ── Bloc C — Fix #1 : blocage manuel attente→en_cours si lignes en attente ──
+  console.log('\n── Bloc C · Fix #1 : PATCH /statut attente→en_cours bloqué ─────');
+  try {
+    const { ordre_reparation: or4 } = await OrdresReparation.create(garage_id, { moto_id: moto.id, km_entree: moto.km });
+    await OrdresReparation.update(or4.id, garage_id, { statut: 'en_cours' });
+    const resT4 = await OrTaches.create(garage_id, or4.id, {
+      libelle: 'Test fix#1', duree_h: 0.5, taux_horaire: 60
+    });
+    check('OR bascule en attente (setup)', resT4.ordre_reparation.statut === 'attente');
+
+    let blocked = false, blockedMsg = '';
+    try {
+      await OrdresReparation.changerStatut(or4.id, garage_id, { user_id: 'test-mecano', role: 'MECANO' }, { nouveau_statut: 'en_cours' });
+    } catch (e) { blocked = true; blockedMsg = e.message; }
+    console.log(`  Transition manuelle attente→en_cours : ${blocked ? 'bloquée' : 'ACCEPTÉE (bug)'} ${blocked ? '(' + blockedMsg + ')' : ''}`);
+    check('PATCH /statut manuel bloqué tant que la ligne est en attente', blocked);
+
+    // Accepter la ligne débloque la transition manuelle
+    await OrTaches.accepterLigne(resT4.tache.id, clientId);
+    const { data: orAvantManuel } = await supabase.from('ordres_reparation').select('statut').eq('id', or4.id).single();
+    check("OR déjà repassé en_cours automatiquement après acceptation", orAvantManuel.statut === 'en_cours');
+  } catch (e) {
+    console.error('  ❌ ERREUR:', e.message);
+    KO++;
+  }
+
+  // ── Bloc C — Fix #1 (suite) : attente_auto remis à false sur transition manuelle ──
+  console.log('\n── Bloc C · Fix #1 (suite) : attente_auto réinitialisé ──────────');
+  try {
+    const { ordre_reparation: or5 } = await OrdresReparation.create(garage_id, { moto_id: moto.id, km_entree: moto.km });
+    await OrdresReparation.update(or5.id, garage_id, { statut: 'en_cours' });
+    await OrdresReparation.changerStatut(or5.id, garage_id, { user_id: 'test-mecano', role: 'MECANO' },
+      { nouveau_statut: 'attente', attente_motif: 'Attente pièce (manuel)' });
+    const { data: or5Db } = await supabase.from('ordres_reparation').select('attente_auto').eq('id', or5.id).single();
+    check('attente_auto=false après une mise en attente MANUELLE via changerStatut', or5Db.attente_auto === false);
+  } catch (e) {
+    console.error('  ❌ ERREUR:', e.message);
+    KO++;
+  }
+
+  // ── Bloc C — Fix #2 : ligne ajoutée pendant une attente MANUELLE requiert désormais l'acceptation ──
+  console.log('\n── Bloc C · Fix #2 : ligne ajoutée pendant attente manuelle ─────');
+  try {
+    const { ordre_reparation: or6 } = await OrdresReparation.create(garage_id, { moto_id: moto.id, km_entree: moto.km });
+    await OrdresReparation.update(or6.id, garage_id, { statut: 'en_cours' });
+    await OrdresReparation.changerStatut(or6.id, garage_id, { user_id: 'test-mecano', role: 'MECANO' },
+      { nouveau_statut: 'attente', attente_motif: 'Pièce manquante (manuel)' });
+    const resT6 = await OrTaches.create(garage_id, or6.id, {
+      libelle: 'Ajoutée pendant attente manuelle', duree_h: 0.5, taux_horaire: 60
+    });
+    check('ligne ajoutée pendant une attente MANUELLE est marquée en attente d\'acceptation',
+      resT6.tache.en_attente_acceptation_client === true, `réel: ${resT6.tache.en_attente_acceptation_client}`);
+  } catch (e) {
+    console.error('  ❌ ERREUR:', e.message);
+    KO++;
+  }
+
+  // ── Bloc C — Fix #3 : supprimer la dernière ligne en attente débloque l'OR ──
+  console.log('\n── Bloc C · Fix #3 : DELETE dernière ligne en attente → revert ─');
+  try {
+    const { ordre_reparation: or7 } = await OrdresReparation.create(garage_id, { moto_id: moto.id, km_entree: moto.km });
+    await OrdresReparation.update(or7.id, garage_id, { statut: 'en_cours' });
+    const resT7 = await OrTaches.create(garage_id, or7.id, {
+      libelle: 'À supprimer', duree_h: 0.5, taux_horaire: 60
+    });
+    check('OR bascule en attente (setup)', resT7.ordre_reparation.statut === 'attente');
+    const resDel = await OrTaches.remove(resT7.tache.id, garage_id);
+    console.log(`  OR.statut après suppression de la seule ligne en attente : ${resDel.ordre_reparation.statut}`);
+    check("OR repasse 'en_cours' après suppression de la dernière ligne en attente",
+      resDel.ordre_reparation.statut === 'en_cours', `réel: ${resDel.ordre_reparation.statut}`);
+  } catch (e) {
+    console.error('  ❌ ERREUR:', e.message);
+    KO++;
+  }
+
+  // ── Bloc C — Fix #4 : statut='fait' bloqué sur ligne en attente d'acceptation ──
+  console.log('\n── Bloc C · Fix #4 : statut=\'fait\' bloqué sur ligne pendante ───');
+  try {
+    const { ordre_reparation: or8 } = await OrdresReparation.create(garage_id, { moto_id: moto.id, km_entree: moto.km });
+    await OrdresReparation.update(or8.id, garage_id, { statut: 'en_cours' });
+    const resT8 = await OrTaches.create(garage_id, or8.id, {
+      libelle: 'Pas encore acceptée', duree_h: 0.5, taux_horaire: 60
+    });
+    let blockedFait = false;
+    try {
+      await OrTaches.update(resT8.tache.id, garage_id, { statut: 'fait' });
+    } catch (e) { blockedFait = true; }
+    check("PATCH /or-taches/:id statut='fait' bloqué tant que en_attente_acceptation_client=true", blockedFait);
+
+    // Après acceptation, le passage à 'fait' redevient possible
+    await OrTaches.accepterLigne(resT8.tache.id, clientId);
+    const resFaitOk = await OrTaches.update(resT8.tache.id, garage_id, { statut: 'fait' });
+    check("statut='fait' accepté une fois la ligne acceptée par le client",
+      resFaitOk.tache.statut === 'fait', `réel: ${resFaitOk.tache.statut}`);
+  } catch (e) {
+    console.error('  ❌ ERREUR:', e.message);
+    KO++;
+  }
+
   // ── Récap ───────────────────────────────────────────────────────────────────
   console.log('\n' + '═'.repeat(60));
   console.log(`📊 ${OK}/${OK + KO} checks passés`);
   if (KO === 0) {
-    console.log('🎉 L10 commit 2 (Bloc A + Bloc B) validé.');
+    console.log('🎉 L10 commit 2 (Bloc A + Bloc B + fixes review) validé.');
   } else {
     console.log(`⚠️  ${KO} échec(s) — voir détail ci-dessus.`);
     process.exitCode = 1;

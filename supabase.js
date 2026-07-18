@@ -1173,7 +1173,27 @@ const OrdresReparation = {
     if (nouveau_statut === 'attente' && !attente_motif)
       throw new Error('attente_motif requis pour passer en attente');
 
-    const patch = { statut: nouveau_statut };
+    // L10 commit 2 (fix review, finding #1) : sortir manuellement de
+    // 'attente' vers 'en_cours' pendant que des lignes complémentaires
+    // attendent encore une acceptation client court-circuiterait le
+    // contrôle que la fonctionnalité doit garantir — bloqué explicitement.
+    if (ancien === 'attente' && nouveau_statut === 'en_cours') {
+      const { count: ct } = await supabase.from('or_taches')
+        .select('id', { count: 'exact', head: true }).eq('or_id', id).eq('en_attente_acceptation_client', true);
+      const { count: cp } = await supabase.from('or_pieces')
+        .select('id', { count: 'exact', head: true }).eq('or_id', id).eq('en_attente_acceptation_client', true);
+      if ((ct || 0) + (cp || 0) > 0)
+        throw new Error('INVALID_TRANSITION: des lignes complémentaires attendent encore une acceptation client — impossible de reprendre manuellement');
+    }
+
+    // L10 commit 2 (fix review, finding #1) : changerStatut est le chemin
+    // MANUEL (PATCH /statut) — attente_auto est réservé au chemin
+    // automatique (_basculerEnAttentePourLigne). Toute transition manuelle
+    // remet donc attente_auto à false, y compris vers 'attente' (motif
+    // humain) : sans ça, un ancien attente_auto=true resterait périmé et
+    // pourrait plus tard faire annuler à tort une pause manuelle réelle
+    // par _revenirEnCoursSiPlusDeLigneEnAttente.
+    const patch = { statut: nouveau_statut, attente_auto: false };
     if (attente_motif)    patch.attente_motif    = attente_motif;
     if (km_sortie)        patch.km_sortie        = parseInt(km_sortie);
     if (signature_base64) patch.signature_client = signature_base64;
@@ -1264,15 +1284,15 @@ const OrTaches = {
     const dh = parseFloat(payload.duree_h)     || 0;
     const th = parseFloat(payload.taux_horaire) || 0;
     // en_cours -> première ligne complémentaire, déclenche la bascule.
-    // attente (déjà auto) -> une ligne ajoutée ENTRE-TEMPS (ex: pièce juste
-    // après la tâche qui vient de basculer l'OR) doit aussi être marquée en
-    // attente d'acceptation, sinon _revenirEnCoursSiPlusDeLigneEnAttente
-    // repasserait l'OR en_cours dès la 1ère ligne acceptée en ignorant
-    // celle-ci. Pas de re-bascule ni de nouveau log historique dans ce cas
-    // (l'OR y est déjà) — seule la ligne elle-même est marquée.
+    // attente (auto OU manuelle, ex: "pièce manquante") -> une ligne ajoutée
+    // pendant une pause quelconque doit aussi requérir l'acceptation client
+    // (fix review, finding #2 : l'ancienne condition ne couvrait que
+    // l'attente auto, laissant passer sans acceptation toute ligne ajoutée
+    // pendant une attente manuelle). Pas de re-bascule ni de nouveau log
+    // historique si l'OR est déjà en 'attente' (quelle qu'en soit l'origine)
+    // — seule la ligne elle-même est marquée.
     const enCoursDejaLance = or.statut === 'en_cours';
-    const dejaEnAttenteAuto = or.statut === 'attente' && or.attente_auto === true;
-    const requiertAcceptation = enCoursDejaLance || dejaEnAttenteAuto;
+    const requiertAcceptation = enCoursDejaLance || or.statut === 'attente';
     const tache = await insert('or_taches', {
       garage_id, or_id,
       ordre:         parseInt(payload.ordre) || 0,
@@ -1325,6 +1345,12 @@ const OrTaches = {
     if (patch.duree_h !== undefined || patch.taux_horaire !== undefined) {
       patch.montant_ht = +(newDh * newTh).toFixed(2);
     }
+    // Fix review, finding #4 : impossible de marquer une ligne 'fait' tant
+    // qu'elle attend une acceptation client — sinon le travail est
+    // enregistré comme terminé/facturable avant que le client n'ait
+    // approuvé le complément.
+    if (patch.statut === 'fait' && existing.en_attente_acceptation_client)
+      throw new Error("Cette ligne attend encore une acceptation client — impossible de la marquer terminée avant validation");
     if (patch.statut === 'fait' && existing.statut !== 'fait') {
       patch.fait_le = new Date().toISOString();
     }
@@ -1335,12 +1361,18 @@ const OrTaches = {
     return { tache, ordre_reparation: orMaj };
   },
 
-  async remove(id, garage_id) {
+  // ctx optionnel (défaut null) — voir OrTaches.create pour le rationale.
+  async remove(id, garage_id, ctx = null) {
     const { data: tache, error: fe } = await supabase.from('or_taches')
-      .select('or_id').eq('id', id).eq('garage_id', garage_id).single();
+      .select('or_id, en_attente_acceptation_client').eq('id', id).eq('garage_id', garage_id).single();
     if (fe) throw new Error('Tâche non trouvée');
     const { error } = await supabase.from('or_taches').delete().eq('id', id);
     if (error) throw new Error(error.message);
+    // Fix review, finding #3 : supprimer la dernière ligne encore en attente
+    // d'acceptation ne doit pas laisser l'OR bloqué en 'attente' pour
+    // toujours — même contrôle que l'acceptation elle-même.
+    if (tache.en_attente_acceptation_client)
+      await OrdresReparation._revenirEnCoursSiPlusDeLigneEnAttente(tache.or_id, ctx);
     const orMaj = await OrdresReparation.recalculerTotaux(tache.or_id);
     return { deleted_id: id, ordre_reparation: orMaj };
   }
@@ -1354,15 +1386,14 @@ const OrPieces = {
   // ctx optionnel (défaut null) — voir OrTaches.create pour le rationale.
   async create(garage_id, or_id, payload, ctx = null) {
     const { data: or, error: oe } = await supabase.from('ordres_reparation')
-      .select('id, statut, attente_auto').eq('id', or_id).eq('garage_id', garage_id).single();
+      .select('id, statut').eq('id', or_id).eq('garage_id', garage_id).single();
     if (oe) throw new Error('Ordre non trouvé');
     const q  = parseFloat(payload.qte)   || 1;
     const pu = parseFloat(payload.pu_ht) || 0;
-    // Voir OrTaches.create pour le rationale (attente déjà auto -> ligne
-    // aussi marquée en attente, pas de re-bascule).
+    // Voir OrTaches.create pour le rationale (attente auto OU manuelle ->
+    // ligne aussi marquée en attente, pas de re-bascule).
     const enCoursDejaLance = or.statut === 'en_cours';
-    const dejaEnAttenteAuto = or.statut === 'attente' && or.attente_auto === true;
-    const requiertAcceptation = enCoursDejaLance || dejaEnAttenteAuto;
+    const requiertAcceptation = enCoursDejaLance || or.statut === 'attente';
     const piece = await insert('or_pieces', {
       garage_id, or_id,
       piece_id:  payload.piece_id  || null,
@@ -1418,12 +1449,16 @@ const OrPieces = {
     return { piece, ordre_reparation: orMaj };
   },
 
-  async delete(id, garage_id) {
+  // ctx optionnel (défaut null) — voir OrTaches.remove pour le rationale.
+  async delete(id, garage_id, ctx = null) {
     const { data: piece, error: fe } = await supabase.from('or_pieces')
-      .select('or_id').eq('id', id).eq('garage_id', garage_id).single();
+      .select('or_id, en_attente_acceptation_client').eq('id', id).eq('garage_id', garage_id).single();
     if (fe) throw new Error('Pièce non trouvée');
     const { error } = await supabase.from('or_pieces').delete().eq('id', id);
     if (error) throw new Error(error.message);
+    // Fix review, finding #3 — voir OrTaches.remove pour le rationale.
+    if (piece.en_attente_acceptation_client)
+      await OrdresReparation._revenirEnCoursSiPlusDeLigneEnAttente(piece.or_id, ctx);
     const orMaj = await OrdresReparation.recalculerTotaux(piece.or_id);
     return { deleted_id: id, ordre_reparation: orMaj };
   }

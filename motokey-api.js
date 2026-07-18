@@ -3198,7 +3198,16 @@ const server = http.createServer(async function(req, res){
     const vt = _validerTransitionRAM(orSt.statut, nouveau_statut);
     if (!vt.ok) return fail(res, vt.msg, vt.code==='WRONG_ENDPOINT' ? 400 : 422, vt.code);
     if (vt.requiresMotif && !attente_motif) return fail(res, 'attente_motif requis pour passer en attente', 400, 'MISSING_FIELD');
-    const patchSt = { statut: nouveau_statut, updated_at: nowISO() };
+    // L10 commit 2 (fix review, finding #1) : voir supabase.js changerStatut
+    // pour le rationale — bloque la sortie manuelle d'attente vers en_cours
+    // tant que des lignes complémentaires sont encore en attente client.
+    if (orSt.statut === 'attente' && nouveau_statut === 'en_cours') {
+      const enAttenteT = (DB.or_taches||[]).some(function(t){ return t.or_id===p.id && t.en_attente_acceptation_client; });
+      const enAttenteP = (DB.or_pieces||[]).some(function(pp){ return pp.or_id===p.id && pp.en_attente_acceptation_client; });
+      if (enAttenteT || enAttenteP)
+        return fail(res, "Des lignes complémentaires attendent encore une acceptation client — impossible de reprendre manuellement", 422, 'INVALID_TRANSITION');
+    }
+    const patchSt = { statut: nouveau_statut, attente_auto: false, updated_at: nowISO() };
     if (attente_motif)    patchSt.attente_motif    = attente_motif;
     if (signature_base64) patchSt.signature_client = signature_base64;
     if (annulation_motif) patchSt.annulation_motif = annulation_motif;
@@ -3451,12 +3460,11 @@ const server = http.createServer(async function(req, res){
     const dh = parseFloat(duree_h) || 0;
     const th = parseFloat(taux_horaire) || 65;
     // L10 commit 2 (Bloc B point 1) : ligne ajoutée sur OR en_cours -> attente
-    // client. Ligne ajoutée pendant que l'OR est déjà en attente auto (ex:
-    // pièce juste après la tâche qui vient de basculer l'OR) -> aussi
-    // marquée en attente, pas de re-bascule (voir supabase.js OrTaches.create).
+    // client. Ligne ajoutée pendant une attente quelconque (auto OU
+    // manuelle, ex: "pièce manquante") -> aussi marquée en attente, pas de
+    // re-bascule (fix review, finding #2 — voir supabase.js OrTaches.create).
     const enCoursDejaLance = or.statut === 'en_cours';
-    const dejaEnAttenteAuto = or.statut === 'attente' && !!or.attente_auto;
-    const requiertAcceptation = enCoursDejaLance || dejaEnAttenteAuto;
+    const requiertAcceptation = enCoursDejaLance || or.statut === 'attente';
     const tache = {
       id: 'ort-'+uid(),
       garage_id: garageId,
@@ -3511,6 +3519,9 @@ const server = http.createServer(async function(req, res){
     if (patch.duree_h !== undefined || patch.taux_horaire !== undefined) {
       patch.montant_ht = Math.round(newDh * newTh * 100)/100;
     }
+    // Fix review, finding #4 — voir supabase.js OrTaches.update pour le rationale.
+    if (patch.statut === 'fait' && DB.or_taches[i].en_attente_acceptation_client)
+      return fail(res, "Cette ligne attend encore une acceptation client — impossible de la marquer terminée avant validation", 409, 'INVALID_STATE');
     if (patch.statut === 'fait' && DB.or_taches[i].statut !== 'fait') {
       patch.fait_le = nowISO();
     }
@@ -3546,8 +3557,7 @@ const server = http.createServer(async function(req, res){
     const pu = parseFloat(pu_ht) || 0;
     // L10 commit 2 (Bloc B point 1) — voir taches ci-dessus pour le rationale.
     const enCoursDejaLance = or.statut === 'en_cours';
-    const dejaEnAttenteAuto = or.statut === 'attente' && !!or.attente_auto;
-    const requiertAcceptation = enCoursDejaLance || dejaEnAttenteAuto;
+    const requiertAcceptation = enCoursDejaLance || or.statut === 'attente';
     const piece = {
       id: 'orp-'+uid(),
       garage_id: garageId,
@@ -3583,7 +3593,7 @@ const server = http.createServer(async function(req, res){
 
     if (USE_SUPABASE && SBLayer) {
       try {
-        const result = await SBLayer.OrPieces.delete(p.id, garageId);
+        const result = await SBLayer.OrPieces.delete(p.id, garageId, ctx);
         return ok(res, result, 'Pièce supprimée');
       } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
     }
@@ -3592,7 +3602,11 @@ const server = http.createServer(async function(req, res){
     const i = (DB.or_pieces||[]).findIndex(function(pp){ return pp.id===p.id && pp.garage_id===garageId; });
     if (i<0) return fail(res, 'Pièce non trouvée', 404, 'NOT_FOUND');
     const orId = DB.or_pieces[i].or_id;
+    const etaitEnAttente = DB.or_pieces[i].en_attente_acceptation_client;
     DB.or_pieces.splice(i,1);
+    // Fix review, finding #3 : supprimer la dernière ligne encore en attente
+    // ne doit pas laisser l'OR bloqué en 'attente' pour toujours.
+    if (etaitEnAttente) _revenirEnCoursRam(orId, ctx);
     const orMaj = _recalcTotauxOR(orId, garageId);
     return ok(res, { deleted_id: p.id, ordre_reparation: orMaj }, 'Pièce supprimée');
   }
@@ -3697,7 +3711,7 @@ const server = http.createServer(async function(req, res){
 
     if (USE_SUPABASE && SBLayer) {
       try {
-        const result = await SBLayer.OrTaches.remove(p.id, garageId);
+        const result = await SBLayer.OrTaches.remove(p.id, garageId, ctx);
         const orMaj = result.ordre_reparation || {};
         return ok(res, {
           deleted_id: p.id,
@@ -3718,7 +3732,11 @@ const server = http.createServer(async function(req, res){
     if (orParent && ['facture','annule'].includes(orParent.statut)) {
       return fail(res, 'OR clôturé, modification impossible', 409, 'OR_LOCKED');
     }
+    const tacheEtaitEnAttente = DB.or_taches[iT].en_attente_acceptation_client;
     DB.or_taches.splice(iT, 1);
+    // Fix review, finding #3 : supprimer la dernière ligne encore en attente
+    // ne doit pas laisser l'OR bloqué en 'attente' pour toujours.
+    if (tacheEtaitEnAttente) _revenirEnCoursRam(tacheOrId, ctx);
     const orMaj = _recalcTotauxOR(tacheOrId, garageId);
     return ok(res, {
       deleted_id: p.id,
