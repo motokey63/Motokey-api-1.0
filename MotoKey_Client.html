@@ -32,7 +32,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
 .logo-badge{font-size:11px;font-weight:600;background:var(--accbg);color:var(--acc);border:1px solid var(--acc2);border-radius:20px;padding:2px 8px;margin-left:8px;white-space:nowrap;}
 .topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px;}
 #nav-user-name{font-size:13px;font-weight:600;color:var(--tx2);display:none;}
-#btn-devis{display:none;}
+#btn-interventions{display:none;}
 #btn-account{display:none;}
 #btn-logout-nav{display:none;}
 
@@ -173,7 +173,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
   <div class="logo">Moto<em>Key</em> <span class="logo-badge">Espace Client</span></div>
   <div class="topbar-right">
     <span id="nav-user-name"></span>
-    <button class="btn btn-secondary btn-sm" id="btn-devis" style="font-size:13px;padding:7px 14px;">Mes devis</button>
+    <button class="btn btn-secondary btn-sm" id="btn-interventions" style="font-size:13px;padding:7px 14px;">Mes interventions</button>
     <button class="btn btn-secondary btn-sm" id="btn-account" style="font-size:13px;padding:7px 14px;">Mon compte</button>
     <button class="btn btn-ghost" id="btn-logout-nav" style="color:var(--rd);">Déconnexion</button>
   </div>
@@ -417,15 +417,15 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
 </div>
 
 <!-- ══════════════════════════════════════════
-     ÉCRAN 8 — MES DEVIS
+     ÉCRAN 8 — MES INTERVENTIONS
 ════════════════════════════════════════════ -->
-<div id="screen-devis" style="display:none;">
+<div id="screen-interventions" style="display:none;">
   <div class="app-wrap">
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-      <h2 style="font-size:20px;font-weight:600;margin:0">Mes devis</h2>
-      <button class="btn btn-secondary btn-sm" id="btn-back-from-devis">← Mes motos</button>
+      <h2 style="font-size:20px;font-weight:600;margin:0">Mes interventions</h2>
+      <button class="btn btn-secondary btn-sm" id="btn-back-from-interventions">← Mes motos</button>
     </div>
-    <div id="devis-list-content">
+    <div id="interventions-list-content">
       <div class="empty-state"><div class="empty-icon">⏳</div><p>Chargement…</p></div>
     </div>
   </div>
@@ -452,10 +452,10 @@ let pendingEmail = '';
    UI
 ═══════════════════════════════════════════════════════ */
 function showScreen(id) {
-  ['login','register','verify','reset-request','reset-confirm','app','account','devis'].forEach(s => {
+  ['login','register','verify','reset-request','reset-confirm','app','account','interventions'].forEach(s => {
     const el = document.getElementById('screen-' + s);
     if (el) el.style.display = (s === id)
-      ? (s === 'app' || s === 'account' || s === 'devis' ? 'block' : 'flex')
+      ? (s === 'app' || s === 'account' || s === 'interventions' ? 'block' : 'flex')
       : 'none';
   });
 }
@@ -561,14 +561,14 @@ function startRefreshTimer() {
 function setNavLoggedIn(email) {
   const n = document.getElementById('nav-user-name');
   n.textContent = email || ''; n.style.display = email ? 'inline' : 'none';
-  document.getElementById('btn-devis').style.display      = 'inline-flex';
+  document.getElementById('btn-interventions').style.display = 'inline-flex';
   document.getElementById('btn-account').style.display    = 'inline-flex';
   document.getElementById('btn-logout-nav').style.display = 'inline';
 }
 
 function setNavLoggedOut() {
   document.getElementById('nav-user-name').style.display  = 'none';
-  document.getElementById('btn-devis').style.display      = 'none';
+  document.getElementById('btn-interventions').style.display = 'none';
   document.getElementById('btn-account').style.display    = 'none';
   document.getElementById('btn-logout-nav').style.display = 'none';
 }
@@ -1005,86 +1005,136 @@ document.getElementById('btn-reset-confirm').addEventListener('click', async () 
 document.getElementById('link-login-from-reset-confirm').addEventListener('click', () => showScreen('login'));
 
 /* ═══════════════════════════════════════════════════════
-   ÉCRAN 8 — MES DEVIS
+   ÉCRAN 8 — MES INTERVENTIONS
 ═══════════════════════════════════════════════════════ */
-const STATUT_LABEL = { envoye: 'À valider', accepte: 'Validé', refuse: 'Refusé', brouillon: 'Brouillon' };
-const STATUT_COLOR = { envoye: 'var(--or)', accepte: 'var(--gn)', refuse: 'var(--rd)', brouillon: 'var(--tx3)' };
+const OR_STATUT_LABEL = { accepte:'Accepté', en_cours:'En cours', attente:'En attente', termine:'Terminé', facture:'Facturé', refuse:'Refusé', annule:'Annulé' };
+const OR_STATUT_COLOR = { accepte:'var(--bl)', en_cours:'var(--yw)', attente:'var(--pu)', termine:'var(--gn)', facture:'var(--acc)', refuse:'var(--rd)', annule:'var(--tx3)' };
 
-async function loadClientDevis() {
+let _interventionsListCache = [];
+let _interventionsCache     = {}; // or_id -> détail complet (or_taches/or_pieces), rempli à la demande
+let _interventionsOpen      = {}; // or_id -> bool, carte dépliée ou non
+
+async function loadClientInterventions() {
   const at = localStorage.getItem(LS_AT);
-  const box = document.getElementById('devis-list-content');
+  const box = document.getElementById('interventions-list-content');
   box.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><p>Chargement…</p></div>';
 
-  const { ok, data } = await apiGet('/devis', at);
+  const { ok, data } = await apiGet('/client/ordres-reparation', at);
   if (!ok) {
     box.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠</div><p>' + esc(errMsg(data)) + '</p></div>';
     return;
   }
 
-  const list = Array.isArray(data) ? data : (data.devis || data.data || []);
+  const list = data.ordres || data.data || [];
   if (!list.length) {
-    box.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Aucun devis pour le moment.</p></div>';
+    box.innerHTML = '<div class="empty-state"><div class="empty-icon">🔧</div><p>Aucune intervention pour le moment.</p></div>';
     return;
   }
 
-  box.innerHTML = list.map(function(dv) {
-    const lignes = dv.devis_lignes || dv.lignes || [];
-    const label  = STATUT_LABEL[dv.statut] || dv.statut;
-    const color  = STATUT_COLOR[dv.statut] || 'var(--tx2)';
-    const total  = typeof dv.total_ttc === 'number' ? dv.total_ttc.toFixed(2) + ' €' : '—';
-    const motoInfo = dv.motos ? esc(dv.motos.marque + ' ' + dv.motos.modele + (dv.motos.plaque ? ' — ' + dv.motos.plaque : '')) : '—';
-    const dateStr  = fmtDate(dv.created_at);
+  _interventionsListCache = list;
+  renderInterventionsList();
+}
 
-    const lignesHtml = lignes.length
-      ? '<table style="width:100%;font-size:13px;border-collapse:collapse;margin:8px 0">' +
-          lignes.map(function(l) {
-            const desc = esc(l.description || l.desc || '');
-            const qty  = l.quantite || 1;
-            const pu   = typeof l.prix_unitaire === 'number' ? l.prix_unitaire.toFixed(2) : '—';
-            return '<tr><td style="padding:4px 0;color:var(--tx2)">' + desc + '</td>' +
-                   '<td style="padding:4px 0;text-align:right;white-space:nowrap;color:var(--tx)">' + qty + ' × ' + pu + ' €</td></tr>';
-          }).join('') +
-        '</table>'
-      : '<p style="font-size:13px;color:var(--tx3);margin:8px 0">Aucune ligne.</p>';
+function renderInterventionsList() {
+  const box = document.getElementById('interventions-list-content');
+  if (!box) return;
+  box.innerHTML = _interventionsListCache.map(renderInterventionCard).join('');
+}
 
-    const actionsHtml = dv.statut === 'envoye'
-      ? '<div style="display:flex;gap:10px;margin-top:12px">' +
-          '<button class="btn btn-primary btn-sm" onclick="acceptDevis(\'' + esc(dv.id) + '\')">Accepter</button>' +
-          '<button class="btn btn-secondary btn-sm" onclick="refuseDevis(\'' + esc(dv.id) + '\')">Refuser</button>' +
-        '</div>'
-      : (dv.date_acceptation || dv.date_refus
-          ? '<p style="font-size:12px;color:var(--tx3);margin-top:10px">Décision le ' + esc(fmtDate(dv.date_acceptation || dv.date_refus)) + '</p>'
-          : '');
+function _pendingLignes(or) {
+  const src = _interventionsCache[or.id] || or;
+  const taches = (src.or_taches || []).filter(function(t){ return t.en_attente_acceptation_client; });
+  const pieces = (src.or_pieces || []).filter(function(p){ return p.en_attente_acceptation_client; });
+  return { taches: taches, pieces: pieces, count: taches.length + pieces.length };
+}
 
-    return '<div class="card" style="margin-bottom:16px">' +
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:8px">' +
-        '<div>' +
-          '<div style="font-weight:700;font-size:15px">' + esc(dv.numero || dv.id) + '</div>' +
-          '<div style="font-size:12px;color:var(--tx3)">' + dateStr + ' · ' + motoInfo + '</div>' +
-        '</div>' +
-        '<span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:color-mix(in srgb,' + color + ' 15%,transparent);color:' + color + '">' + esc(label) + '</span>' +
+function renderInterventionCard(or) {
+  const src   = _interventionsCache[or.id] || or;
+  const label = OR_STATUT_LABEL[src.statut] || src.statut;
+  const color = OR_STATUT_COLOR[src.statut] || 'var(--tx2)';
+  const total = typeof src.total_ttc === 'number' ? src.total_ttc.toFixed(2) + ' €' : '—';
+  const motoInfo = or.motos ? esc(or.motos.marque + ' ' + or.motos.modele + (or.motos.plaque ? ' — ' + or.motos.plaque : '')) : '—';
+  const dateStr  = fmtDate(or.date_ouverture || or.created_at);
+  const pending  = _pendingLignes(or);
+  const open     = !!_interventionsOpen[or.id];
+
+  const pendingHtml = pending.count
+    ? '<div style="margin-top:12px">' +
+        '<button class="btn btn-primary btn-sm" onclick="toggleInterventionDetail(\'' + esc(or.id) + '\')">' +
+          (open ? 'Masquer les compléments' : ('⏳ ' + pending.count + ' complément' + (pending.count > 1 ? 's' : '') + ' en attente de votre accord')) +
+        '</button>' +
+        (open ? renderInterventionDetail(or.id, pending) : '') +
+      '</div>'
+    : '';
+
+  return '<div class="card" style="margin-bottom:16px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:8px">' +
+      '<div>' +
+        '<div style="font-weight:700;font-size:15px">' + esc(or.numero || or.id) + '</div>' +
+        '<div style="font-size:12px;color:var(--tx3)">' + dateStr + ' · ' + motoInfo + '</div>' +
       '</div>' +
-      lignesHtml +
-      '<div style="text-align:right;font-weight:700;font-size:15px;border-top:1px solid var(--border);padding-top:8px;margin-top:4px">Total TTC : ' + total + '</div>' +
-      actionsHtml +
-    '</div>';
-  }).join('');
+      '<span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:color-mix(in srgb,' + color + ' 15%,transparent);color:' + color + '">' + esc(label) + '</span>' +
+    '</div>' +
+    '<div style="text-align:right;font-weight:700;font-size:15px;border-top:1px solid var(--border);padding-top:8px;margin-top:4px">Total TTC : ' + total + '</div>' +
+    pendingHtml +
+  '</div>';
 }
 
-async function acceptDevis(id) {
-  if (!confirm('Confirmer l\'acceptation de ce devis ?')) return;
-  const at = localStorage.getItem(LS_AT);
-  const { ok, data } = await apiPost('/devis/' + id + '/valider', null, at);
-  if (ok) { toast('Devis accepté.', 'success'); loadClientDevis(); }
-  else     toast(errMsg(data), 'error');
+function renderInterventionDetail(orId, pending) {
+  if (!_interventionsCache[orId]) return '<p style="font-size:13px;color:var(--tx3);margin-top:8px">Chargement…</p>';
+  const rows = pending.taches.map(function(t) {
+    const montant = t.montant_ht != null ? t.montant_ht : (parseFloat(t.duree_h || t.temps_estime_h || 0) * parseFloat(t.taux_horaire || 0));
+    return _renderLigneAttente('or-taches', t.id, t.libelle, montant);
+  }).concat(pending.pieces.map(function(p) {
+    const montant = p.montant_ht != null ? p.montant_ht : (parseFloat(p.qte != null ? p.qte : (p.quantite || 0)) * parseFloat(p.pu_ht || 0));
+    return _renderLigneAttente('or-pieces', p.id, p.libelle || p.designation, montant);
+  }));
+
+  return '<div style="border-top:1px dashed var(--border);padding-top:10px;margin-top:10px">' +
+    '<p style="font-size:12px;color:var(--tx3);margin-bottom:8px">Ces prestations ont été ajoutées en cours d\'intervention et nécessitent votre accord avant d\'être facturées.</p>' +
+    rows.join('') +
+  '</div>';
 }
 
-async function refuseDevis(id) {
-  if (!confirm('Confirmer le refus de ce devis ?')) return;
+function _renderLigneAttente(kind, ligneId, libelle, montant) {
+  const montantStr = typeof montant === 'number' && !isNaN(montant) ? montant.toFixed(2) + ' € HT' : '—';
+  return '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--accbg);border:1px solid var(--acc2);border-radius:10px;padding:10px 12px;margin-bottom:8px">' +
+    '<div>' +
+      '<div style="font-weight:600;font-size:13px">' + esc(libelle || '—') + '</div>' +
+      '<div style="font-size:13px;color:var(--acc);font-weight:700;margin-top:2px">' + montantStr + '</div>' +
+    '</div>' +
+    '<button class="btn btn-primary btn-sm" id="accept-btn-' + esc(ligneId) + '" onclick="acceptComplement(\'' + kind + '\',\'' + esc(ligneId) + '\')">Accepter ce complément</button>' +
+  '</div>';
+}
+
+async function toggleInterventionDetail(orId) {
+  _interventionsOpen[orId] = !_interventionsOpen[orId];
+  if (_interventionsOpen[orId] && !_interventionsCache[orId]) {
+    const at = localStorage.getItem(LS_AT);
+    const { ok, data } = await apiGet('/client/ordres-reparation/' + orId, at);
+    if (ok) _interventionsCache[orId] = data.ordre_reparation || data.data || data;
+  }
+  renderInterventionsList();
+}
+
+async function acceptComplement(kind, ligneId) {
+  if (!confirm('Confirmer l\'acceptation de ce complément ? Le montant indiqué sera ajouté à votre facture.')) return;
+  const btn = document.getElementById('accept-btn-' + ligneId);
+  if (btn) { btn.disabled = true; btn.textContent = 'Envoi…'; }
   const at = localStorage.getItem(LS_AT);
-  const { ok, data } = await apiPost('/devis/' + id + '/refuser', null, at);
-  if (ok) { toast('Devis refusé.', 'info'); loadClientDevis(); }
-  else     toast(errMsg(data), 'error');
+  const { ok, data } = await apiPost('/' + kind + '/' + ligneId + '/accepter', null, at);
+  if (!ok) {
+    toast(errMsg(data), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = 'Accepter ce complément'; }
+    return;
+  }
+  toast('Complément accepté — merci de votre confirmation.', 'success');
+  const orId = data.ordre_reparation && data.ordre_reparation.id;
+  if (orId) {
+    const { ok: ok2, data: data2 } = await apiGet('/client/ordres-reparation/' + orId, at);
+    if (ok2) _interventionsCache[orId] = data2.ordre_reparation || data2.data || data2;
+  }
+  renderInterventionsList();
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1111,13 +1161,13 @@ document.getElementById('btn-account').addEventListener('click', async () => {
 });
 
 /* ═══════════════════════════════════════════════════════
-   ÉCRAN 8 — MES DEVIS
+   ÉCRAN 8 — MES INTERVENTIONS
 ═══════════════════════════════════════════════════════ */
-document.getElementById('btn-devis').addEventListener('click', () => {
-  showScreen('devis');
-  loadClientDevis();
+document.getElementById('btn-interventions').addEventListener('click', () => {
+  showScreen('interventions');
+  loadClientInterventions();
 });
-document.getElementById('btn-back-from-devis').addEventListener('click', () => showScreen('app'));
+document.getElementById('btn-back-from-interventions').addEventListener('click', () => showScreen('app'));
 
 /* ═══════════════════════════════════════════════════════
    ÉCRAN 7 — MON COMPTE

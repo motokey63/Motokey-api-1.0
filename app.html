@@ -140,6 +140,9 @@ input,select,textarea{font-family:inherit}
 .or-badge-facture{background:#fff4ee;color:#1a1d23;border:1px solid #ff6b00}
 .or-badge-annule{background:#fef2f2;color:#dc2626;text-decoration:line-through}
 .or-badge-refuse{background:#fdf2f8;color:#db2777;text-decoration:line-through}
+tr.or-ligne-attente{background:#fff7ed}
+tr.or-ligne-attente td:first-child{box-shadow:inset 3px 0 0 #f97316}
+.or-ligne-attente-badge{display:inline-flex;align-items:center;gap:4px;margin-top:4px;font-size:11px;font-weight:700;color:#c2410c;background:#ffedd5;padding:2px 8px;border-radius:10px;white-space:nowrap}
 
 .or-header{background:linear-gradient(135deg,#1a1d23 0%,#2d3340 100%);color:#fff;border-radius:14px;padding:20px 24px;margin-bottom:14px}
 .or-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
@@ -258,8 +261,7 @@ input,select,textarea{font-family:inherit}
   <div id="nav">
     <span class="nav-logo">🔑 MotoKey</span>
     <button class="nav-btn active" onclick="nav('dashboard',this)">Tableau de bord</button>
-    <button class="nav-btn" onclick="nav('or',this)">OR</button>
-    <button class="nav-btn" onclick="nav('devis',this)">Devis</button>
+    <button class="nav-btn" onclick="nav('or',this)">Interventions</button>
     <button class="nav-btn" id="navReclamations" onclick="nav('reclamations',this)">Réclamations <span id="badgeReclam" class="nav-badge" style="display:none">0</span></button>
     <button class="nav-btn" id="navClients" onclick="nav('clients',this)">Clients</button>
     <button class="nav-btn" id="navParams" onclick="nav('params',this)">Paramètres</button>
@@ -309,9 +311,6 @@ let motos = [];
 let reclamCount = 0;
 let selectedMoto = null;
 let ficheTab = 'infos';
-let devisLines = [];
-let devisListCache = [];
-let devisEditId = null; // null = mode création ; sinon id du devis brouillon en cours d'édition
 let ordresList = [];
 let orMode     = 'comptoir';
 let orFilters  = { statut: '', search: '', periode: '30j' };
@@ -751,7 +750,6 @@ function nav(section, btn) {
   else if (section === 'fiche') renderFiche();
   else if (section === 'entretien') renderEntretien();
   else if (section === 'or')   loadOR();
-  else if (section === 'devis') loadDevis();
   else if (section === 'params') renderParams();
   else if (section === 'reclamations') loadReclamations();
   else if (section === 'clients') loadClients();
@@ -818,9 +816,8 @@ function consoChip(mo){
   return `<div><span class="score-badge score-jaune">📸 Photo consommable à faire</span></div>`;
 }
 function badgeStatut(s){
-  const cls={brouillon:'badge-jaune',en_cours:'badge-bleu',termine:'badge-vert',annule:'badge-rouge'}[s]||'badge-bleu';
-  const lbl={brouillon:'Brouillon',en_cours:'En cours',termine:'Terminé',annule:'Annulé'}[s]||s;
-  return `<span class="badge ${cls}">${lbl}</span>`;
+  const sm = orStatutMeta(s);
+  return `<span class="or-badge ${sm.cls}">${sm.label}</span>`;
 }
 function fmtDate(iso){
   return new Date(iso).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
@@ -1009,7 +1006,7 @@ async function loadFicheORList(motoId) {
     const rows = list.map(or => {
       const ttc = (or.total_ttc||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
       return `<tr>
-        <td><strong>${or.numero_or}</strong></td>
+        <td><strong>${or.numero}</strong></td>
         <td style="white-space:nowrap">${fmtDate(or.date_ouverture)}</td>
         <td>${badgeStatut(or.statut)}</td>
         <td style="text-align:right;font-weight:600">${ttc}</td>
@@ -1194,136 +1191,6 @@ async function saveInter() {
   } catch(e) { err.textContent = e.message; err.style.display='block'; }
 }
 
-// ── DEVIS ──
-async function loadDevis() {
-  const m = document.getElementById('main');
-  m.innerHTML = '<div class="loading">Chargement devis…</div>';
-  try {
-    const data = await api('/devis');
-    const liste = data.devis || data || [];
-    devisListCache = liste;
-    devisEditId = null;
-    devisLines = [{designation:'',qte:1,prix_ht:0}];
-    m.innerHTML = `
-      <div class="section-header">
-        <div><div class="section-title">Devis</div><div class="section-sub">${liste.length} devis</div></div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
-        <div id="devisFormZone">${renderDevisFormCard()}</div>
-        <div>
-          ${liste.length ? `<table class="table"><thead><tr><th>Réf.</th><th>Date</th><th>Moto</th><th>Statut</th><th>Total TTC</th><th></th></tr></thead><tbody>
-            ${liste.map(d=>{
-              const motoLabel = d.motos ? [d.motos.marque,d.motos.modele,d.motos.plaque].filter(Boolean).join(' ') : (d.moto_label||d.moto_info||'—');
-              const statutBadge = {brouillon:'badge-jaune',envoye:'badge-bleu',accepte:'badge-vert',refuse:'badge-rouge'}[d.statut]||'badge-jaune';
-              const statutLabel = {brouillon:'Brouillon',envoye:'Envoyé',accepte:'Validé',refuse:'Refusé'}[d.statut]||d.statut;
-              const dateStr = d.created_at ? new Date(d.created_at).toLocaleDateString('fr-FR') : '—';
-              const total = (d.total_ttc||0).toLocaleString('fr-FR',{minimumFractionDigits:2});
-              return `<tr>
-                <td><strong>${d.numero||d.id}</strong></td>
-                <td>${dateStr}</td>
-                <td>${motoLabel}</td>
-                <td><span class="badge ${statutBadge}">${statutLabel}</span></td>
-                <td>${total} €</td>
-                <td>${d.statut==='brouillon' ? `<button class="btn btn-secondary btn-sm" onclick="startEditDevis('${d.id}')">Modifier</button> <button class="btn btn-primary btn-sm" onclick="envoyerDevis('${d.id}')">Envoyer au client</button>` : ''}</td>
-              </tr>`;
-            }).join('')}
-          </tbody></table>` : '<div class="empty"><div class="empty-icon">📄</div><div class="empty-text">Aucun devis</div></div>'}
-        </div>
-      </div>`;
-    const selEl = document.getElementById('dSelMoto');
-    if (selectedMoto && selEl) selEl.value = selectedMoto.id;
-  } catch(e) { m.innerHTML = '<div class="card"><div class="alert alert-warn">Erreur : '+e.message+'</div></div>'; }
-}
-
-function renderDevisFormCard() {
-  const editing = !!devisEditId;
-  const dv = editing ? devisListCache.find(d=>d.id===devisEditId) : null;
-  const remiseVal = editing && dv ? (dv.remise_pct||0) : 0;
-  const motoLabel = editing && dv ? (dv.motos ? [dv.motos.marque,dv.motos.modele,dv.motos.plaque].filter(Boolean).join(' ') : (dv.moto_label||dv.moto_info||'—')) : '';
-  return `
-    <div class="card">
-      <div style="font-size:13px;font-weight:700;margin-bottom:14px">${editing ? 'Modifier le devis '+(dv?dv.numero:'') : 'Créer un devis'}</div>
-      <div id="devisErr" class="alert alert-warn" style="display:none"></div>
-      ${editing
-        ? `<div class="field"><label>Moto</label><input value="${motoLabel}" disabled style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--bg2);color:var(--text2)"></div>`
-        : `<div class="field"><label>Moto</label>${motoSelect('dSelMoto',null)}</div>`}
-      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Lignes</div>
-      <div id="devisLines">${renderDevisLines()}</div>
-      <button class="btn btn-secondary btn-sm" style="margin-bottom:14px" onclick="addDevisLine()">+ Ligne</button>
-      <div class="field"><label>Remise (%)</label><input id="dRemise" type="number" value="${remiseVal}" min="0" max="100"></div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-primary" onclick="saveDevis()">${editing ? 'Enregistrer les modifications' : 'Créer le devis'}</button>
-        ${editing ? `<button class="btn btn-secondary" onclick="cancelEditDevis()">Annuler</button>` : ''}
-      </div>
-    </div>`;
-}
-
-function startEditDevis(id) {
-  const dv = devisListCache.find(x=>x.id===id);
-  if (!dv) { toast('❌ Devis introuvable'); return; }
-  devisEditId = id;
-  devisLines = (dv.lignes && dv.lignes.length) ? JSON.parse(JSON.stringify(dv.lignes)) : [{designation:'',qte:1,prix_ht:0}];
-  const zone = document.getElementById('devisFormZone');
-  if (zone) zone.innerHTML = renderDevisFormCard();
-}
-
-function cancelEditDevis() {
-  devisEditId = null;
-  devisLines = [{designation:'',qte:1,prix_ht:0}];
-  const zone = document.getElementById('devisFormZone');
-  if (zone) zone.innerHTML = renderDevisFormCard();
-}
-
-function renderDevisLines() {
-  return devisLines.map((l,i)=>`
-    <div class="devis-line">
-      <input placeholder="Désignation" value="${l.designation}" oninput="devisLines[${i}].designation=this.value" style="padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px">
-      <input type="number" placeholder="Qté" value="${l.qte}" oninput="devisLines[${i}].qte=+this.value" style="padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px">
-      <input type="number" placeholder="Prix HT" value="${l.prix_ht}" oninput="devisLines[${i}].prix_ht=+this.value" style="padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px">
-      <button onclick="devisLines.splice(${i},1);document.getElementById('devisLines').innerHTML=renderDevisLines()" style="background:none;border:none;cursor:pointer;color:var(--danger);font-size:16px">×</button>
-    </div>`).join('');
-}
-
-function addDevisLine() {
-  devisLines.push({designation:'',qte:1,prix_ht:0});
-  document.getElementById('devisLines').innerHTML = renderDevisLines();
-}
-
-async function saveDevis() {
-  const err = document.getElementById('devisErr');
-  err.style.display = 'none';
-  const lignes = devisLines.filter(l=>l.designation.trim());
-  if (!lignes.length) { err.textContent = 'Ajoutez au moins une ligne.'; err.style.display='block'; return; }
-  const remise_pct = parseFloat(document.getElementById('dRemise').value)||0;
-  const motoId = devisEditId ? null : document.getElementById('dSelMoto').value;
-  if (!devisEditId && !motoId) { err.textContent = 'Sélectionnez une moto.'; err.style.display='block'; return; }
-  const btn = document.querySelector('#devisFormZone .btn-primary');
-  const btnLabel = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = 'Enregistrement…'; }
-  try {
-    if (devisEditId) {
-      await api('/devis/'+devisEditId,'PUT',{entete:{remise_pct}, lignes});
-      toast('✅ Devis modifié');
-    } else {
-      await api('/devis','POST',{moto_id:motoId, lignes, remise_pct});
-      toast('✅ Devis créé');
-    }
-    await loadDevis();
-  } catch(e) {
-    err.textContent = e.message; err.style.display='block';
-    if (btn) { btn.disabled = false; btn.textContent = btnLabel; }
-  }
-}
-
-async function envoyerDevis(id) {
-  if (!confirm('Envoyer ce devis au client ? Il ne sera plus modifiable ensuite.')) return;
-  try {
-    await api('/devis/'+id+'/envoyer','POST');
-    toast('✅ Devis envoyé au client');
-    await loadDevis();
-  } catch(e) { toast('❌ '+e.message); }
-}
-
 // ── ORDRES DE RÉPARATION ──
 async function loadOR() {
   const m = document.getElementById('main');
@@ -1340,17 +1207,17 @@ async function loadOR() {
 function renderORPage() {
   const sel = 'padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;background:var(--bg2);color:var(--text);outline:none;cursor:pointer';
   const togBtn = (active) => `padding:6px 14px;font-size:12px;font-weight:600;border:none;cursor:pointer;transition:.15s;${active?'background:var(--primary);color:#fff':'background:var(--bg2);color:var(--text2)'}`;
-  const statutOpts = [['','Tous (sauf annulé)'],['brouillon','Brouillon'],['en_cours','En cours'],['termine','Terminé'],['annule','Annulé']]
+  const statutOpts = [['','Tous (sauf annulé)'],['brouillon','Brouillon'],['accepte','Accepté'],['en_cours','En cours'],['attente','En attente'],['termine','Terminé'],['facture','Facturé'],['refuse','Refusé'],['annule','Annulé']]
     .map(([v,l])=>`<option value="${v}"${orFilters.statut===v?' selected':''}>${l}</option>`).join('');
   const periodeOpts = [['today',"Aujourd'hui"],['7j','7 derniers jours'],['30j','30 derniers jours'],['all','Tout']]
     .map(([v,l])=>`<option value="${v}"${orFilters.periode===v?' selected':''}>${l}</option>`).join('');
   return `
     <div class="section-header">
       <div>
-        <div class="section-title">Ordres de Réparation</div>
+        <div class="section-title">Interventions</div>
         <div class="section-sub" id="orSubtitle">Chargement…</div>
       </div>
-      <button class="btn btn-primary btn-sm" onclick="renderNewOR()">+ Nouveau OR</button>
+      <button class="btn btn-primary btn-sm" onclick="renderNewOR()">+ Nouvelle intervention</button>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
       <select style="${sel}" onchange="orFilters.statut=this.value;renderORTable()">${statutOpts}</select>
@@ -1376,7 +1243,7 @@ function renderORTable() {
     if (!orFilters.statut) { if (or.statut==='annule') return false; }
     else if (or.statut !== orFilters.statut) return false;
     if (sq) {
-      const hay = ((or.numero_or||'')+' '+(or.motos?.plaque||'')+' '+(or.motos?.clients?.nom||'')).toLowerCase();
+      const hay = ((or.numero||'')+' '+(or.motos?.plaque||'')+' '+(or.motos?.clients?.nom||'')).toLowerCase();
       if (!hay.includes(sq)) return false;
     }
     return true;
@@ -1389,7 +1256,7 @@ function renderORTable() {
   if (!filtered.length) {
     zone.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">${
       !ordresList.length
-        ? "Aucun ordre de réparation. Cliquez sur '+ Nouveau OR' pour en créer un."
+        ? "Aucune intervention. Cliquez sur '+ Nouvelle intervention' pour en créer une."
         : 'Aucun OR ne correspond à ces critères.'
     }</div></div>`;
     return;
@@ -1400,7 +1267,7 @@ function renderORTable() {
       const client = or.motos?.clients?.nom ?? '—';
       const ttc    = (or.total_ttc||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
       return `<tr>
-        <td><strong>${or.numero_or}</strong></td>
+        <td><strong>${or.numero}</strong></td>
         <td>${moto}</td><td>${client}</td>
         <td style="white-space:nowrap">${fmtDate(or.date_ouverture)}</td>
         <td>${badgeStatut(or.statut)}</td>
@@ -1418,7 +1285,7 @@ function renderORTable() {
       const left  = t.filter(t => t.statut!=='fait').length;
       const label = t.length ? `${left}/${t.length} à faire` : '—';
       return `<tr>
-        <td><strong>${or.numero_or}</strong></td>
+        <td><strong>${or.numero}</strong></td>
         <td>${moto}</td><td>${label}</td>
         <td>${badgeStatut(or.statut)}</td>
         <td><button class="btn btn-secondary btn-sm" onclick="selectOR('${or.id}')">Voir tâches</button></td>
@@ -1607,7 +1474,7 @@ function selectCataloguePieceById(id) {
 function orStatutMeta(statut) {
   return ({
     brouillon: {label:'Brouillon',     cls:'or-badge-brouillon'},
-    accepte:   {label:'Validé client', cls:'or-badge-accepte'},
+    accepte:   {label:'Accepté',       cls:'or-badge-accepte'},
     en_cours:  {label:'En cours',      cls:'or-badge-en_cours'},
     attente:   {label:'En attente',    cls:'or-badge-attente'},
     termine:   {label:'Terminé',       cls:'or-badge-termine'},
@@ -1698,13 +1565,13 @@ function buildFicheOR(or, hist) {
 
 function buildORHeader(or) {
   const sm     = orStatutMeta(or.statut);
-  const numero = or.numero_or || or.numero || '—';
+  const numero = or.numero || '—';
   const motif  = or.notes_client || or.motif_client || or.notes_atelier || 'Sans motif';
   const date   = fmtDateOnly(or.date_ouverture || or.created_at || or.date_creation);
   const mecano = or.mecano_assigne;
 
   let h = '<div class="or-header">';
-  h += '<button class="btn btn-secondary btn-sm" style="background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.25);margin-bottom:14px" onclick="window.location.hash=\'\';loadOR()">← Retour aux OR</button>';
+  h += '<button class="btn btn-secondary btn-sm" style="background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.25);margin-bottom:14px" onclick="window.location.hash=\'\';loadOR()">← Retour aux interventions</button>';
   h += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap">';
 
   h += '<div>';
@@ -1770,6 +1637,15 @@ function buildORMotoClient(or) {
   return h;
 }
 
+function _ligneAttenteAttrs(ligne) {
+  return ligne.en_attente_acceptation_client ? ' class="or-ligne-attente"' : '';
+}
+function _ligneAttenteBadge(ligne) {
+  return ligne.en_attente_acceptation_client
+    ? '<div class="or-ligne-attente-badge">⏳ En attente d\'acceptation client</div>'
+    : '';
+}
+
 function buildORTaches(taches) {
   const etatMeta = {
     a_faire:  {l:'À faire',  c:'#d97706'},
@@ -1796,9 +1672,9 @@ function buildORTaches(taches) {
       const tot = t.montant_ht != null ? t.montant_ht : (t.total_ht != null ? t.total_ht : dh * thr);
       const st  = t.statut || t.etat || 'a_faire';
       const em  = etatMeta[st] || {l: st || '—', c:'#9ca3af'};
-      h += '<tr>';
+      h += '<tr' + _ligneAttenteAttrs(t) + '>';
       h += '<td style="color:var(--text2)">' + (t.ordre || t.ordre_affichage || i+1) + '</td>';
-      h += '<td><div style="font-weight:500">' + escHtml(t.libelle||'—') + '</div>' + (t.description ? '<div style="font-size:11px;color:var(--text2);margin-top:2px">' + escHtml(t.description) + '</div>' : '') + '</td>';
+      h += '<td><div style="font-weight:500">' + escHtml(t.libelle||'—') + '</div>' + (t.description ? '<div style="font-size:11px;color:var(--text2);margin-top:2px">' + escHtml(t.description) + '</div>' : '') + _ligneAttenteBadge(t) + '</td>';
       h += '<td style="text-align:right;color:var(--text2)">' + (dh ? dh+'h' : '—') + '</td>';
       h += '<td style="text-align:right;color:var(--text2)">' + (thr ? thr+'€/h' : '—') + '</td>';
       h += '<td style="text-align:right;font-weight:600">' + fmtEur(tot) + '</td>';
@@ -1813,8 +1689,8 @@ function buildORTaches(taches) {
       const thr = parseFloat(t.taux_horaire) || 0;
       const tot = dh * thr;
       const st  = t.statut || t.etat || 'a_faire';
-      h += '<tr>';
-      h += '<td><input class="or-edit-input" style="width:100%" value="' + escAttr(t.libelle||'') + '" placeholder="Libellé" oninput="orUpdateTache(' + i + ',\'libelle\',this.value)"></td>';
+      h += '<tr' + _ligneAttenteAttrs(t) + '>';
+      h += '<td><input class="or-edit-input" style="width:100%" value="' + escAttr(t.libelle||'') + '" placeholder="Libellé" oninput="orUpdateTache(' + i + ',\'libelle\',this.value)">' + _ligneAttenteBadge(t) + '</td>';
       h += '<td><input type="number" class="or-edit-input" style="width:68px;text-align:right" value="' + (dh||'') + '" step="0.5" min="0" oninput="orUpdateTache(' + i + ',\'duree_h\',this.value)"></td>';
       h += '<td><input type="number" class="or-edit-input" style="width:73px;text-align:right" value="' + (thr||'') + '" step="5" min="0" oninput="orUpdateTache(' + i + ',\'taux_horaire\',this.value)"></td>';
       h += '<td style="text-align:right;color:var(--text2)">' + fmtEur(tot) + '</td>';
@@ -1850,9 +1726,9 @@ function buildORPieces(pieces) {
       const pu  = parseFloat(p.pu_ht) || 0;
       const tot = p.montant_ht != null ? p.montant_ht : (p.total_ht != null ? p.total_ht : q * pu);
       const des = p.libelle || p.designation || '—';
-      h += '<tr>';
+      h += '<tr' + _ligneAttenteAttrs(p) + '>';
       h += '<td style="font-family:monospace;font-size:12px;color:var(--text2)">' + escHtml(p.reference||'—') + '</td>';
-      h += '<td style="font-weight:500">' + escHtml(des) + '</td>';
+      h += '<td style="font-weight:500">' + escHtml(des) + _ligneAttenteBadge(p) + '</td>';
       h += '<td style="text-align:right">' + q + '</td>';
       h += '<td style="text-align:right;color:var(--text2)">' + fmtEur(pu) + '</td>';
       h += '<td style="text-align:right;font-weight:600">' + fmtEur(tot) + '</td>';
@@ -1866,9 +1742,9 @@ function buildORPieces(pieces) {
       const pu  = parseFloat(p.pu_ht) || 0;
       const tot = (parseFloat(q) || 0) * pu;
       const des = p.libelle || p.designation || '';
-      h += '<tr>';
+      h += '<tr' + _ligneAttenteAttrs(p) + '>';
       h += '<td><input class="or-edit-input" style="width:100%" value="' + escAttr(p.reference||'') + '" placeholder="Réf." oninput="orUpdatePiece(' + i + ',\'reference\',this.value)"></td>';
-      h += '<td><input class="or-edit-input" style="width:100%" value="' + escAttr(des) + '" placeholder="Désignation" oninput="orUpdatePiece(' + i + ',\'libelle\',this.value)"></td>';
+      h += '<td><input class="or-edit-input" style="width:100%" value="' + escAttr(des) + '" placeholder="Désignation" oninput="orUpdatePiece(' + i + ',\'libelle\',this.value)">' + _ligneAttenteBadge(p) + '</td>';
       h += '<td><input type="number" class="or-edit-input" style="width:55px;text-align:right" value="' + q + '" min="0.01" step="1" oninput="orUpdatePiece(' + i + ',\'qte\',this.value)"></td>';
       h += '<td><input type="number" class="or-edit-input" style="width:78px;text-align:right" value="' + pu + '" min="0" step="0.01" oninput="orUpdatePiece(' + i + ',\'pu_ht\',this.value)"></td>';
       h += '<td style="text-align:right;color:var(--text2)">' + fmtEur(tot) + '</td>';
@@ -1927,7 +1803,7 @@ function buildORStatusStepper(or) {
     return '<div class="or-stepper"><span class="or-stepper-annule">✕ OR Annulé</span></div>';
   }
   if (s === 'refuse') {
-    return '<div class="or-stepper"><span class="or-stepper-refuse">✕ Devis refusé</span></div>';
+    return '<div class="or-stepper"><span class="or-stepper-refuse">✕ Refusé</span></div>';
   }
   const steps = [
     { key: 'brouillon', lbl: 'Brouillon' },
@@ -2509,8 +2385,8 @@ async function renderNewOR() {
   const m = document.getElementById('main');
   m.innerHTML = `
     <div class="section-header">
-      <div><div class="section-title">Nouveau OR</div><div class="section-sub">Création d'un ordre de réparation</div></div>
-      <button class="btn btn-secondary btn-sm" onclick="loadOR()">← Retour liste OR</button>
+      <div><div class="section-title">Nouvelle intervention</div><div class="section-sub">Création d'une intervention</div></div>
+      <button class="btn btn-secondary btn-sm" onclick="loadOR()">← Retour aux interventions</button>
     </div>
     <div class="loading">Chargement motos…</div>`;
   let motosDisp = [];
@@ -2520,8 +2396,8 @@ async function renderNewOR() {
   } catch(e) {
     m.innerHTML = `
       <div class="section-header">
-        <div><div class="section-title">Nouveau OR</div></div>
-        <button class="btn btn-secondary btn-sm" onclick="loadOR()">← Retour liste OR</button>
+        <div><div class="section-title">Nouvelle intervention</div></div>
+        <button class="btn btn-secondary btn-sm" onclick="loadOR()">← Retour aux interventions</button>
       </div>
       <div class="card"><div class="alert alert-warn">Erreur chargement motos : ${e.message}</div></div>`;
     return;
@@ -2529,8 +2405,8 @@ async function renderNewOR() {
   if (!motosDisp.length) {
     m.innerHTML = `
       <div class="section-header">
-        <div><div class="section-title">Nouveau OR</div></div>
-        <button class="btn btn-secondary btn-sm" onclick="loadOR()">← Retour liste OR</button>
+        <div><div class="section-title">Nouvelle intervention</div></div>
+        <button class="btn btn-secondary btn-sm" onclick="loadOR()">← Retour aux interventions</button>
       </div>
       <div class="card"><div class="empty">
         <div class="empty-icon">🏍️</div>
@@ -2545,8 +2421,8 @@ async function renderNewOR() {
   }).join('');
   m.innerHTML = `
     <div class="section-header">
-      <div><div class="section-title">Nouveau OR</div><div class="section-sub">Création d'un ordre de réparation</div></div>
-      <button class="btn btn-secondary btn-sm" onclick="loadOR()">← Retour liste OR</button>
+      <div><div class="section-title">Nouvelle intervention</div><div class="section-sub">Création d'une intervention</div></div>
+      <button class="btn btn-secondary btn-sm" onclick="loadOR()">← Retour aux interventions</button>
     </div>
     <div class="card" style="max-width:600px">
       <div id="orCreateErr" class="alert alert-warn" style="display:none"></div>
@@ -2608,7 +2484,7 @@ async function submitNewOR() {
   if (nc) payload.notes_client  = nc;
   try {
     const data = await api('/ordres-reparation', 'POST', payload);
-    toast(`✅ OR ${data.ordre_reparation.numero_or} créé`);
+    toast(`✅ Intervention ${data.ordre_reparation.numero} créée`);
     await loadOR();
   } catch(e) {
     err.textContent = e.message; err.style.display = 'block';

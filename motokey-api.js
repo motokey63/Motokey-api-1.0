@@ -2029,6 +2029,54 @@ const server = http.createServer(async function(req, res){
     } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
   }
 
+  // GET /client/ordres-reparation (CLIENT) — L10 commit 3 : liste des interventions du client (via ses motos)
+  if((p=M('GET','/client/ordres-reparation'))!==null){
+    const ctx = req.ctx || (SBLayer ? await rbac.extractRoleFromRequest(req, SBLayer) : null);
+    if (!ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
+    if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
+    try {
+      const { data: clientRow } = await SBLayer.supabase
+        .from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
+      if (!clientRow) return ok(res, { ordres: [], total: 0 });
+
+      const { data: motoRows } = await SBLayer.supabase.from('motos').select('id').eq('client_id', clientRow.id);
+      const motoIds = (motoRows || []).map(m => m.id);
+      if (!motoIds.length) return ok(res, { ordres: [], total: 0 });
+
+      const { data: ordres, error } = await SBLayer.supabase
+        .from('ordres_reparation')
+        .select('*, motos(marque, modele, plaque), or_taches(id, en_attente_acceptation_client), or_pieces(id, en_attente_acceptation_client)')
+        .in('moto_id', motoIds)
+        .neq('statut', 'brouillon')
+        .order('date_ouverture', { ascending: false });
+      if (error) return fail(res, error.message, 500, 'DB_ERROR');
+      return ok(res, { ordres: ordres || [], total: (ordres || []).length });
+    } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+  }
+
+  // GET /client/ordres-reparation/:id (CLIENT) — L10 commit 3 : détail + lignes tâches/pièces
+  if((p=M('GET','/client/ordres-reparation/:id'))!==null){
+    const ctx = req.ctx || (SBLayer ? await rbac.extractRoleFromRequest(req, SBLayer) : null);
+    if (!ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Réservé aux clients', 403, 'FORBIDDEN');
+    if (!USE_SUPABASE || !SBLayer) return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
+    try {
+      const { data: clientRow } = await SBLayer.supabase
+        .from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
+      if (!clientRow) return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+
+      const { data: or, error } = await SBLayer.supabase
+        .from('ordres_reparation')
+        .select('*, motos(marque, modele, plaque, client_id), or_taches(*), or_pieces(*)')
+        .eq('id', p.id).single();
+      if (error || !or || !or.motos || or.motos.client_id !== clientRow.id) {
+        return fail(res, 'Ordre non trouvé', 404, 'NOT_FOUND');
+      }
+      return ok(res, { ordre_reparation: or });
+    } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+  }
+
   // POST /client/device-tokens (CLIENT) — enregistre/réassigne un device token push Expo
   if((p=M('POST','/client/device-tokens'))!==null){
     const ctx = req.ctx || (SBLayer ? await rbac.extractRoleFromRequest(req, SBLayer) : null);
