@@ -265,6 +265,8 @@ CREATE TABLE motos (
   proprio_libre            TEXT NULL,
   statut_moto              TEXT NULL DEFAULT 'actif',
   carte_grise_photo_url    TEXT NULL,
+  profil_transmission          TEXT DEFAULT 'chaine' CHECK (profil_transmission IN ('chaine','courroie','cardan')),
+  profil_transmission_source   TEXT DEFAULT 'auto' CHECK (profil_transmission_source IN ('auto','manuel')),
   created_at       TIMESTAMPTZ DEFAULT NOW(),
   updated_at       TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT moto_proprietaire_coherence CHECK (
@@ -615,6 +617,28 @@ CREATE INDEX idx_releves_km_moto        ON releves_km(moto_id, created_at DESC);
 CREATE INDEX idx_releves_km_rejets_moto ON releves_km_rejets(moto_id, created_at DESC);
 CREATE INDEX idx_consommables_moto      ON consommables(moto_id);
 CREATE INDEX idx_photos_conso_moto      ON photos_consommables(moto_id);
+
+-- ══════════════════════════════════════════════════════════
+-- Migration 29 — Profil de transmission moto
+-- ══════════════════════════════════════════════════════════
+CREATE TABLE profils_transmission_modeles (
+  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  marque              TEXT NOT NULL,
+  modele_pattern      TEXT NOT NULL,
+  profil_transmission TEXT NOT NULL CHECK (profil_transmission IN ('chaine','courroie','cardan')),
+  created_at          TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX idx_profils_transmission_marque ON profils_transmission_modeles(marque);
+
+INSERT INTO profils_transmission_modeles (marque, modele_pattern, profil_transmission) VALUES
+  ('Yamaha','T-MAX%','courroie'),
+  ('Honda','SILVER WING%','courroie'),
+  ('BMW','R 1%','cardan'),
+  ('BMW','K 1%','cardan'),
+  ('Moto Guzzi','%','cardan'),
+  ('Harley-Davidson','%','courroie');
+
+ALTER TABLE profils_transmission_modeles ENABLE ROW LEVEL SECURITY;
 
 -- v_motos_avec_proprietaire — source : sql/migrations/13_liaison_client_moto.sql
 CREATE OR REPLACE VIEW v_motos_avec_proprietaire AS
