@@ -1013,6 +1013,28 @@ const server = http.createServer(async function(req, res){
     return ok(res,{moto:DB.motos[i]},'Moto mise à jour');
   }
 
+  if((p=M('PATCH','/motos/:id/profil-transmission'))!==null){
+    // RBAC: PRO minimum — override manuel réservé aux comptes garage employeurs (pas MECANO)
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+
+    const PROFILS_VALIDES = ['chaine','courroie','cardan'];
+    if (!PROFILS_VALIDES.includes(b.profil_transmission)) return fail(res, 'profil_transmission invalide (chaine, courroie, cardan)', 400, 'VALIDATION_ERROR');
+
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const moto = await SBLayer.Motos.updateProfilTransmission(p.id, garageId, b.profil_transmission);
+        return ok(res, { moto }, 'Profil de transmission mis à jour');
+      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+    }
+    return fail(res, 'Non supporté en mode RAM fallback', 501, 'NOT_IMPLEMENTED');
+  }
+
   if((p=M('DELETE','/motos/:id'))!==null){
     // RBAC: CONCESSION minimum
     const a = authSilent(req);

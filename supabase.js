@@ -354,6 +354,10 @@ const Motos = {
       client_id = client.id;
     }
 
+    // Profil de transmission — auto-détecté, jamais bloquant (fallback chaine/auto).
+    const { detecterProfilTransmission } = require('./services/profilTransmission');
+    const detection = await detecterProfilTransmission(payload.marque, payload.modele);
+
     // Construire le payload moto selon le type de propriétaire
     const motoPayload = {
       garage_id,
@@ -363,7 +367,9 @@ const Motos = {
       plaque:  payload.plaque,
       vin:     payload.vin,
       km:      payload.km || 0,
-      proprietaire_type
+      proprietaire_type,
+      profil_transmission:        detection.profil,
+      profil_transmission_source: detection.source
     };
 
     if (proprietaire_type === 'client') {
@@ -403,6 +409,14 @@ const Motos = {
     const allowed = ['couleur','photo_url'];
     const clean   = Object.fromEntries(Object.entries(payload).filter(([k]) => allowed.includes(k)));
     const { data, error } = await supabase.from('motos').update(clean).eq('id', id).eq('garage_id', garage_id).select().single();
+    if (error) throw new Error(error.message);
+    return data;
+  },
+
+  async updateProfilTransmission(id, garage_id, profil_transmission) {
+    const { data, error } = await supabase.from('motos')
+      .update({ profil_transmission, profil_transmission_source: 'manuel' })
+      .eq('id', id).eq('garage_id', garage_id).select().single();
     if (error) throw new Error(error.message);
     return data;
   },
