@@ -1006,7 +1006,7 @@ async function loadFicheORList(motoId) {
     const rows = list.map(or => {
       const ttc = (or.total_ttc||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
       return `<tr>
-        <td><strong>${or.numero}</strong></td>
+        <td><strong>${or.numero || '—'}</strong></td>
         <td style="white-space:nowrap">${fmtDate(or.date_ouverture)}</td>
         <td>${badgeStatut(or.statut)}</td>
         <td style="text-align:right;font-weight:600">${ttc}</td>
@@ -1267,7 +1267,7 @@ function renderORTable() {
       const client = or.motos?.clients?.nom ?? '—';
       const ttc    = (or.total_ttc||0).toLocaleString('fr-FR',{style:'currency',currency:'EUR'});
       return `<tr>
-        <td><strong>${or.numero}</strong></td>
+        <td><strong>${or.numero || '—'}</strong></td>
         <td>${moto}</td><td>${client}</td>
         <td style="white-space:nowrap">${fmtDate(or.date_ouverture)}</td>
         <td>${badgeStatut(or.statut)}</td>
@@ -1285,7 +1285,7 @@ function renderORTable() {
       const left  = t.filter(t => t.statut!=='fait').length;
       const label = t.length ? `${left}/${t.length} à faire` : '—';
       return `<tr>
-        <td><strong>${or.numero}</strong></td>
+        <td><strong>${or.numero || '—'}</strong></td>
         <td>${moto}</td><td>${label}</td>
         <td>${badgeStatut(or.statut)}</td>
         <td><button class="btn btn-secondary btn-sm" onclick="selectOR('${or.id}')">Voir tâches</button></td>

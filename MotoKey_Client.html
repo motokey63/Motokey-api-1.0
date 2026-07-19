@@ -1014,6 +1014,13 @@ let _interventionsListCache = [];
 let _interventionsCache     = {}; // or_id -> détail complet (or_taches/or_pieces), rempli à la demande
 let _interventionsOpen      = {}; // or_id -> bool, carte dépliée ou non
 
+/* apiFetch renvoie le corps JSON complet {success, data:{...}, ...} tel que
+   posté par l'API (helper ok() côté backend) — la charge utile est TOUJOURS
+   sous data.data, jamais à la racine de data. */
+function _unwrap(data, key) {
+  return (data && data.data && data.data[key]) || (data && data[key]) || null;
+}
+
 async function loadClientInterventions() {
   const at = localStorage.getItem(LS_AT);
   const box = document.getElementById('interventions-list-content');
@@ -1025,7 +1032,7 @@ async function loadClientInterventions() {
     return;
   }
 
-  const list = data.ordres || data.data || [];
+  const list = _unwrap(data, 'ordres') || [];
   if (!list.length) {
     box.innerHTML = '<div class="empty-state"><div class="empty-icon">🔧</div><p>Aucune intervention pour le moment.</p></div>';
     return;
@@ -1070,7 +1077,7 @@ function renderInterventionCard(or) {
   return '<div class="card" style="margin-bottom:16px">' +
     '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:6px;margin-bottom:8px">' +
       '<div>' +
-        '<div style="font-weight:700;font-size:15px">' + esc(or.numero || or.id) + '</div>' +
+        '<div style="font-weight:700;font-size:15px">' + esc(or.numero || '—') + '</div>' +
         '<div style="font-size:12px;color:var(--tx3)">' + dateStr + ' · ' + motoInfo + '</div>' +
       '</div>' +
       '<span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:color-mix(in srgb,' + color + ' 15%,transparent);color:' + color + '">' + esc(label) + '</span>' +
@@ -1112,7 +1119,7 @@ async function toggleInterventionDetail(orId) {
   if (_interventionsOpen[orId] && !_interventionsCache[orId]) {
     const at = localStorage.getItem(LS_AT);
     const { ok, data } = await apiGet('/client/ordres-reparation/' + orId, at);
-    if (ok) _interventionsCache[orId] = data.ordre_reparation || data.data || data;
+    if (ok) _interventionsCache[orId] = _unwrap(data, 'ordre_reparation');
   }
   renderInterventionsList();
 }
@@ -1129,10 +1136,11 @@ async function acceptComplement(kind, ligneId) {
     return;
   }
   toast('Complément accepté — merci de votre confirmation.', 'success');
-  const orId = data.ordre_reparation && data.ordre_reparation.id;
+  const acceptedOr = _unwrap(data, 'ordre_reparation');
+  const orId = acceptedOr && acceptedOr.id;
   if (orId) {
     const { ok: ok2, data: data2 } = await apiGet('/client/ordres-reparation/' + orId, at);
-    if (ok2) _interventionsCache[orId] = data2.ordre_reparation || data2.data || data2;
+    if (ok2) _interventionsCache[orId] = _unwrap(data2, 'ordre_reparation');
   }
   renderInterventionsList();
 }
