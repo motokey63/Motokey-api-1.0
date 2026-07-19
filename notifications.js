@@ -77,16 +77,6 @@ const SMS = {
         : `🚨 Dépassé — intervention urgente`) +
       `\nRDV : ${CFG.app.url}/rdv`,
 
-    devis_envoye: d =>
-      `📄 Devis N° ${d.numero} — ${d.garage_nom}\n` +
-      `${d.moto} · Total TTC : ${d.total_ttc}€\n` +
-      `Consulter : ${CFG.app.url}/devis/${d.devis_id}`,
-
-    facture_validee: d =>
-      `✅ Facture confirmée — ${d.moto}\n` +
-      `${d.date} · ${d.total_ttc}€ TTC\n` +
-      `Score MotoKey : ${d.score}/100 — Dossier mis à jour`,
-
     transfert_vendeur: d =>
       `🔑 Code de cession MotoKey\n` +
       `Vente : ${d.moto} — ${d.prix}€\n` +
@@ -206,26 +196,6 @@ const EMAIL = {
           Enregistré par <strong>${d.garage_nom}</strong> dans votre dossier numérique.
         </p>
         <a href="${CFG.app.url}/client" class="btn">📱 Voir mon dossier MotoKey</a>
-      `)
-    }),
-
-    devis_client: d => ({
-      subject: `📄 Devis N° ${d.numero} — ${d.total_ttc}€ TTC`,
-      html: baseEmail('Devis', `
-        <p style="color:#8b9199;font-size:11px;text-transform:uppercase;letter-spacing:2px">Devis N° ${d.numero}</p>
-        <h2 style="margin:4px 0 2px">${d.garage_nom}</h2>
-        <p style="color:#6b6459;margin:0 0 16px">${d.moto}</p>
-        <table>
-          <tr><th>Prestation</th><th style="text-align:right">HT</th></tr>
-          ${(d.lignes || []).map(l =>
-            `<tr><td>${l.description}</td><td style="text-align:right">${l.total_ht}€</td></tr>`
-          ).join('')}
-          ${d.remise_globale > 0 ? `<tr><td style="color:#22c55e">Remise ${d.remise_type}</td><td style="text-align:right;color:#22c55e">-${d.remise_globale}€</td></tr>` : ''}
-          <tr><td style="color:#8b9199">TVA ${d.tva}%</td><td style="text-align:right;color:#8b9199">${d.tva_montant}€</td></tr>
-          <tr class="ttc"><td>TOTAL TTC</td><td style="text-align:right;color:#ff6b00">${d.total_ttc}€</td></tr>
-        </table>
-        ${d.remise_note ? `<p style="font-size:12px;color:#22c55e;margin-top:8px">💚 ${d.remise_note}</p>` : ''}
-        <a href="${CFG.app.url}/devis/${d.devis_id}" class="btn">📄 Voir le devis complet</a>
       `)
     }),
 
@@ -370,57 +340,6 @@ const Notif = {
     const results = {};
     if (client.tel)   results.sms   = await SMS.send(client.tel, 'nouvelle_intervention', data).catch(e => ({ error: e.message }));
     if (client.email) results.email = await EMAIL.send(client.email, 'nouvelle_intervention', data).catch(e => ({ error: e.message }));
-    return results;
-  },
-
-  /**
-   * Devis envoyé au client
-   */
-  async devisEnvoye({ client, garage, moto, devis, totaux }) {
-    const data = {
-      garage_nom:     garage.nom,
-      moto:           `${moto.marque} ${moto.modele}`,
-      plaque:         moto.plaque,
-      numero:         devis.numero,
-      devis_id:       devis.id,
-      lignes:         devis.devis_lignes || devis.lignes || [],
-      remise_type:    devis.remise_type,
-      remise_globale: totaux?.remise_globale || 0,
-      remise_note:    devis.remise_note,
-      tva:            devis.tva,
-      tva_montant:    totaux?.tva_montant || 0,
-      total_ttc:      totaux?.total_ttc || 0,
-    };
-    const results = {};
-    if (client.tel)   results.sms   = await SMS.send(client.tel, 'devis_envoye', { ...data, total_ttc: data.total_ttc }).catch(e => ({ error: e.message }));
-    if (client.email) results.email = await EMAIL.send(client.email, 'devis_client', data).catch(e => ({ error: e.message }));
-    return results;
-  },
-
-  /**
-   * Devis validé → facture + PDF joint optionnel
-   */
-  async factureValidee({ client, garage, moto, devis, totaux, pdfBuffer }) {
-    const data = {
-      moto:       `${moto.marque} ${moto.modele}`,
-      plaque:     moto.plaque,
-      date:       new Date().toLocaleDateString('fr-FR'),
-      total_ttc:  totaux?.total_ttc || 0,
-      score:      moto.score,
-      couleur:    moto.couleur_dossier,
-    };
-    const results = {};
-    if (client.tel)   results.sms = await SMS.send(client.tel, 'facture_validee', data).catch(e => ({ error: e.message }));
-    if (client.email) {
-      if (pdfBuffer) {
-        results.email = await EMAIL.sendWithPDF(
-          client.email, 'devis_client', { ...data, garage_nom: garage.nom, numero: devis.numero, lignes: devis.lignes || [], remise_type: devis.remise_type, remise_globale: totaux?.remise_globale || 0, tva: devis.tva, tva_montant: totaux?.tva_montant || 0, devis_id: devis.id },
-          pdfBuffer, `Facture_${devis.numero}.pdf`
-        ).catch(e => ({ error: e.message }));
-      } else {
-        results.email = await EMAIL.send(client.email, 'devis_client', { ...data, garage_nom: garage.nom, numero: devis.numero, lignes: [], remise_type: '', remise_globale: 0, tva: 20, tva_montant: 0, devis_id: devis.id }).catch(e => ({ error: e.message }));
-      }
-    }
     return results;
   },
 

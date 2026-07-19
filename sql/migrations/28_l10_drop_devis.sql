@@ -1,0 +1,61 @@
+-- ═══════════════════════════════════════════════════════════
+-- Migration 28 — L10 commit 4 — DROP TABLE devis (IRRÉVERSIBLE)
+-- ═══════════════════════════════════════════════════════════
+-- Phase 31 (v1.8). Dernier commit du chantier L10. `ordres_reparation` est la
+-- table canonique unique du cycle devis/OR depuis la migration 26 : `devis`
+-- a été vidée (DELETE FROM devis) et déconnectée (devis.or_id supprimée) à
+-- cette occasion. Ce script achève la migration en supprimant la table
+-- devenue inutile.
+--
+-- ⚠️ IRRÉVERSIBLE — TOUTE LIGNE RESTANTE DANS `devis` SERA PERDUE.
+-- La table a été vidée en migration 26 — 0 ligne attendue au moment
+-- d'exécuter ce script. VÉRIFIER AVANT D'EXÉCUTER :
+--
+--   SELECT count(*) FROM devis;
+--   -- Attendu : 0. Si > 0, investiguer AVANT de continuer — ça voudrait
+--   -- dire qu'un devis a été créé après la migration 26 via un chemin non
+--   -- identifié dans cet audit (aucun frontend ni endpoint actif ne
+--   -- devrait plus écrire dans cette table au moment d'écrire ce fichier,
+--   -- mais mieux vaut vérifier que supposer).
+--
+-- ⚠️ PRÉ-REQUIS — AUDITER LA CONTRAINTE FK AVANT D'EXÉCUTER LE DROP :
+-- `ordres_reparation.devis_id` référence `devis.id` par une FK posée hors
+-- dépôt (migration fondatrice de ordres_reparation non commitée — voir
+-- 26_l10_unification_devis_or_schema.sql §2, qui documente son existence :
+-- "Le lien réel et fonctionnel est ordres_reparation.devis_id -> devis.id").
+-- DROP TABLE devis échouera si cette contrainte existe et que CASCADE n'est
+-- pas utilisé. Vérifier d'abord quelles contraintes référencent `devis` :
+--
+--   SELECT conname, conrelid::regclass AS table_dependante
+--   FROM pg_constraint
+--   WHERE confrelid = 'devis'::regclass AND contype = 'f';
+--   -- Attendu : une ligne, conrelid = ordres_reparation (la FK sur
+--   -- ordres_reparation.devis_id). CASCADE (ci-dessous) la supprime
+--   -- automatiquement avec la table.
+--
+-- Ce script NE supprime PAS la colonne ordres_reparation.devis_id — elle
+-- reste en base comme UUID nullable sans contrainte référentielle après le
+-- DROP (elle est déjà NULL sur tout OR créé depuis la migration 26, aucun
+-- devis n'ayant plus été créé pour générer une valeur ; le code applicatif
+-- continue de la lire/écrire pour le chemin legacy de synchronisation vers
+-- `interventions`, voir supabase.js OrdresReparation.cloturer). Retirer
+-- cette colonne serait un changement de schéma applicatif séparé, hors
+-- scope de ce commit — le champ orphelin est inoffensif tel quel.
+--
+-- ✅ AUDIT CÔTÉ CODE APPLICATIF (fait avant d'écrire ce script, commit
+-- associé à cette migration) :
+--   - app.html : 0 référence à /devis (grep exhaustif)
+--   - MotoKey_Client.html : 0 référence à /devis (grep exhaustif)
+--   - Seul consommateur backend restant hors des endpoints /devis eux-mêmes :
+--     Garages.getStats() (GET /stats) interrogeait directement `devis` pour
+--     le calcul du CA — corrigé au commit `7b48a14` (calcule désormais le
+--     CA depuis ordres_reparation.statut='facture'), AVANT ce script.
+--   - Les endpoints /devis (motokey-api.js), le module Devis (supabase.js),
+--     calcDevis()/DB.devis (fallback RAM), et les notifications
+--     devisEnvoye()/factureValidee() (notifications.js, déjà mortes — 0
+--     appelant trouvé) sont retirés dans le même commit que ce fichier.
+--
+-- NE PAS EXÉCUTER avant d'avoir confirmé les deux SELECT ci-dessus.
+-- ═══════════════════════════════════════════════════════════
+
+DROP TABLE IF EXISTS devis CASCADE;

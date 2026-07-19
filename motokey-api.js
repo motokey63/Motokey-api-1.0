@@ -38,13 +38,13 @@
  *   GET /motos/:id/entretien                Plan complet (Autodata)
  *   GET /motos/:id/entretien/alertes        Opérations dues
  *
- *  [DEVIS & FACTURATION]
- *   GET  /devis                   Liste des devis
- *   POST /devis                   Créer un devis
- *   GET  /devis/:id               Détail + totaux
- *   PUT  /devis/:id               Modifier lignes/remises
- *   POST /devis/:id/valider       Valider → crée intervention
- *   POST /devis/:id/pdf           Simuler export PDF
+ *  [ORDRES DE RÉPARATION — table canonique, remplace l'ancien flux devis (L10)]
+ *   GET   /ordres-reparation              Liste des OR du garage
+ *   POST  /ordres-reparation              Créer un OR (brouillon)
+ *   GET   /ordres-reparation/:id          Détail + tâches + pièces + totaux
+ *   PATCH /ordres-reparation/:id/statut   Transition de statut
+ *   POST  /ordres-reparation/:id/cloturer Clôturer (→ terminé)
+ *   POST  /ordres-reparation/:id/facturer Facturer (→ facturé, numero_facture)
  *
  *  [ANTI-FRAUDE]
  *   POST /fraude/analyser         Analyser une facture (IA)
@@ -236,17 +236,6 @@ const DB = {
     {id:'int-005',moto_id:'moto-003',garage_id:'gar-001',type:'jaune',titre:'Vidange maison',         description:'Castrol Power1 Racing 10W50, facture jointe',km:29100,technicien:'Propriétaire',           date:'18/01/2026',score_confiance:54,montant_ht:45.00, created_at:'2026-01-18T10:00:00Z'},
     {id:'int-006',moto_id:'moto-004',garage_id:'gar-001',type:'vert', titre:'Révision 7 500 km',      description:'Courroies, soupapes, freins',                km:8900, technicien:'Ducati Store Orléans',    date:'28/02/2026',score_confiance:99,montant_ht:580.00,created_at:'2026-02-28T10:00:00Z'}
   ],
-  devis: [{
-    id:'dv-001',moto_id:'moto-001',garage_id:'gar-001',
-    numero:'2026-0147',statut:'brouillon',technicien:'Jean-Marc Duval',
-    remise_type:'fidelite',remise_pct:10,remise_note:'Client fidèle 4 ans',tva:20,
-    lignes:[
-      {id:'lg-001',type:'mo',    icon:'🔧',desc:'Vidange + filtre huile',        ref:'MO-STD', qty:0.8,pu:65,   remise_pct:0,reason_type:''},
-      {id:'lg-002',type:'fluide',icon:'🛢️',desc:'Huile Yamalube 10W-40 · 3L', ref:'FLU-YAM',qty:3,  pu:12.50,remise_pct:0,reason_type:''},
-      {id:'lg-003',type:'piece', icon:'🔩',desc:'Filtre à huile Yamaha OEM',    ref:'PIE-001',qty:1,  pu:14.90,remise_pct:0,reason_type:''}
-    ],
-    created_at:nowISO(),updated_at:nowISO()
-  }],
   fraude_verifications: [
     {id:'fv-001',moto_id:'moto-001',garage:'Moto Shop Orléans',montant:89.50, km:18650,qr_valide:true, signature_valide:true, score:96,verdict:'authentifie',       date:'05/02/2026',created_at:nowISO()},
     {id:'fv-002',moto_id:'moto-001',garage:'Top Moto 45',      montant:313.90,km:16200,qr_valide:true, signature_valide:true, score:91,verdict:'authentifie',       date:'11/11/2025',created_at:nowISO()},
@@ -315,20 +304,6 @@ function calcScore(ints, km) {
 }
 function couleur(score) {
   return score>=80?'vert':score>=60?'bleu':score>=40?'jaune':'rouge';
-}
-function calcDevis(dv) {
-  let moHT=0,pieHT=0,remL=0;
-  (dv.lignes||[]).forEach(function(l){
-    const brut = l.pu * l.qty;
-    const rem  = brut * ((l.remise_pct||0)/100);
-    remL += rem;
-    if(l.type==='mo') moHT += brut-rem; else pieHT += brut-rem;
-  });
-  const sous = moHT+pieHT;
-  const remG = sous*((dv.remise_pct||0)/100);
-  const base = sous-remG;
-  const tva  = base*((dv.tva||20)/100);
-  return {mo_ht:moHT,pieces_ht:pieHT,remise_lignes:remL,sous_total:sous,remise_globale:remG,base_ht:+base.toFixed(2),tva_montant:+tva.toFixed(2),total_ttc:+(base+tva).toFixed(2)};
 }
 function analyserFraude(p) {
   const isFake = p.garage_type==='fake';
@@ -789,7 +764,7 @@ const server = http.createServer(async function(req, res){
         motos:['GET /motos','POST /motos','GET /motos/:id','PUT /motos/:id','DELETE /motos/:id','GET /motos/:id/score'],
         interventions:['GET /motos/:id/interventions','POST /motos/:id/interventions','PUT /motos/:id/interventions/:iid','DELETE /motos/:id/interventions/:iid'],
         entretien:['GET /motos/:id/entretien','GET /motos/:id/entretien/alertes'],
-        devis:['GET /devis','POST /devis','GET /devis/:id','PUT /devis/:id','POST /devis/:id/envoyer','POST /devis/:id/valider','POST /devis/:id/pdf'],
+        ordres_reparation:['GET /ordres-reparation','POST /ordres-reparation','GET /ordres-reparation/:id','PATCH /ordres-reparation/:id/statut'],
         fraude:['POST /fraude/analyser','GET /fraude/historique'],
         transfert:['POST /transfert/initier','POST /transfert/confirmer-vendeur','POST /transfert/consulter','POST /transfert/finaliser','GET /transfert/:code'],
         client:['GET /client/moto','GET /client/alertes','GET /client/documents'],
@@ -1364,324 +1339,6 @@ const server = http.createServer(async function(req, res){
       } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
     }
     return fail(res, 'Supabase requis', 503, 'SERVICE_UNAVAILABLE');
-  }
-
-  /* DEVIS */
-  if((p=M('GET','/devis'))!==null){
-    // RBAC: MECANO minimum — CLIENT voit ses propres devis, MECANO+ voit le garage
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-
-    // CLIENT : ses propres devis (via ses motos)
-    if (rbac.requireAnyRole(ctx, ['CLIENT'])) {
-      if (USE_SUPABASE && SBLayer) {
-        try {
-          const { data: clientRow } = await SBLayer.supabase.from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
-          if (!clientRow) return ok(res, { devis: [], total: 0 });
-          const { data: motoIds } = await SBLayer.supabase.from('motos').select('id').eq('client_id', clientRow.id);
-          if (!motoIds || motoIds.length === 0) return ok(res, { devis: [], total: 0 });
-          const ids = motoIds.map(function(m){ return m.id; });
-          const { data: list } = await SBLayer.supabase.from('devis').select('*, motos(marque, modele, plaque)').in('moto_id', ids).neq('statut', 'brouillon');
-          return ok(res, { devis: list || [], total: (list || []).length });
-        } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
-      }
-      const cli = DB.clients.find(function(c){ return c.auth_user_id === ctx.user_id; });
-      if (!cli) return ok(res, { devis: [], total: 0 });
-      const cliMotos = DB.motos.filter(function(m){ return m.client_id === cli.id; }).map(function(m){ return m.id; });
-      const list = DB.devis.filter(function(d){ return cliMotos.includes(d.moto_id) && d.statut !== 'brouillon'; });
-      return ok(res, { devis: list, total: list.length });
-    }
-
-    // MECANO+ : tous les devis du garage
-    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
-    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
-    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
-
-    if (USE_SUPABASE && SBLayer) {
-      try {
-        const list = await SBLayer.Devis.list(garageId);
-        return ok(res, { devis: list, total: list.length });
-      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
-    }
-    // ── RAM fallback ──
-    const list = DB.devis.filter(function(d){return d.garage_id===garageId;}).map(function(d){
-      const m = DB.motos.find(function(x){return x.id===d.moto_id;});
-      return Object.assign({},d,{moto_info:m?m.marque+' '+m.modele+' — '+m.plaque:'—',total_ttc:calcDevis(d).total_ttc});
-    });
-    return ok(res,{devis:list,total:list.length});
-  }
-
-  if((p=M('POST','/devis'))!==null){
-    // RBAC: MECANO minimum — CLIENT rejeté
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
-
-    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
-    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
-
-    const {moto_id,lignes,remise_type,remise_pct,remise_note} = b;
-    if(!moto_id) return fail(res,'moto_id requis');
-    if (USE_SUPABASE && SBLayer) {
-      try {
-        const dv = await SBLayer.Devis.create(garageId, { moto_id, lignes, remise_type, remise_pct, remise_note });
-        return ok(res, { devis: dv }, 'Devis créé', 201);
-      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
-    }
-    // ── RAM fallback ──
-    const m = DB.motos.find(function(x){return x.id===moto_id&&x.garage_id===garageId;});
-    if(!m) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
-    const dv = {id:'dv-'+uid(),moto_id,garage_id:garageId,numero:'2026-'+String(DB.devis.length+100).padStart(4,'0'),statut:'brouillon',lignes:lignes||[],remise_type:remise_type||'aucun',remise_pct:remise_pct||0,remise_note:remise_note||'',tva:20,created_at:nowISO(),updated_at:nowISO()};
-    DB.devis.push(dv);
-    return ok(res,{devis:dv,totaux:calcDevis(dv)},'Devis créé',201);
-  }
-
-  if((p=M('GET','/devis/:id'))!==null){
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-
-    // CLIENT : vérification propriété + brouillons invisibles
-    if (rbac.requireAnyRole(ctx, ['CLIENT'])) {
-      if (USE_SUPABASE && SBLayer) {
-        try {
-          const { data: clientRow } = await SBLayer.supabase.from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
-          if (!clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
-          const { data: dv } = await SBLayer.supabase.from('devis').select('*, motos(marque, modele, plaque, clients(nom, email))').eq('id', p.id).single();
-          if (!dv) return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND');
-          const { data: motoCheck } = await SBLayer.supabase.from('motos').select('id').eq('id', dv.moto_id).eq('client_id', clientRow.id).limit(1).single();
-          if (!motoCheck) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
-          if (dv.statut === 'brouillon') return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND');
-          return ok(res, { devis: dv, moto: dv.motos, totaux: SBLayer.Devis._calcTotaux(dv) });
-        } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
-      }
-      // ── RAM fallback ──
-      const cli = DB.clients.find(function(c){ return c.auth_user_id === ctx.user_id; });
-      if (!cli) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
-      const dvC = DB.devis.find(function(d){ return d.id === p.id; });
-      if (!dvC) return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND');
-      const motoC = DB.motos.find(function(x){ return x.id === dvC.moto_id && x.client_id === cli.id; });
-      if (!motoC) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
-      if (dvC.statut === 'brouillon') return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND');
-      return ok(res, { devis: dvC, moto: motoC, totaux: calcDevis(dvC) });
-    }
-
-    // MECANO+ : accès garage normal
-    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
-    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
-    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
-
-    if (USE_SUPABASE && SBLayer) {
-      try {
-        const dv = await SBLayer.Devis.getById(p.id, garageId);
-        return ok(res, { devis: dv, moto: dv.motos, totaux: SBLayer.Devis._calcTotaux(dv) });
-      } catch(e) { return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND'); }
-    }
-    // ── RAM fallback ──
-    const dv = DB.devis.find(function(d){return d.id===p.id&&d.garage_id===garageId;});
-    if(!dv) return fail(res,'Devis non trouvé',404,'NOT_FOUND');
-    const m  = DB.motos.find(function(x){return x.id===dv.moto_id;});
-    const c  = DB.clients.find(function(x){return x.id===(m?m.client_id:null);});
-    const {password:_,...cd} = c||{};
-    return ok(res,{devis:dv,moto:m,client:cd,totaux:calcDevis(dv)});
-  }
-
-  if((p=M('PUT','/devis/:id'))!==null){
-    // RBAC: MECANO minimum
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
-    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
-    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
-
-    if (USE_SUPABASE && SBLayer) {
-      try {
-        const { data: current } = await SBLayer.supabase.from('devis').select('statut').eq('id', p.id).eq('garage_id', garageId).single();
-        if (!current) return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND');
-        if (current.statut !== 'brouillon') return fail(res, 'Devis déjà envoyé — créez un nouveau devis pour modifier', 400, 'INVALID_STATUS');
-        const dv = await SBLayer.Devis.update(p.id, garageId, { entete: b.entete, lignes: b.lignes });
-        return ok(res, { devis: dv }, 'Devis mis à jour');
-      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
-    }
-    // ── RAM fallback ──
-    const i = DB.devis.findIndex(function(d){return d.id===p.id&&d.garage_id===garageId;});
-    if(i<0) return fail(res,'Devis non trouvé',404,'NOT_FOUND');
-    if(DB.devis[i].statut!=='brouillon') return fail(res,'Devis déjà envoyé — créez un nouveau devis pour modifier',400,'INVALID_STATUS');
-    DB.devis[i] = Object.assign({},DB.devis[i],b,{id:p.id,garage_id:garageId,updated_at:nowISO()});
-    return ok(res,{devis:DB.devis[i],totaux:calcDevis(DB.devis[i])},'Devis mis à jour');
-  }
-
-  if((p=M('POST','/devis/:id/envoyer'))!==null){
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
-    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
-    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
-
-    if (USE_SUPABASE && SBLayer) {
-      try {
-        const dv = await SBLayer.Devis.envoyer(p.id, garageId);
-        // client_id est une colonne snapshot directe sur `devis` (schéma réel live) — fallback
-        // sur la jointure motos.client_id si absent pour compat avec d'anciennes lignes.
-        const pushClientId = dv.client_id || (dv.motos && dv.motos.client_id);
-        if (pushClientId) {
-          pushService.sendPush(pushClientId, {
-            title: 'Nouveau devis reçu',
-            body: `Un devis (${dv.numero}) vous a été envoyé.`,
-            data: { type: 'devis_recu', devisId: dv.id }
-          }, `devis-envoye-${dv.id}`).catch(() => {});
-        }
-        return ok(res, { devis: dv }, 'Devis envoyé au client');
-      } catch(e) { return fail(res, e.message, 400, 'INVALID_STATUS'); }
-    }
-    // ── RAM fallback ──
-    const i = DB.devis.findIndex(function(d){return d.id===p.id&&d.garage_id===garageId;});
-    if(i<0) return fail(res,'Devis non trouvé',404,'NOT_FOUND');
-    if(DB.devis[i].statut!=='brouillon') return fail(res,'Ce devis a déjà été envoyé',400,'INVALID_STATUS');
-    DB.devis[i].statut='envoye'; DB.devis[i].updated_at=nowISO();
-    const mRam = DB.motos.find(function(x){return x.id===DB.devis[i].moto_id;});
-    if (mRam && mRam.client_id) {
-      pushService.sendPush(mRam.client_id, {
-        title: 'Nouveau devis reçu',
-        body: `Un devis (${DB.devis[i].numero}) vous a été envoyé.`,
-        data: { type: 'devis_recu', devisId: DB.devis[i].id }
-      }, `devis-envoye-${DB.devis[i].id}`).catch(() => {});
-    }
-    return ok(res,{devis:DB.devis[i]},'Devis envoyé au client');
-  }
-
-  if((p=M('POST','/devis/:id/valider'))!==null){
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-
-    // CLIENT : validation propriétaire
-    if (rbac.requireAnyRole(ctx, ['CLIENT'])) {
-      if (USE_SUPABASE && SBLayer) {
-        try {
-          const { data: clientRow } = await SBLayer.supabase.from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
-          if (!clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
-          const { data: dvC } = await SBLayer.supabase.from('devis').select('id, moto_id, garage_id, statut').eq('id', p.id).single();
-          if (!dvC) return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND');
-          const { data: motoCheck } = await SBLayer.supabase.from('motos').select('id').eq('id', dvC.moto_id).eq('client_id', clientRow.id).limit(1).single();
-          if (!motoCheck) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
-          if (dvC.statut !== 'envoye') return fail(res, 'Ce devis ne peut pas être validé (statut: ' + dvC.statut + ')', 400, 'INVALID_STATUS');
-          const result = await SBLayer.Devis.valider(p.id, dvC.garage_id);
-          return ok(res, result, 'Devis validé · Intervention créée · Client synchronisé');
-        } catch(e) { return fail(res, e.message, 400, 'ERROR'); }
-      }
-      // ── RAM fallback ──
-      const cli = DB.clients.find(function(c){ return c.auth_user_id === ctx.user_id; });
-      if (!cli) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
-      const ic = DB.devis.findIndex(function(d){ return d.id === p.id; });
-      if (ic < 0) return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND');
-      const dvR = DB.devis[ic];
-      const motoC = DB.motos.find(function(x){ return x.id === dvR.moto_id && x.client_id === cli.id; });
-      if (!motoC) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
-      if (dvR.statut !== 'envoye') return fail(res, 'Ce devis ne peut pas être validé (statut: ' + dvR.statut + ')', 400, 'INVALID_STATUS');
-      DB.devis[ic].statut = 'accepte'; DB.devis[ic].date_acceptation = nowISO(); DB.devis[ic].updated_at = nowISO();
-      const totC = calcDevis(DB.devis[ic]);
-      const interC = {id:'int-'+uid(),moto_id:dvR.moto_id,garage_id:dvR.garage_id,type:'bleu',titre:'Facture '+dvR.numero,description:(dvR.lignes||[]).map(function(l){return l.desc||l.description||'';}).join(', '),km:motoC?motoC.km:0,date:todayFR(),score_confiance:96,montant_ht:totC.base_ht,devis_id:p.id,created_at:nowISO()};
-      DB.interventions.push(interC);
-      const sc = calcScore(DB.interventions.filter(function(x){return x.moto_id===dvR.moto_id;}));
-      const mi = DB.motos.findIndex(function(x){return x.id===dvR.moto_id;});
-      if(mi>=0){DB.motos[mi].score=sc;DB.motos[mi].couleur_dossier=couleur(sc);}
-      return ok(res,{devis:DB.devis[ic],totaux:totC,intervention_creee:interC,nouveau_score:sc},'Devis validé · Intervention créée · Client synchronisé');
-    }
-
-    // MECANO+ : validation garage
-    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
-    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
-    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
-
-    if (USE_SUPABASE && SBLayer) {
-      try {
-        const result = await SBLayer.Devis.valider(p.id, garageId);
-        return ok(res, result, 'Devis validé · Intervention créée · Client synchronisé');
-      } catch(e) { return fail(res, e.message, 400, 'ERROR'); }
-    }
-    // ── RAM fallback ──
-    const i = DB.devis.findIndex(function(d){return d.id===p.id&&d.garage_id===garageId;});
-    if(i<0) return fail(res,'Devis non trouvé',404,'NOT_FOUND');
-    if(DB.devis[i].statut==='accepte') return fail(res,'Devis déjà validé');
-    DB.devis[i].statut='accepte'; DB.devis[i].date_acceptation=nowISO(); DB.devis[i].updated_at=nowISO();
-    const tot = calcDevis(DB.devis[i]);
-    const m   = DB.motos.find(function(x){return x.id===DB.devis[i].moto_id;});
-    const inter = {id:'int-'+uid(),moto_id:DB.devis[i].moto_id,garage_id:garageId,type:'bleu',titre:'Facture '+DB.devis[i].numero,description:(DB.devis[i].lignes||[]).map(function(l){return l.desc||l.description||'';}).join(', '),km:m?m.km:0,date:todayFR(),score_confiance:96,montant_ht:tot.base_ht,devis_id:p.id,created_at:nowISO()};
-    DB.interventions.push(inter);
-    const allIs = DB.interventions.filter(function(x){return x.moto_id===DB.devis[i].moto_id;});
-    const sc = calcScore(allIs);
-    const mi = DB.motos.findIndex(function(x){return x.id===DB.devis[i].moto_id;});
-    if(mi>=0){DB.motos[mi].score=sc;DB.motos[mi].couleur_dossier=couleur(sc);}
-    return ok(res,{devis:DB.devis[i],totaux:tot,intervention_creee:inter,nouveau_score:sc},'Devis validé · Intervention créée · Client synchronisé');
-  }
-
-  if((p=M('POST','/devis/:id/refuser'))!==null){
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-
-    // CLIENT : refus propriétaire
-    if (rbac.requireAnyRole(ctx, ['CLIENT'])) {
-      if (USE_SUPABASE && SBLayer) {
-        try {
-          const { data: clientRow } = await SBLayer.supabase.from('clients').select('id').eq('auth_user_id', ctx.user_id).limit(1).single();
-          if (!clientRow) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
-          const { data: dvC } = await SBLayer.supabase.from('devis').select('id, moto_id, statut').eq('id', p.id).single();
-          if (!dvC) return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND');
-          const { data: motoCheck } = await SBLayer.supabase.from('motos').select('id').eq('id', dvC.moto_id).eq('client_id', clientRow.id).limit(1).single();
-          if (!motoCheck) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
-          if (dvC.statut !== 'envoye') return fail(res, 'Ce devis ne peut pas être refusé (statut: ' + dvC.statut + ')', 400, 'INVALID_STATUS');
-          const { data: updated } = await SBLayer.supabase.from('devis').update({ statut: 'refuse', date_refus: nowISO() }).eq('id', p.id).select().single();
-          return ok(res, { devis: updated }, 'Devis refusé');
-        } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
-      }
-      // ── RAM fallback ──
-      const cli = DB.clients.find(function(c){ return c.auth_user_id === ctx.user_id; });
-      if (!cli) return fail(res, 'Client introuvable', 404, 'NOT_FOUND');
-      const ir = DB.devis.findIndex(function(d){ return d.id === p.id; });
-      if (ir < 0) return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND');
-      const motoR = DB.motos.find(function(x){ return x.id === DB.devis[ir].moto_id && x.client_id === cli.id; });
-      if (!motoR) return fail(res, 'Permission refusée', 403, 'FORBIDDEN');
-      if (DB.devis[ir].statut !== 'envoye') return fail(res, 'Ce devis ne peut pas être refusé (statut: ' + DB.devis[ir].statut + ')', 400, 'INVALID_STATUS');
-      DB.devis[ir].statut = 'refuse'; DB.devis[ir].date_refus = nowISO(); DB.devis[ir].updated_at = nowISO();
-      return ok(res, { devis: DB.devis[ir] }, 'Devis refusé');
-    }
-
-    // MECANO+ : annulation interne
-    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
-    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
-    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
-
-    if (USE_SUPABASE && SBLayer) {
-      try {
-        const { data: dvG } = await SBLayer.supabase.from('devis').select('id, statut').eq('id', p.id).eq('garage_id', garageId).single();
-        if (!dvG) return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND');
-        const { data: updated } = await SBLayer.supabase.from('devis').update({ statut: 'refuse', date_refus: nowISO() }).eq('id', p.id).select().single();
-        return ok(res, { devis: updated }, 'Devis refusé');
-      } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
-    }
-    // ── RAM fallback ──
-    const ig = DB.devis.findIndex(function(d){ return d.id === p.id && d.garage_id === garageId; });
-    if (ig < 0) return fail(res, 'Devis non trouvé', 404, 'NOT_FOUND');
-    DB.devis[ig].statut = 'refuse'; DB.devis[ig].date_refus = nowISO(); DB.devis[ig].updated_at = nowISO();
-    return ok(res, { devis: DB.devis[ig] }, 'Devis refusé');
-  }
-
-  if((p=M('POST','/devis/:id/pdf'))!==null){
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
-    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
-    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
-    const dv = DB.devis.find(function(d){return d.id===p.id&&d.garage_id===garageId;});
-    if(!dv) return fail(res,'Devis non trouvé',404,'NOT_FOUND');
-    return ok(res,{pdf_url:'https://motokey.fr/pdf/'+p.id+'.pdf',generated_at:nowISO(),simulation:true},'PDF généré (simulation)');
   }
 
   /* FRAUDE */
