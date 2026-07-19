@@ -1028,10 +1028,21 @@ const LABELS_CONSO = {
   disque_av:'Disque avant', disque_ar:'Disque arrière',
   huile_moteur:'Huile moteur', liquide_frein:'Liquide de frein'
 };
+// Le catalogue consommables n'a qu'un type fixe 'chaine' (pas de type 'courroie'/'cardan' dédié) —
+// on relabellise cette ligne selon motos.profil_transmission de la moto affichée, pour ne pas
+// afficher "Chaîne" sur une moto à transmission courroie/cardan.
+const LABELS_TRANSMISSION = { chaine:'Chaîne', courroie:'Courroie', cardan:'Cardan' };
 const ETAT_CLASS = { bon:'score-vert', moyen:'score-bleu', 'usé':'score-jaune', critique:'score-rouge' };
 
+function labelConso(type_consommable) {
+  if (type_consommable === 'chaine' && selectedMoto && selectedMoto.profil_transmission) {
+    return LABELS_TRANSMISSION[selectedMoto.profil_transmission] || LABELS_CONSO.chaine;
+  }
+  return LABELS_CONSO[type_consommable] || type_consommable;
+}
+
 function jaugeBarConso(item) {
-  const label = LABELS_CONSO[item.type_consommable] || item.type_consommable;
+  const label = labelConso(item.type_consommable);
   if (!item.has_data) {
     return `<div class="pneu-stat"><span class="pneu-label">${label}</span><span class="score-badge score-jaune" style="opacity:.55">Non renseigné</span></div>`;
   }
@@ -1049,7 +1060,7 @@ function renderConsommables(data) {
   const items = (data && data.consommables) || [];
   const jg = data ? data.jauge_generale : null;
   const generalHtml = jg
-    ? `<div class="card" style="margin-bottom:16px"><div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">État général (maillon le plus faible)</div><span class="score-badge ${ETAT_CLASS[jg.etat]||'score-bleu'}">${LABELS_CONSO[jg.type_consommable]||jg.type_consommable} · ${jg.pct_usure}% · ${jg.etat}</span></div>`
+    ? `<div class="card" style="margin-bottom:16px"><div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">État général (maillon le plus faible)</div><span class="score-badge ${ETAT_CLASS[jg.etat]||'score-bleu'}">${labelConso(jg.type_consommable)} · ${jg.pct_usure}% · ${jg.etat}</span></div>`
     : `<div class="card" style="margin-bottom:16px"><span class="score-badge score-jaune" style="opacity:.7">Pas encore suivi</span><div style="font-size:12px;color:var(--text2);margin-top:8px">Aucune photo/analyse de consommable pour cette moto. Le client peut ajouter une photo depuis son espace.</div></div>`;
   return `${generalHtml}<div class="card"><div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">Détail par consommable</div>${items.map(jaugeBarConso).join('')}</div>`;
 }
