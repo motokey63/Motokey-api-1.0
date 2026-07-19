@@ -202,15 +202,15 @@ const Garages = {
   },
 
   async getStats(garage_id) {
-    const [motos, interventions, devis] = await Promise.all([
+    const [motos, interventions, ordres] = await Promise.all([
       supabase.from('motos').select('couleur_dossier, score').eq('garage_id', garage_id),
       supabase.from('interventions').select('type, montant_ht').eq('garage_id', garage_id),
-      supabase.from('devis').select('statut, total_ttc').eq('garage_id', garage_id)
+      supabase.from('ordres_reparation').select('statut, total_ttc').eq('garage_id', garage_id)
     ]);
 
     const motoData = motos.data || [];
     const intData  = interventions.data || [];
-    const dvData   = devis.data || [];
+    const orData   = ordres.data || [];
 
     const parCouleur = { vert: 0, bleu: 0, jaune: 0, rouge: 0 };
     motoData.forEach(m => parCouleur[m.couleur_dossier]++);
@@ -218,13 +218,17 @@ const Garages = {
     const parType = { vert: 0, bleu: 0, jaune: 0, rouge: 0 };
     intData.forEach(i => parType[i.type]++);
 
-    const dvValides = dvData.filter(d => d.statut === 'accepte');
-    const caTTC     = dvValides.reduce((s, d) => s + (d.total_ttc || 0), 0);
+    // CA = OR facturés (facture réellement émise) — remplace l'ancien calcul basé sur
+    // devis.statut='accepte' (L10 : la table devis est vidée/dépréciée, la facturation
+    // vit désormais sur ordres_reparation.statut='facture', une mesure de CA plus fidèle
+    // qu'un devis signé mais pas nécessairement facturé).
+    const orFactures = orData.filter(o => o.statut === 'facture');
+    const caTTC       = orFactures.reduce((s, o) => s + (o.total_ttc || 0), 0);
 
     return {
-      motos:         { total: motoData.length, par_couleur: parCouleur },
-      interventions: { total: intData.length, par_type: parType },
-      devis:         { total: dvData.length, valides: dvValides.length, ca_ttc: +caTTC.toFixed(2), ca_ht: +(caTTC/1.2).toFixed(2) }
+      motos:             { total: motoData.length, par_couleur: parCouleur },
+      interventions:     { total: intData.length, par_type: parType },
+      ordres_reparation: { total: orData.length, factures: orFactures.length, ca_ttc: +caTTC.toFixed(2), ca_ht: +(caTTC/1.2).toFixed(2) }
     };
   }
 };

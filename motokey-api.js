@@ -2221,12 +2221,13 @@ const server = http.createServer(async function(req, res){
     const co = {vert:0,bleu:0,jaune:0,rouge:0};
     ms.forEach(function(m){co[m.couleur_dossier]=(co[m.couleur_dossier]||0)+1;});
     const is  = DB.interventions.filter(function(i){return i.garage_id===garageId;});
-    const dvs = DB.devis.filter(function(d){return d.garage_id===garageId;});
-    const ca  = dvs.filter(function(d){return d.statut==='accepte';}).reduce(function(s,d){return s+calcDevis(d).total_ttc;},0);
+    const ors = DB.ordres_reparation.filter(function(o){return o.garage_id===garageId;});
+    const orsFacturees = ors.filter(function(o){return o.statut==='facture';});
+    const ca  = orsFacturees.reduce(function(s,o){return s+(o.total_ttc||0);},0);
     return ok(res,{
       motos:{total:ms.length,par_couleur:co},
       interventions:{total:is.length,par_type:{vert:is.filter(function(i){return i.type==='vert';}).length,bleu:is.filter(function(i){return i.type==='bleu';}).length,jaune:is.filter(function(i){return i.type==='jaune';}).length,rouge:is.filter(function(i){return i.type==='rouge';}).length}},
-      devis:{total:dvs.length,valides:dvs.filter(function(d){return d.statut==='accepte';}).length,ca_ttc:+ca.toFixed(2),ca_ht:+(ca/1.2).toFixed(2)},
+      ordres_reparation:{total:ors.length,factures:orsFacturees.length,ca_ttc:+ca.toFixed(2),ca_ht:+(ca/1.2).toFixed(2)},
       transferts:{total:DB.transferts.filter(function(t){return t.garage_id===garageId;}).length,finalises:DB.transferts.filter(function(t){return t.garage_id===garageId&&t.statut==='finalise';}).length},
       fraude:{total:DB.fraude_verifications.length,authentifiees:DB.fraude_verifications.filter(function(f){return f.verdict==='authentifie';}).length,suspectes:DB.fraude_verifications.filter(function(f){return f.verdict==='fraude_suspectee';}).length}
     });
