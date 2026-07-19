@@ -506,6 +506,13 @@ function errMsg(data) {
   return data?.error?.message || data?.message || 'Erreur inattendue.';
 }
 
+/* apiFetch renvoie le corps JSON complet {success, data:{...}, ...} tel que
+   posté par l'API (helper ok() côté backend) — la charge utile est TOUJOURS
+   sous data.data, jamais à la racine de data. */
+function _unwrap(data, key) {
+  return (data && data.data && data.data[key]) || (data && data[key]) || null;
+}
+
 /* Gère les deux structures de réponse Supabase possibles */
 function extractTokens(data) {
   return {
@@ -763,7 +770,7 @@ async function loadMotos() {
     return;
   }
 
-  const motos = Array.isArray(data) ? data : (data.motos || data.data || []);
+  const motos = Array.isArray(data) ? data : (_unwrap(data, 'motos') || []);
   if (!motos.length) {
     content.innerHTML = `
       <div class="empty-state">
@@ -782,13 +789,13 @@ async function loadMotos() {
       apiGet(`/motos/${moto.id}/consommables`, at)
     ]);
     const interventions = ivRes.ok
-      ? (Array.isArray(ivRes.data) ? ivRes.data : (ivRes.data.interventions || ivRes.data.data || []))
+      ? (Array.isArray(ivRes.data) ? ivRes.data : (_unwrap(ivRes.data, 'interventions') || []))
       : [];
     const alertes = alRes.ok
-      ? (Array.isArray(alRes.data) ? alRes.data : (alRes.data.alertes || alRes.data.data || []))
+      ? (Array.isArray(alRes.data) ? alRes.data : (_unwrap(alRes.data, 'alertes') || []))
       : null; // null = non accessible (403 RBAC) → section masquée
-    const consommables = coRes.ok ? (coRes.data.consommables || []) : [];
-    const jaugeGenerale = coRes.ok ? coRes.data.jauge_generale : null;
+    const consommables = coRes.ok ? (_unwrap(coRes.data, 'consommables') || []) : [];
+    const jaugeGenerale = coRes.ok ? _unwrap(coRes.data, 'jauge_generale') : null;
     return { ...moto, interventions, alertes, consommables, jaugeGenerale };
   }));
 
@@ -1014,13 +1021,6 @@ let _interventionsListCache = [];
 let _interventionsCache     = {}; // or_id -> détail complet (or_taches/or_pieces), rempli à la demande
 let _interventionsOpen      = {}; // or_id -> bool, carte dépliée ou non
 
-/* apiFetch renvoie le corps JSON complet {success, data:{...}, ...} tel que
-   posté par l'API (helper ok() côté backend) — la charge utile est TOUJOURS
-   sous data.data, jamais à la racine de data. */
-function _unwrap(data, key) {
-  return (data && data.data && data.data[key]) || (data && data[key]) || null;
-}
-
 async function loadClientInterventions() {
   const at = localStorage.getItem(LS_AT);
   const box = document.getElementById('interventions-list-content');
@@ -1243,7 +1243,7 @@ async function loadClaimCountBadge() {
   const at = localStorage.getItem(LS_AT);
   const { ok, data } = await apiGet('/client/reclamations', at);
   if (!ok) return;
-  const count = (data.reclamations||[]).filter(function(r){ return r.statut==='en_attente'; }).length;
+  const count = (_unwrap(data, 'reclamations')||[]).filter(function(r){ return r.statut==='en_attente'; }).length;
   const badge = document.getElementById('badgeClaimClient');
   if (!badge) return;
   if (count>0) { badge.textContent=count; badge.style.display='inline-flex'; } else badge.style.display='none';
@@ -1353,7 +1353,7 @@ async function loadClientReclamationsTab() {
   const at = localStorage.getItem(LS_AT);
   const { ok, data } = await apiGet('/client/reclamations', at);
   if (!ok) { content.innerHTML=`<div class="empty-state"><div class="empty-icon">⚠️</div><p>${esc(errMsg(data))}</p></div>`; return; }
-  const list = data.reclamations||[];
+  const list = _unwrap(data, 'reclamations')||[];
   if (!list.length) { content.innerHTML=`<div class="empty-state"><div class="empty-icon">📋</div><p>Aucune réclamation en cours.</p><button class="btn btn-primary" style="margin-top:12px" onclick="switchClientTab('claim')">Réclamer une moto</button></div>`; return; }
   const sLabel={'en_attente':'En attente','accepte':'Acceptée','refuse':'Refusée','litige':'Litige'};
   const sCls={'en_attente':'yw','accepte':'gn','refuse':'rd','litige':'rd'};
@@ -1377,7 +1377,7 @@ async function loadClientGaragesTab() {
   const at = localStorage.getItem(LS_AT);
   const { ok, data } = await apiGet('/client/garages', at);
   if (!ok) { content.innerHTML=`<div class="empty-state"><div class="empty-icon">⚠️</div><p>${esc(errMsg(data))}</p></div>`; return; }
-  const list = data.garages||[];
+  const list = _unwrap(data, 'garages')||[];
   if (!list.length) { content.innerHTML=`<div class="empty-state"><div class="empty-icon">🔧</div><p>Aucun garage lié à votre compte.</p></div>`; return; }
   content.innerHTML = `<div style="font-size:16px;font-weight:700;margin-bottom:16px">Mes garages</div><div style="display:flex;flex-direction:column;gap:12px">`+
     list.map(function(g){
