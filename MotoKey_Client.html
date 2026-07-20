@@ -378,6 +378,21 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
 </div>
 
 <!-- ══════════════════════════════════════════
+     MODALE GUIDE PHOTO CONSOMMABLE (L11 morceau 3/3)
+════════════════════════════════════════════ -->
+<div id="consoGuideModalOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:center;justify-content:center;padding:16px" onclick="if(event.target===this)closeConsoGuideModal()">
+  <div style="background:#fff;border-radius:12px;padding:24px;width:100%;max-width:460px;box-shadow:0 8px 32px rgba(0,0,0,.2);text-align:center">
+    <div id="consoGuideModalSvg" style="margin:0 auto 12px;display:flex;justify-content:center;gap:12px"></div>
+    <div id="consoGuideModalTitre" style="font-size:16px;font-weight:800;margin-bottom:4px"></div>
+    <div id="consoGuideModalSousTitre" style="font-size:13px;color:var(--tx2);margin-bottom:20px;line-height:1.5"></div>
+    <div style="display:flex;gap:8px;justify-content:center">
+      <button class="btn btn-secondary" onclick="closeConsoGuideModal()">Annuler</button>
+      <button class="btn btn-primary" id="consoGuideModalConfirmBtn">J'ai compris, prendre la photo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
      ÉCRAN 7 — MON COMPTE
 ════════════════════════════════════════════ -->
 <div id="screen-account" style="display:none;">
@@ -614,6 +629,101 @@ function fmtStatut(s) {
 }
 
 /* ═══════════════════════════════════════════════════════
+   GUIDES PHOTO SVG (L11 morceau 3/3) — croquis illustré + zone de cadrage
+═══════════════════════════════════════════════════════ */
+const GUIDES = {
+  pneu: {
+    svg: `<svg width="110" height="110" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="44" fill="#f4f4f4" stroke="#222" stroke-width="2.5"/>
+      <circle cx="60" cy="60" r="16" fill="#ddd" stroke="#222" stroke-width="2"/>
+      <path d="M20,60 A40,40 0 0,1 60,20" stroke="#e11" stroke-width="4" fill="none"/>
+      <text x="60" y="14" font-size="9" fill="#e11" text-anchor="middle" font-weight="600">bande</text>
+    </svg>
+    <svg width="110" height="110" viewBox="0 0 120 120">
+      <ellipse cx="60" cy="60" rx="48" ry="30" fill="#f4f4f4" stroke="#222" stroke-width="2.5"/>
+      <rect x="25" y="50" width="70" height="20" fill="none" stroke="#e11" stroke-width="2.5" stroke-dasharray="5,3" rx="3"/>
+      <text x="60" y="80" font-size="8" fill="#e11" text-anchor="middle" font-weight="600">flanc</text>
+    </svg>`,
+    titre: 'Photo du pneu',
+    sousTitre: 'Cadrez la bande de roulement (zone rouge) — le flanc peut apparaître en second plan. Pneu sec, propre, bonne luminosité.'
+  },
+  chaine_brin: {
+    svg: `<svg width="120" height="120" viewBox="0 0 120 120">
+      <circle cx="35" cy="60" r="18" fill="#f4f4f4" stroke="#222" stroke-width="3"/>
+      <circle cx="90" cy="60" r="10" fill="#f4f4f4" stroke="#222" stroke-width="3"/>
+      <path d="M50,50 L78,54 M50,70 L78,66" stroke="#222" stroke-width="2.5"/>
+      <rect x="45" y="45" width="35" height="30" fill="none" stroke="#e11" stroke-width="2.5" stroke-dasharray="5,3" rx="3"/>
+    </svg>`,
+    titre: 'Photo 1/2 — Le brin de chaîne',
+    sousTitre: 'Cadrez une portion tendue de la chaîne (zone rouge), chaîne sèche et propre, sans produit dessus.'
+  },
+  chaine_couronne: {
+    svg: `<svg width="120" height="120" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="30" fill="#f4f4f4" stroke="#222" stroke-width="3"/>
+      <circle cx="60" cy="60" r="6" fill="#222"/>
+      <g stroke="#222" stroke-width="2.5">
+        <line x1="60" y1="30" x2="60" y2="38"/><line x1="85" y1="45" x2="79" y2="49"/>
+        <line x1="85" y1="75" x2="79" y2="71"/><line x1="60" y1="90" x2="60" y2="82"/>
+        <line x1="35" y1="75" x2="41" y2="71"/><line x1="35" y1="45" x2="41" y2="49"/>
+      </g>
+      <circle cx="60" cy="60" r="30" fill="none" stroke="#e11" stroke-width="2.5" stroke-dasharray="5,3"/>
+    </svg>`,
+    titre: 'Photo 2/2 — La couronne',
+    sousTitre: "Cadrez la couronne arrière en entier (zone rouge). C'est cette photo qui détermine surtout l'état affiché."
+  },
+  courroie: {
+    svg: `<svg width="140" height="120" viewBox="0 0 140 120">
+      <circle cx="40" cy="60" r="22" fill="#f4f4f4" stroke="#222" stroke-width="2.5"/>
+      <circle cx="100" cy="60" r="14" fill="#f4f4f4" stroke="#222" stroke-width="2.5"/>
+      <path d="M40,38 L100,46 M40,82 L100,74" stroke="#222" stroke-width="3" fill="none"/>
+      <rect x="30" y="35" width="80" height="50" fill="none" stroke="#e11" stroke-width="2.5" stroke-dasharray="5,3" rx="4"/>
+    </svg>`,
+    titre: 'Photo de la courroie',
+    sousTitre: 'Cadrez la portion de courroie visible (zone rouge). Pas de graisse à vérifier sur ce type de transmission — une seule photo suffit.'
+  }
+};
+
+// Doctrine L11 point 4 : seuls ces 3 types relèvent d'un suivi photo+IA (méthode A).
+// Les 6 autres (plaquettes/disques/huile/liquide_frein) relèvent d'un contrôle mécano
+// manuel ou d'un suivi temps+km — pas de champ 'methode' en base pour piloter ça
+// dynamiquement (vérifié : ni consommables, ni TYPES_CONSOMMABLES, ni la forme
+// renvoyée par GET /motos/:id/consommables n'exposent cette donnée) — liste en dur
+// assumée, à migrer vers un champ DB si une 4e méthode apparaît un jour.
+const TYPES_METHODE_PHOTO = ['pneu_av', 'pneu_ar', 'chaine'];
+
+/**
+ * Résout la séquence de guides/zones à parcourir pour un type+profil donnés.
+ * @returns {?Array<{zone: ?('brin'|'couronne'), guideKey: string}>} null = pas de photo pour ce cas
+ */
+function resolveGuideSequence(typeConsommable, profilTransmission) {
+  if (typeConsommable === 'pneu_av' || typeConsommable === 'pneu_ar') {
+    return [{ zone: null, guideKey: 'pneu' }];
+  }
+  if (typeConsommable === 'chaine') {
+    if (profilTransmission === 'cardan') return null; // aucune photo — vidange de pont au km
+    if (profilTransmission === 'courroie') return [{ zone: null, guideKey: 'courroie' }];
+    return [{ zone: 'brin', guideKey: 'chaine_brin' }, { zone: 'couronne', guideKey: 'chaine_couronne' }];
+  }
+  return null; // hors méthode photo_ia — bouton jamais affiché pour ces types de toute façon
+}
+
+function showConsoGuideModal(guideKey, onConfirm) {
+  const guide = GUIDES[guideKey];
+  document.getElementById('consoGuideModalSvg').innerHTML = guide.svg;
+  document.getElementById('consoGuideModalTitre').textContent = guide.titre;
+  document.getElementById('consoGuideModalSousTitre').textContent = guide.sousTitre;
+  const btn = document.getElementById('consoGuideModalConfirmBtn');
+  const freshBtn = btn.cloneNode(true); // évite l'empilement de listeners entre 2 étapes successives (brin puis couronne)
+  btn.parentNode.replaceChild(freshBtn, btn);
+  freshBtn.onclick = () => { closeConsoGuideModal(); onConfirm(); };
+  document.getElementById('consoGuideModalOverlay').style.display = 'flex';
+}
+
+function closeConsoGuideModal() {
+  document.getElementById('consoGuideModalOverlay').style.display = 'none';
+}
+
+/* ═══════════════════════════════════════════════════════
    JAUGES CONSOMMABLES (GAUGE-01/02, CONSO-04)
 ═══════════════════════════════════════════════════════ */
 const CONSO_LABELS_CLIENT = {
@@ -625,18 +735,23 @@ const CONSO_LABELS_CLIENT = {
 const ETAT_WORDING_CLIENT = { bon:'Très bon état', moyen:'À surveiller', 'usé':'À changer bientôt', critique:'À changer maintenant' };
 const ETAT_COLOR_CLIENT = { bon:'vert', moyen:'bleu', 'usé':'jaune', critique:'rouge' };
 
-function jaugeRowClient(motoId, item) {
+function jaugeRowClient(motoId, item, profilTransmission) {
   const label = CONSO_LABELS_CLIENT[item.type_consommable] || item.type_consommable;
-  const uploadBtn = `<button class="btn btn-secondary" style="font-size:11px;padding:4px 8px" onclick="triggerConsoPhoto('${esc(motoId)}','${esc(item.type_consommable)}')">📸 Ajouter une photo</button>`;
+  const isCardanChaine = item.type_consommable === 'chaine' && profilTransmission === 'cardan';
+  const actionHtml = !TYPES_METHODE_PHOTO.includes(item.type_consommable)
+    ? '' // méthode B/C (contrôle mécano ou suivi temps+km) — pas de bouton photo, doctrine L11 point 4
+    : isCardanChaine
+      ? `<span style="font-size:11px;color:var(--tx3);font-style:italic">Vidange de pont au km — pas de photo</span>`
+      : `<button class="btn btn-secondary" style="font-size:11px;padding:4px 8px" onclick="triggerConsoPhoto('${esc(motoId)}','${esc(item.type_consommable)}','${esc(profilTransmission||'')}')">📸 Ajouter une photo</button>`;
   if (!item.has_data) {
-    return `<div class="conso-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="flex:1;font-size:13px">${label}</span><span class="score-num jaune" style="opacity:.55;font-size:12px;padding:2px 8px">Non renseigné</span>${uploadBtn}</div>`;
+    return `<div class="conso-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="flex:1;font-size:13px">${label}</span><span class="score-num jaune" style="opacity:.55;font-size:12px;padding:2px 8px">Non renseigné</span>${actionHtml}</div>`;
   }
   const color = ETAT_COLOR_CLIENT[item.etat] || 'bleu';
   const wording = ETAT_WORDING_CLIENT[item.etat] || item.etat;
   return `<div class="conso-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
     <span style="flex:1;font-size:13px">${label}</span>
     <div style="width:80px;height:6px;background:var(--line);border-radius:3px;overflow:hidden"><div class="${color}" style="width:${item.pct_usure}%;height:100%;background:currentColor"></div></div>
-    <span class="score-num ${color}" style="font-size:12px;padding:2px 8px">${wording}</span>${uploadBtn}
+    <span class="score-num ${color}" style="font-size:12px;padding:2px 8px">${wording}</span>${actionHtml}
   </div>`;
 }
 
@@ -649,14 +764,15 @@ function jaugesSectionClient(moto) {
   return `<div class="moto-section">
     <div class="moto-section-title">Usure des Consommables</div>
     ${general}
-    ${items.map(i => jaugeRowClient(moto.id, i)).join('')}
+    ${items.map(i => jaugeRowClient(moto.id, i, moto.profil_transmission)).join('')}
   </div>`;
 }
 
-async function uploadConsoPhoto(motoId, typeConsommable, file, token) {
+async function uploadConsoPhoto(motoId, typeConsommable, file, token, zone) {
   const fd = new FormData();
   fd.append('photo', file);
   fd.append('type_consommable', typeConsommable);
+  if (zone) fd.append('zone', zone);
   const res = await fetch(API_BASE + '/motos/' + motoId + '/photos-consommables', {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + token }, // NO Content-Type
@@ -666,25 +782,38 @@ async function uploadConsoPhoto(motoId, typeConsommable, file, token) {
   return { ok: res.ok, status: res.status, data };
 }
 
-function triggerConsoPhoto(motoId, typeConsommable) {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/jpeg,image/png,image/webp';
-  input.onchange = async () => {
-    const file = input.files && input.files[0];
-    if (!file) return;
-    const at = localStorage.getItem(LS_AT);
-    const r = await uploadConsoPhoto(motoId, typeConsommable, file, at);
-    if (r.ok) {
-      alert('Photo envoyée — analyse en cours.');
-      loadMotos(); // refresh gauges
-    } else if (r.status === 503) {
-      alert("Envoi de photo temporairement indisponible (stockage non configuré). Réessayez plus tard.");
-    } else {
-      alert('Échec de l\'envoi : ' + ((r.data && (r.data.error || r.data.message)) || r.status));
-    }
-  };
-  input.click();
+function triggerConsoPhoto(motoId, typeConsommable, profilTransmission) {
+  const sequence = resolveGuideSequence(typeConsommable, profilTransmission);
+  if (!sequence) return; // garde-fou défensif — le bouton n'est normalement jamais affiché dans ce cas
+  runConsoPhotoStep(motoId, typeConsommable, sequence, 0);
+}
+
+function runConsoPhotoStep(motoId, typeConsommable, sequence, index) {
+  const step = sequence[index];
+  showConsoGuideModal(step.guideKey, () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/jpeg,image/png,image/webp';
+    input.onchange = async () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      const at = localStorage.getItem(LS_AT);
+      const r = await uploadConsoPhoto(motoId, typeConsommable, file, at, step.zone);
+      if (!r.ok) {
+        if (r.status === 503) alert("Envoi de photo temporairement indisponible (stockage non configuré). Réessayez plus tard.");
+        else alert('Échec de l\'envoi : ' + ((r.data && (r.data.error || r.data.message)) || r.status));
+        return;
+      }
+      const next = index + 1;
+      if (next < sequence.length) {
+        runConsoPhotoStep(motoId, typeConsommable, sequence, next);
+      } else {
+        alert('Photo(s) envoyée(s) — analyse en cours.');
+        loadMotos(); // refresh gauges
+      }
+    };
+    input.click();
+  });
 }
 
 function renderMotoCard(moto) {
