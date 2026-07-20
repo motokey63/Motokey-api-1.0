@@ -135,6 +135,72 @@ function caseJaugeGeneraleLogic() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Cas chaine-zone-logic : fonction pure, aucune DB/réseau
+// ─────────────────────────────────────────────────────────────────────────
+
+function caseChaineZoneLogic() {
+  const caseName = 'chaine-zone-logic';
+
+  let pickChainAnalysis;
+  try {
+    ({ pickChainAnalysis } = require('../services/jaugeConsommables'));
+  } catch (err) {
+    assert(caseName, "require('../services/jaugeConsommables') réussit", false, err.message);
+    return;
+  }
+
+  assert(caseName, 'aucune photo → null', pickChainAnalysis([]) === null);
+
+  assert(
+    caseName,
+    'photos sans analyse_ia exploitable → null',
+    pickChainAnalysis([{ zone: 'brin', analyse_ia: null }, { zone: 'couronne' }]) === null
+  );
+
+  const brinPire = pickChainAnalysis([
+    { zone: 'couronne', analyse_ia: { pct_usure: 20, etat: 'bon' } },
+    { zone: 'brin', analyse_ia: { pct_usure: 75, etat: 'usé' } },
+  ]);
+  assert(
+    caseName,
+    'brin plus usé que couronne → retient brin (pire des deux, PAS la première de la liste)',
+    !!brinPire && brinPire.pct_usure === 75 && brinPire.etat === 'usé',
+    JSON.stringify(brinPire)
+  );
+
+  const uneSeuleZone = pickChainAnalysis([
+    { zone: 'couronne', analyse_ia: { pct_usure: 40, etat: 'moyen' } },
+  ]);
+  assert(
+    caseName,
+    "une seule zone photographiée jusqu'ici → retourne quand même cette analyse (jamais bloquant)",
+    !!uneSeuleZone && uneSeuleZone.pct_usure === 40,
+    JSON.stringify(uneSeuleZone)
+  );
+
+  const profilCourroie = pickChainAnalysis([
+    { zone: null, analyse_ia: { pct_usure: 55, etat: 'moyen' } },
+  ]);
+  assert(
+    caseName,
+    'profil courroie (zone=null, une seule prise) → fonctionne comme un cas à zone unique',
+    !!profilCourroie && profilCourroie.pct_usure === 55,
+    JSON.stringify(profilCourroie)
+  );
+
+  const doubleZoneMemePct = pickChainAnalysis([
+    { zone: 'couronne', analyse_ia: { pct_usure: 60, etat: 'usé' } },
+    { zone: 'brin', analyse_ia: { pct_usure: 60, etat: 'usé' } },
+  ]);
+  assert(
+    caseName,
+    'égalité de pct_usure entre les deux zones → une des deux analyses retournée (pas de crash)',
+    !!doubleZoneMemePct && doubleZoneMemePct.pct_usure === 60,
+    JSON.stringify(doubleZoneMemePct)
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Cas endpoint-shape : structural toujours + live optionnel
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -486,6 +552,7 @@ function caseDeadCodeRemoved() {
 
 async function main() {
   if (shouldRun('jauge-generale-logic')) caseJaugeGeneraleLogic();
+  if (shouldRun('chaine-zone-logic')) caseChaineZoneLogic();
   if (shouldRun('endpoint-shape')) {
     caseEndpointShapeStructural();
     await caseEndpointShapeLive();

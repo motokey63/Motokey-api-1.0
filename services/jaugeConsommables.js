@@ -25,6 +25,33 @@ function computeJaugeGenerale(items) {
 }
 
 /**
+ * PURE — aucun accès DB. Pour le type 'chaine', combine les deux zones (brin/couronne)
+ * en gardant la PIRE des deux (pct_usure max), jamais "la plus récente gagne" — l'usure
+ * de la chaîne est déterminée par son maillon le plus faible entre les deux zones
+ * photographiées (doctrine L11 : bon comportement sécurité).
+ *
+ * Pour un profil courroie (une seule prise, zone toujours NULL) ou si une seule des deux
+ * zones a été photographiée jusqu'ici, retourne cette unique analyse exploitable — jamais
+ * bloquant en attendant la 2e photo (D-04, cohérent avec le reste du système : montrer ce
+ * qui est disponible plutôt que rien).
+ *
+ * @param {Array<{zone?: ?('brin'|'couronne'), analyse_ia?: ?{pct_usure:number, etat:string}}>} photos
+ *        Triées desc created_at (comme retourné par PhotosConsommables.listByConsommable).
+ * @returns {?{pct_usure:number, etat:string}} null si aucune photo exploitable
+ */
+function pickChainAnalysis(photos) {
+  const latestByZone = {};
+  for (const p of (photos || [])) {
+    if (!p || !p.analyse_ia || typeof p.analyse_ia.pct_usure !== 'number') continue;
+    const key = p.zone || '_unique'; // profil courroie : toujours zone=NULL → une seule clé
+    if (!(key in latestByZone)) latestByZone[key] = p.analyse_ia; // photos triées desc → 1ère rencontre = plus récente pour cette zone
+  }
+  const candidates = Object.values(latestByZone);
+  if (!candidates.length) return null;
+  return candidates.reduce((worst, a) => (a.pct_usure > worst.pct_usure ? a : worst));
+}
+
+/**
  * Assemble les 9 jauges consommables (TYPES_CONSOMMABLES) pour une moto donnée,
  * en joignant Consommables.listByMoto (état courant, une ligne par type) avec
  * la photo la plus récente ayant une analyse exploitable (analyse_ia.pct_usure).
@@ -43,11 +70,17 @@ async function buildConsommablesJauges(moto_id) {
     let pct_usure = null, etat = null, has_data = false;
     if (conso) {
       const photos = await SB.PhotosConsommables.listByConsommable(conso.id); // desc created_at
-      const latest = photos[0];
-      if (latest && latest.analyse_ia && typeof latest.analyse_ia.pct_usure === 'number') {
-        pct_usure = latest.analyse_ia.pct_usure;
-        etat = latest.analyse_ia.etat;
-        has_data = true;
+      if (type === 'chaine') {
+        // Migration 30 : pire des 2 zones (brin/couronne), jamais "la dernière gagne".
+        const worst = pickChainAnalysis(photos);
+        if (worst) { pct_usure = worst.pct_usure; etat = worst.etat; has_data = true; }
+      } else {
+        const latest = photos[0];
+        if (latest && latest.analyse_ia && typeof latest.analyse_ia.pct_usure === 'number') {
+          pct_usure = latest.analyse_ia.pct_usure;
+          etat = latest.analyse_ia.etat;
+          has_data = true;
+        }
       }
     }
     items.push({
@@ -61,4 +94,4 @@ async function buildConsommablesJauges(moto_id) {
   return { items, jaugeGenerale: computeJaugeGenerale(items) };
 }
 
-module.exports = { computeJaugeGenerale, buildConsommablesJauges };
+module.exports = { computeJaugeGenerale, pickChainAnalysis, buildConsommablesJauges };
