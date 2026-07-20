@@ -81,6 +81,7 @@ const emailService = require('./services/emailService');
 const pushService  = require('./services/pushService');
 const maintenanceAlertService = require('./services/maintenanceAlertService');
 const consommableRappelService = require('./services/consommableRappelService');
+const consommableEcheanceService = require('./services/consommableEcheanceService');
 const rbac        = require('./auth/rbac');
 const { stripe: stripeClient, handleWebhookEvent, createCheckoutSession, createAutoTrial, createPortalSession } = require('./services/stripeService');
 const planLimits = require('./auth/planLimits');
@@ -762,6 +763,22 @@ const server = http.createServer(async function(req, res){
       return ok(res, result, 'Cron rappels photo consommables exécuté');
     } catch (e) {
       console.error('[cron] rappels-photo-consommables échoué:', e.message);
+      return fail(res, e.message, 500, 'CRON_ERROR');
+    }
+  }
+
+  /* CRON — échéances calendaires consommables (L11), même auth X-Cron-Secret que ci-dessus.
+     Service DISTINCT du rappel photo binaire (Phase 26) — palier 90%, pas 100%+. */
+  if ((p = M('POST', '/cron/echeances-calendaires-consommables')) !== null) {
+    const secret = req.headers['x-cron-secret'];
+    if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+      return fail(res, 'Non autorisé', 401, 'UNAUTHORIZED');
+    }
+    try {
+      const result = await consommableEcheanceService.runConsommableEcheanceCron();
+      return ok(res, result, 'Cron échéances calendaires consommables exécuté');
+    } catch (e) {
+      console.error('[cron] echeances-calendaires-consommables échoué:', e.message);
       return fail(res, e.message, 500, 'CRON_ERROR');
     }
   }

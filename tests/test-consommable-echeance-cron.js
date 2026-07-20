@@ -5,9 +5,49 @@
 // [CRON]/[PATCH-OVERRIDE] (ajoutées Tâches 4/6) nécessitent `node motokey-api.js`
 // démarré localement + CRON_SECRET dans l'environnement (SKIP propre sinon).
 
+const http = require('http');
+
 const {
   calculerPalier, isPalier90Atteint, axeCalendaire
 } = require('../services/consommableEcheanceService');
+
+const BASE_URL = 'http://localhost:3000';
+const CRON_SECRET = process.env.CRON_SECRET || null;
+
+function request(method, urlPath, options = {}) {
+  return new Promise((resolve, reject) => {
+    const { token, json, headers: extraHeaders } = options;
+    const url = new URL(BASE_URL + urlPath);
+    const headers = Object.assign({}, extraHeaders || {});
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    let bodyBuffer = null;
+    if (json !== undefined) {
+      bodyBuffer = Buffer.from(JSON.stringify(json));
+      headers['Content-Type'] = 'application/json';
+      headers['Content-Length'] = bodyBuffer.length;
+    }
+    const reqOptions = { hostname: url.hostname, port: url.port || 80, path: url.pathname + url.search, method, headers };
+    const req = http.request(reqOptions, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const raw = Buffer.concat(chunks).toString('utf8');
+        let body;
+        try { body = raw ? JSON.parse(raw) : null; } catch (e) { body = raw; }
+        resolve({ status: res.statusCode, body });
+      });
+    });
+    req.on('error', reject);
+    if (bodyBuffer) req.write(bodyBuffer);
+    req.end();
+  });
+}
+
+function cronEcheance(secretHeader) {
+  return request('POST', '/cron/echeances-calendaires-consommables', {
+    headers: secretHeader != null ? { 'x-cron-secret': secretHeader } : {}
+  });
+}
 
 let OK = 0, KO = 0;
 function check(label, cond, detail = '') {
@@ -80,6 +120,32 @@ async function run() {
     check("axeCalendaire('plaquettes_av') === null (hors allowlist)", axeCalendaire('plaquettes_av') === null);
     check('plaquettes_av hors allowlist : calculerPalier === null malgré référence très ancienne', calculerPalier(conso, 999999, AUJOURDHUI) === null, `pct=${calculerPalier(conso, 999999, AUJOURDHUI)}`);
     check('plaquettes_av hors allowlist : isPalier90Atteint === false', isPalier90Atteint(conso, 999999, AUJOURDHUI) === false);
+  }
+
+  // ─── [CRON] endpoint /cron/echeances-calendaires-consommables ──────────
+  console.log('\n── [CRON] endpoint /cron/echeances-calendaires-consommables ─────');
+
+  let serverUp = false;
+  try {
+    const { status } = await request('GET', '/');
+    serverUp = status === 200;
+  } catch (e) { /* serverUp reste false */ }
+
+  if (!serverUp) {
+    skip('[CRON] section entière', 'serveur local non joignable sur :3000');
+  } else {
+    const { status: sAuth, body: bAuth } = await cronEcheance('mauvais-secret');
+    check('cron mauvais secret → 401 UNAUTHORIZED', sAuth === 401 && bAuth?.error?.code === 'UNAUTHORIZED', `status=${sAuth} body=${JSON.stringify(bAuth)}`);
+
+    if (!CRON_SECRET) {
+      skip('[CRON] reste de la section', "CRON_SECRET non défini dans l'environnement du test");
+    } else {
+      const { status: s200, body: b200 } = await cronEcheance(CRON_SECRET);
+      check('cron bon secret → 200', s200 === 200, `status=${s200} body=${JSON.stringify(b200)}`);
+      check('  data.scanned est un number', typeof b200?.data?.scanned === 'number', JSON.stringify(b200));
+      check('  data.notified est un number', typeof b200?.data?.notified === 'number', JSON.stringify(b200));
+      check('  data.details est un array', Array.isArray(b200?.data?.details), JSON.stringify(b200));
+    }
   }
 
   console.log(`\nRESULTAT: ${OK} OK / ${KO} KO`);
