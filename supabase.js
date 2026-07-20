@@ -1414,14 +1414,36 @@ const Consommables = {
   async upsert(moto_id, { type_consommable, km_montage, date_montage, reference }) {
     if (!moto_id) throw new Error('[Consommables.upsert] moto_id requis');
     if (!type_consommable) throw new Error('[Consommables.upsert] type_consommable requis');
+
+    // D-05 generalise (fix anti-spam, reco 20/07/2026) : toute mise a jour manuelle de
+    // km_montage/date_montage (ex. purge liquide_frein sans photo, via PATCH) doit
+    // rearmer le rappel — exactement comme une nouvelle photo (PhotosConsommables.insert).
+    // Sans ce lookup, un consommable sans methode photo (liquide_frein, huile_moteur,
+    // plaquettes, disques) reste mute a vie apres sa 1ere notification : le calcul de
+    // retard est recalcule a chaque cron independamment de ce flag, mais le flag
+    // dernier_rappel_envoye_at, lui, ne se reinitialisait QUE via une photo avant ce correctif.
+    const { data: existing } = await supabase
+      .from('consommables').select('km_montage, date_montage')
+      .eq('moto_id', moto_id).eq('type_consommable', type_consommable)
+      .maybeSingle();
+
+    const nextKm = (km_montage !== undefined && km_montage !== null && km_montage !== '') ? parseInt(km_montage) : null;
+    const nextDate = date_montage || null;
+    const referenceChanged = !!existing && (existing.km_montage !== nextKm || existing.date_montage !== nextDate);
+
     const payload = {
       moto_id,
       type_consommable,
-      km_montage: (km_montage !== undefined && km_montage !== null && km_montage !== '') ? parseInt(km_montage) : null,
-      date_montage: date_montage || null,
+      km_montage: nextKm,
+      date_montage: nextDate,
       reference: reference || null,
       updated_at: new Date().toISOString()
     };
+    if (referenceChanged) {
+      payload.dernier_rappel_envoye_at = null;
+      payload.dernier_rappel_km = null;
+    }
+
     const { data, error } = await supabase
       .from('consommables')
       .upsert(payload, { onConflict: 'moto_id,type_consommable' })
