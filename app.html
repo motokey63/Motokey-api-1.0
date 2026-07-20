@@ -306,8 +306,6 @@ tr.or-ligne-attente td:first-child{box-shadow:inset 3px 0 0 #f97316}
 
 <script>
 const API = window.location.origin;
-const CLOUDINARY_CLOUD  = 'nsb6ovkc';
-const CLOUDINARY_PRESET = 'motokey_unsigned';
 let TOKEN = '';
 let motos = [];
 let reclamCount = 0;
@@ -359,14 +357,6 @@ async function api(path, method='GET', body=null) {
     throw new Error(j.error?.message || j.message || 'Erreur');
   }
   return j.data;
-}
-
-async function uploadToCloudinary(file) {
-  const fd = new FormData(); fd.append('file', file); fd.append('upload_preset', CLOUDINARY_PRESET);
-  const r = await fetch('https://api.cloudinary.com/v1_1/'+CLOUDINARY_CLOUD+'/image/upload', { method:'POST', body:fd });
-  const j = await r.json();
-  if (!j.secure_url) throw new Error('Upload échoué — '+(j.error?.message||'erreur Cloudinary'));
-  return j.secure_url;
 }
 
 function _show402Banner(code, message) {
