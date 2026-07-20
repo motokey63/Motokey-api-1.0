@@ -1442,6 +1442,11 @@ const Consommables = {
     if (referenceChanged) {
       payload.dernier_rappel_envoye_at = null;
       payload.dernier_rappel_km = null;
+      // Migration 31 : le palier calendaire (service distinct, Phase L11) se rearme
+      // selon la meme regle — une reference renouvelee reinitialise les deux
+      // mecanismes anti-spam independamment (voir commentaire migration 31).
+      payload.dernier_palier_calendaire_envoye_at = null;
+      payload.dernier_palier_calendaire_km = null;
     }
 
     const { data, error } = await supabase
