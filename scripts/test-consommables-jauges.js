@@ -349,6 +349,113 @@ async function caseMigration() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────
+// Cas migration-30-zone : pg-direct contre FRESH_DB_URL, skip si absent
+// ─────────────────────────────────────────────────────────────────────────
+
+async function caseMigration30Zone() {
+  const caseName = 'migration-30-zone';
+
+  require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+  const connectionString = process.env.FRESH_DB_URL;
+
+  if (!connectionString) {
+    console.log('  SKIP migration-30-zone — FRESH_DB_URL not set');
+    return;
+  }
+  if (connectionString.includes('rzbqbaccjyxvtlnfitrr')) {
+    assert(caseName, 'FRESH_DB_URL ne pointe pas vers la prod', false, 'REFUS : connexion prod détectée');
+    return;
+  }
+
+  const migrationPath = path.join(__dirname, '..', 'sql', 'migrations', '30_photos_consommables_zone.sql');
+  if (!fs.existsSync(migrationPath)) {
+    assert(caseName, 'sql/migrations/30_photos_consommables_zone.sql existe', false, 'fichier introuvable');
+    return;
+  }
+  const migrationSql = fs.readFileSync(migrationPath, 'utf8');
+
+  const { Client } = require('pg');
+  const crypto = require('crypto');
+  const client = new Client({ connectionString });
+  await client.connect();
+
+  const garageId = crypto.randomUUID();
+  const motoId = crypto.randomUUID();
+
+  try {
+    await client.query(migrationSql);
+
+    await client.query(
+      'INSERT INTO garages (id, nom, email) VALUES ($1, $2, $3)',
+      [garageId, 'Fixture Garage 30', `fixture-30-${garageId}@test.local`]
+    );
+    await client.query(
+      `INSERT INTO motos (id, garage_id, marque, modele, annee, plaque, vin, proprietaire_type, proprietaire_garage_id)
+       VALUES ($1, $2, 'Test', 'Fixture', 2024, 'FIX-30', $3, 'garage', $2)`,
+      [motoId, garageId, `VIN-30-${motoId}`]
+    );
+    await client.query(
+      `INSERT INTO consommables (id, moto_id, type_consommable) VALUES (gen_random_uuid(), $1, 'chaine')`,
+      [motoId]
+    );
+    const { rows: consoRows } = await client.query(
+      `SELECT id FROM consommables WHERE moto_id = $1 AND type_consommable = 'chaine'`,
+      [motoId]
+    );
+    const consommableId = consoRows[0].id;
+
+    // zone='brin' accepté
+    await client.query(
+      `INSERT INTO photos_consommables (moto_id, consommable_id, type_consommable, photo_url, zone)
+       VALUES ($1, $2, 'chaine', 'https://example.test/brin.jpg', 'brin')`,
+      [motoId, consommableId]
+    );
+    // zone='couronne' accepté
+    await client.query(
+      `INSERT INTO photos_consommables (moto_id, consommable_id, type_consommable, photo_url, zone)
+       VALUES ($1, $2, 'chaine', 'https://example.test/couronne.jpg', 'couronne')`,
+      [motoId, consommableId]
+    );
+    // zone=NULL toujours accepté (pneus, non-régression)
+    await client.query(
+      `INSERT INTO photos_consommables (moto_id, consommable_id, type_consommable, photo_url)
+       VALUES ($1, $2, 'pneu_av', 'https://example.test/pneu.jpg')`,
+      [motoId, consommableId]
+    );
+
+    const { rows: countRows } = await client.query(
+      `SELECT COUNT(*)::int AS n FROM photos_consommables WHERE moto_id = $1`,
+      [motoId]
+    );
+    assert(caseName, '3 lignes insérées (brin, couronne, NULL)', countRows[0].n === 3, `n=${countRows[0].n}`);
+
+    let checkViolationCaught = false;
+    try {
+      await client.query(
+        `INSERT INTO photos_consommables (moto_id, consommable_id, type_consommable, photo_url, zone)
+         VALUES ($1, $2, 'chaine', 'https://example.test/invalide.jpg', 'invalide')`,
+        [motoId, consommableId]
+      );
+    } catch (err) {
+      checkViolationCaught = err.code === '23514';
+    }
+    assert(caseName, "CHECK zone rejette une valeur invalide", checkViolationCaught);
+  } catch (err) {
+    assert(caseName, "la migration/les inserts s'exécutent sans erreur", false, err.message);
+  } finally {
+    try {
+      await client.query('DELETE FROM photos_consommables WHERE moto_id = $1', [motoId]);
+      await client.query('DELETE FROM consommables WHERE moto_id = $1', [motoId]);
+      await client.query('DELETE FROM motos WHERE id = $1', [motoId]);
+      await client.query('DELETE FROM garages WHERE id = $1', [garageId]);
+    } catch (err) {
+      console.error('Avertissement : nettoyage fixtures incomplet —', err.message);
+    }
+    await client.end();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
 // Cas dead-code-removed : grep app.html + CLAUDE.md
 // ─────────────────────────────────────────────────────────────────────────
 
@@ -385,6 +492,7 @@ async function main() {
   }
   if (shouldRun('frontend-structure')) caseFrontendStructure();
   if (shouldRun('migration')) await caseMigration();
+  if (shouldRun('migration-30-zone')) await caseMigration30Zone();
   if (shouldRun('dead-code-removed')) caseDeadCodeRemoved();
 
   console.log('\n' + '─'.repeat(40));

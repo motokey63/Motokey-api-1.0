@@ -585,6 +585,7 @@ CREATE TABLE photos_consommables (
   analyse_ia        JSONB,           -- rempli par le stub vision (Phase 24/25) — nommé analyse_ia (pas "analyse", mot réservé Postgres/ANALYZE)
   analyse_status    TEXT,            -- ok / incertain / echec (Phase 24)
   km_a_la_photo     INTEGER,
+  zone              TEXT CHECK (zone IN ('brin','couronne')),  -- Migration 30 : distingue les 2 prises chaîne, NULL sinon
   created_at        TIMESTAMPTZ DEFAULT NOW()
 );
 
