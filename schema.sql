@@ -571,6 +571,10 @@ CREATE TABLE consommables (
   reference         TEXT,
   dernier_rappel_envoye_at TIMESTAMPTZ,
   dernier_rappel_km        INTEGER,
+  seuil_km_override                  INTEGER,      -- Migration 31 : override PRO+, NULL = seuil par defaut
+  seuil_mois_override                 INTEGER,      -- Migration 31 : override PRO+, NULL = seuil par defaut
+  dernier_palier_calendaire_envoye_at TIMESTAMPTZ,  -- Migration 31 : anti-spam service calendaire, distinct de dernier_rappel_envoye_at
+  dernier_palier_calendaire_km        INTEGER,      -- Migration 31 : informatif, rearme avec la colonne ci-dessus
   created_at        TIMESTAMPTZ DEFAULT NOW(),
   updated_at        TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE (moto_id, type_consommable)
