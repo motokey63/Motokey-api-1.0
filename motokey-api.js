@@ -523,6 +523,19 @@ async function handlePhotoConsommable(req, res, motoId) {
     const type = (req.body && req.body.type_consommable) || null;
     if (!type || !SBLayer.TYPES_CONSOMMABLES.includes(type)) return fail(res,'type_consommable invalide',400,'VALIDATION_ERROR');
 
+    // Migration 30 : zone distingue les 2 prises chaîne (brin/couronne) pour éviter
+    // que jaugeConsommables.js n'écrase silencieusement l'une des deux analyses.
+    // Ignoré (forcé à null) pour tout type autre que 'chaine' — on ne fait pas
+    // confiance à une valeur envoyée hors contexte.
+    let zone = null;
+    if (type === 'chaine') {
+      const zoneRaw = (req.body && req.body.zone) || null;
+      if (zoneRaw !== null && !['brin','couronne'].includes(zoneRaw)) {
+        return fail(res, "zone invalide pour type_consommable='chaine' (brin, couronne, ou absent)", 400, 'VALIDATION_ERROR');
+      }
+      zone = zoneRaw;
+    }
+
     // Ownership (dual CLIENT/GARAGE) — même sémantique 404 que le pattern existant
     const r = await resolveMotoForCtx(ctx, motoId, a);
     if (!r) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
@@ -545,7 +558,7 @@ async function handlePhotoConsommable(req, res, motoId) {
     const analyse = await analyzePhoto({ photoUrl: secure_url, consommableId: conso.id, typeConsommable: type, kmActuel, kmMontage: conso.km_montage ?? null });
 
     // Persistance historisée
-    const photo = await SBLayer.PhotosConsommables.insert({ moto_id: motoId, consommable_id: conso.id, type_consommable: type, photo_url: secure_url, analyse_ia: analyse, analyse_status: analyse.analyse_status, km_a_la_photo: kmActuel });
+    const photo = await SBLayer.PhotosConsommables.insert({ moto_id: motoId, consommable_id: conso.id, type_consommable: type, photo_url: secure_url, analyse_ia: analyse, analyse_status: analyse.analyse_status, km_a_la_photo: kmActuel, zone });
 
     return ok(res, { photo, analyse, consommable: conso }, 'Photo consommable enregistrée', 201);
   } catch (e) {

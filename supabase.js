@@ -1449,7 +1449,7 @@ const PhotosConsommables = {
   // (pct_usure/etat/confiance/analyse_status/engine) ; analyse_status dupliqué en colonne
   // dédiée pour requêtes rapides. type_consommable dénormalisé DOIT être fourni (pas de CHECK
   // sur cette colonne — pitfall dénormalisation).
-  async insert({ moto_id, consommable_id, type_consommable, photo_url, analyse_ia, analyse_status, km_a_la_photo }) {
+  async insert({ moto_id, consommable_id, type_consommable, photo_url, analyse_ia, analyse_status, km_a_la_photo, zone }) {
     if (!moto_id) throw new Error('[PhotosConsommables.insert] moto_id requis');
     if (!photo_url) throw new Error('[PhotosConsommables.insert] photo_url requis');
     const payload = {
@@ -1460,6 +1460,7 @@ const PhotosConsommables = {
       analyse_ia: analyse_ia || null,
       analyse_status: analyse_status || null,
       km_a_la_photo: (km_a_la_photo !== undefined && km_a_la_photo !== null && km_a_la_photo !== '') ? parseInt(km_a_la_photo) : null,
+      zone: zone || null,  // Migration 30 : 'brin'|'couronne' pour chaîne, NULL sinon (contrainte CHECK côté DB)
     };
     const { data, error } = await supabase
       .from('photos_consommables').insert(payload).select().single();
