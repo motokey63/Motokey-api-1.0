@@ -49,6 +49,45 @@ function cronEcheance(secretHeader) {
   });
 }
 
+const CREDS = {
+  garage: { email: 'garage@motokey.fr', password: 'motokey2026' }
+};
+// Fixture MECANO EPHEMERE dédiée à ce test — créée juste avant usage, nettoyée juste après
+// (scripts/cleanup-test-fixtures.js, Step 6 de la Tâche 6). Domaine .local non résolvable,
+// même convention que scripts/seed-rbac-test-users.js — jamais de fixture qui traîne
+// (discipline post-incident, cf. L8 statiicrazer@gmail.com).
+const MECANO_FIXTURE = { email: 'mecano-l11-test@motokey-test.local', password: 'TestMecanoL11!' };
+
+async function login(email, password, role = 'garage') {
+  const { status, body } = await request('POST', '/auth/login', { json: { email, password, role } });
+  if (status !== 200 || !body || !body.data || !body.data.token) {
+    throw new Error(`login échoué (${email}) — status ${status} — ${JSON.stringify(body)}`);
+  }
+  return body.data;
+}
+
+async function loginClient(email, password) {
+  const { status, body } = await request('POST', '/auth/client/login', { json: { email, password } });
+  const token = body && body.data && body.data.session && body.data.session.access_token;
+  if (status !== 200 || !token) {
+    throw new Error(`login client échoué (${email}) — status ${status} — ${JSON.stringify(body)}`);
+  }
+  let moto_id = null;
+  try {
+    const { status: ms, body: mb } = await request('GET', '/motos', { token });
+    if (ms === 200 && mb && mb.data && mb.data.motos && mb.data.motos.length) moto_id = mb.data.motos[0].id;
+  } catch (e) { /* non-fatal */ }
+  return { token, moto_id };
+}
+
+async function ensureMecanoFixture(garageToken) {
+  await request('POST', '/garage/users', {
+    token: garageToken,
+    json: { email: MECANO_FIXTURE.email, password: MECANO_FIXTURE.password, role: 'MECANO' }
+  }); // 201 (créé) ou 409/400 (déjà existant) — les deux sont acceptables, on tente le login ensuite
+  return login(MECANO_FIXTURE.email, MECANO_FIXTURE.password, 'garage');
+}
+
 let OK = 0, KO = 0;
 function check(label, cond, detail = '') {
   if (cond) { console.log(`  ✅ ${label}`); OK++; }
@@ -145,6 +184,56 @@ async function run() {
       check('  data.scanned est un number', typeof b200?.data?.scanned === 'number', JSON.stringify(b200));
       check('  data.notified est un number', typeof b200?.data?.notified === 'number', JSON.stringify(b200));
       check('  data.details est un array', Array.isArray(b200?.data?.details), JSON.stringify(b200));
+    }
+  }
+
+  // ─── [PATCH-OVERRIDE] seuil_km_override/seuil_mois_override réservés PRO+ ──
+  console.log('\n── [PATCH-OVERRIDE] overrides de seuil réservés PRO+ ────────────');
+
+  if (!serverUp) {
+    skip('[PATCH-OVERRIDE] section entière', 'serveur local non joignable sur :3000');
+  } else {
+    let garageAuth = null, clientAuth = null, mecanoAuth = null;
+    try { garageAuth = await login('garage@motokey.fr', 'motokey2026', 'garage'); }
+    catch (e) { console.warn(`  ⚠️  Login garage échoué : ${e.message}`); }
+    try { clientAuth = await loginClient('sophie@email.com', 'client123'); }
+    catch (e) { console.warn(`  ⚠️  Login client échoué : ${e.message}`); }
+
+    if (!garageAuth || !clientAuth || !clientAuth.moto_id) {
+      skip('[PATCH-OVERRIDE] section entière', 'login garage/client ou moto client indisponible');
+    } else {
+      const motoId = clientAuth.moto_id;
+
+      // 1. CONCESSION (le compte garage owner — niveau 4, >= PRO) peut poser un override.
+      const { status: sPro, body: bPro } = await request('PATCH', `/motos/${motoId}/consommables/huile_moteur`, {
+        token: garageAuth.token,
+        json: { seuil_km_override: 4000 }
+      });
+      check('CONCESSION (>= PRO) → PATCH avec seuil_km_override → 200', sPro === 200, `status=${sPro} body=${JSON.stringify(bPro)}`);
+      check('  réponse contient seuil_km_override=4000', bPro?.data?.consommable?.seuil_km_override === 4000, JSON.stringify(bPro));
+
+      // 2. MECANO (fixture éphémère, créée si besoin) → 403 sur les champs override.
+      try {
+        mecanoAuth = await ensureMecanoFixture(garageAuth.token);
+      } catch (e) {
+        console.warn(`  ⚠️  Setup/login MECANO fixture échoué : ${e.message}`);
+      }
+      if (!mecanoAuth) {
+        skip('MECANO → override refusé (403)', 'fixture MECANO indisponible (setup POST /garage/users ou login échoué)');
+      } else {
+        const { status: sMec, body: bMec } = await request('PATCH', `/motos/${motoId}/consommables/huile_moteur`, {
+          token: mecanoAuth.token,
+          json: { seuil_km_override: 1234 }
+        });
+        check('MECANO → PATCH avec seuil_km_override → 403 FORBIDDEN_ROLE', sMec === 403 && bMec?.error?.code === 'FORBIDDEN_ROLE', `status=${sMec} body=${JSON.stringify(bMec)}`);
+
+        // 3. Non-régression — MECANO peut toujours modifier km_montage/date_montage SANS override.
+        const { status: sMecOk } = await request('PATCH', `/motos/${motoId}/consommables/huile_moteur`, {
+          token: mecanoAuth.token,
+          json: { km_montage: 12345 }
+        });
+        check('MECANO → PATCH sans champ override (km_montage seul) → 200 (non-régression base endpoint)', sMecOk === 200, `status=${sMecOk}`);
+      }
     }
   }
 

@@ -1129,10 +1129,23 @@ const server = http.createServer(async function(req, res){
     const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx,'MECANO')) return fail(res,'Permission refusée — MECANO minimum requis',403,'FORBIDDEN_ROLE');
     if (!SBLayer.TYPES_CONSOMMABLES.includes(p.type)) return fail(res, 'type_consommable invalide', 400, 'VALIDATION_ERROR');
+
+    // Overrides de seuil (L11 sous-livraison) — champs reserves PRO+, meme si le
+    // reste du PATCH reste ouvert a MECANO (saisie terrain courante).
+    const hasOverrideFields = b.seuil_km_override !== undefined || b.seuil_mois_override !== undefined;
+    if (hasOverrideFields && !rbac.requireRole(ctx, 'PRO')) {
+      return fail(res, 'Permission refusée — PRO minimum requis pour seuil_km_override/seuil_mois_override', 403, 'FORBIDDEN_ROLE');
+    }
+
     const r = await resolveMotoForCtx(ctx, p.id, a);
     if (!r) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
     try {
-      const row = await SBLayer.Consommables.upsert(p.id, { type_consommable: p.type, km_montage: b.km_montage, date_montage: b.date_montage, reference: b.reference });
+      const payload = { type_consommable: p.type, km_montage: b.km_montage, date_montage: b.date_montage, reference: b.reference };
+      if (hasOverrideFields) {
+        payload.seuil_km_override = b.seuil_km_override;
+        payload.seuil_mois_override = b.seuil_mois_override;
+      }
+      const row = await SBLayer.Consommables.upsert(p.id, payload);
       return ok(res, { consommable: row }, 'Consommable enregistré');
     } catch (e) { return fail(res, e.message, 500, 'SERVER_ERROR'); }
   }

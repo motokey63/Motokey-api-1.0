@@ -1411,7 +1411,7 @@ const TYPES_CONSOMMABLES = ['pneu_av','pneu_ar','chaine','plaquettes_av','plaque
 const Consommables = {
   // upsert (pas insert) : UNIQUE(moto_id, type_consommable) — la table modélise
   // l'état courant (une ligne par type), pas un historique append-only.
-  async upsert(moto_id, { type_consommable, km_montage, date_montage, reference }) {
+  async upsert(moto_id, { type_consommable, km_montage, date_montage, reference, seuil_km_override, seuil_mois_override }) {
     if (!moto_id) throw new Error('[Consommables.upsert] moto_id requis');
     if (!type_consommable) throw new Error('[Consommables.upsert] type_consommable requis');
 
@@ -1447,6 +1447,12 @@ const Consommables = {
       // mecanismes anti-spam independamment (voir commentaire migration 31).
       payload.dernier_palier_calendaire_envoye_at = null;
       payload.dernier_palier_calendaire_km = null;
+    }
+    if (seuil_km_override !== undefined) {
+      payload.seuil_km_override = (seuil_km_override !== null && seuil_km_override !== '') ? parseInt(seuil_km_override) : null;
+    }
+    if (seuil_mois_override !== undefined) {
+      payload.seuil_mois_override = (seuil_mois_override !== null && seuil_mois_override !== '') ? parseInt(seuil_mois_override) : null;
     }
 
     const { data, error } = await supabase
