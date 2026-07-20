@@ -7,3 +7,4 @@ env
 *.bak
 *.log
 .playwright-mcp/
+.superpowers/
