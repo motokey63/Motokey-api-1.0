@@ -114,16 +114,25 @@ async function getGarageIdForUser(ctx, SBLayer) {
 }
 
 /**
- * Rôle inféré pour les comptes garage legacy (vieux JWT HS256).
- * Dans ces tokens, a.id = PK de la table garages (pas le Supabase user_id).
- * Si un garage existe avec cet id → role CONCESSION par défaut (ceinture+bretelles
- * pour les comptes legacy hypothétiques dont on ne connaît pas encore le rôle).
+ * Rôle inféré pour les comptes garage authentifiés via le vieux JWT HS256 maison
+ * (émis par jwtSign() dans motokey-api.js, distinct des JWT Supabase ES256).
+ * Dans ces tokens, id = PK de la table garages (pas le Supabase user_id) — que
+ * l'appelant soit le propriétaire (CONCESSION) ou un employé PRO/MECANO
+ * (garage_users), tous partagent le même garage_id.
  *
- * @param {string} garageId — PK de la table garages (= a.id du vieux JWT)
+ * Le rôle réel est lu depuis le claim rbac_role embarqué dans le token au login
+ * (motokey-api.js POST /auth/login, depuis session.user.app_metadata.role) —
+ * accepte donc soit le token décodé complet {id, rbac_role, ...}, soit un simple
+ * garageId (compat rétroactive). Sans claim rbac_role exploitable (ancien token
+ * émis avant ce correctif, ou appel legacy avec juste un id) → CONCESSION par
+ * défaut (comportement historique, sans régression pour les sessions déjà actives).
+ *
+ * @param {string|{id:string, rbac_role?:string}} token — token décodé ou garageId brut
  * @param {object} SBLayer
  * @returns {Promise<{role,level,...}|null>}
  */
-async function inferLegacyRole(garageId, SBLayer) {
+async function inferLegacyRole(token, SBLayer) {
+  const garageId = (token && typeof token === 'object') ? token.id : token;
   if (!garageId || !SBLayer) return null;
   try {
     const { data, error } = await SBLayer.supabase
@@ -132,11 +141,13 @@ async function inferLegacyRole(garageId, SBLayer) {
       .eq('id', garageId)
       .single();
     if (error || !data) return null;
+    const embeddedRole = (token && typeof token === 'object') ? token.rbac_role : null;
+    const role = VALID_ROLES.includes(embeddedRole) ? embeddedRole : 'CONCESSION';
     return {
       user_id:     null,
       email:       null,
-      role:        'CONCESSION',
-      level:       ROLE_HIERARCHY['CONCESSION'],
+      role,
+      level:       ROLE_HIERARCHY[role],
       client_type: null
     };
   } catch (e) {

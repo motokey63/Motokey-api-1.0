@@ -430,7 +430,7 @@ async function handleKmReading(req, res, motoId, { remplacement }, bodyFields) {
   try {
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
 
     // KM-02 : remplacement de compteur réservé PRO+ (exclut MECANO et CLIENT)
     if (remplacement) {
@@ -514,7 +514,7 @@ async function handlePhotoConsommable(req, res, motoId) {
   try {
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
 
     let file;
     try { file = await runMulter(req, res); }
@@ -816,7 +816,7 @@ const server = http.createServer(async function(req, res){
           const g = result.garage;
           const rbac_role = result.session?.user?.app_metadata?.role || 'CONCESSION';
           return ok(res, {
-            token: jwtSign({ id: g.id, role: 'garage', email, nom: g.nom }),
+            token: jwtSign({ id: g.id, role: 'garage', rbac_role, email, nom: g.nom }),
             role: 'garage', rbac_role, garage: g
           }, 'Connexion réussie');
         } else {
@@ -893,7 +893,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: dual-auth — vieux JWT garage (HS256) OU JWT Supabase (req.ctx)
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
 
     // CLIENT : uniquement ses propres motos
     if (rbac.requireAnyRole(ctx, ['CLIENT'])) {
@@ -940,7 +940,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — CLIENT rejeté
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     // TODO RBAC L8
 
@@ -976,7 +976,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: dual-auth — vieux JWT garage (HS256) OU JWT Supabase (req.ctx)
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
 
     // CLIENT : accès uniquement à sa propre moto
     if (rbac.requireAnyRole(ctx, ['CLIENT'])) {
@@ -1024,7 +1024,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — CLIENT rejeté
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
 
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
@@ -1047,7 +1047,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: PRO minimum — override manuel réservé aux comptes garage employeurs (pas MECANO)
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
 
     const PROFILS_VALIDES = ['chaine','courroie','cardan'];
@@ -1069,7 +1069,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: CONCESSION minimum
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'CONCESSION')) return fail(res, 'Permission refusée — CONCESSION minimum requis', 403, 'FORBIDDEN_ROLE');
 
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
@@ -1092,7 +1092,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — outil garage
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
 
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
@@ -1126,7 +1126,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('PATCH','/motos/:id/consommables/:type'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res,'Non authentifié',401,'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx,'MECANO')) return fail(res,'Permission refusée — MECANO minimum requis',403,'FORBIDDEN_ROLE');
     if (!SBLayer.TYPES_CONSOMMABLES.includes(p.type)) return fail(res, 'type_consommable invalide', 400, 'VALIDATION_ERROR');
 
@@ -1153,7 +1153,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('POST','/motos/:id/consommables'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res,'Non authentifié',401,'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx,'MECANO')) return fail(res,'Permission refusée — MECANO minimum requis',403,'FORBIDDEN_ROLE');
     const items = Array.isArray(b.consommables) ? b.consommables : (Array.isArray(b) ? b : null);
     if (!items || !items.length) return fail(res, 'tableau consommables requis', 400, 'VALIDATION_ERROR');
@@ -1172,7 +1172,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('GET','/motos/:id/consommables'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res,'Non authentifié',401,'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     const r = await resolveMotoForCtx(ctx, p.id, a);
     if (!r) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
     try {
@@ -1186,7 +1186,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: CLIENT voit ses propres interventions, MECANO+ voit celles du garage
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
 
     // CLIENT : accès uniquement aux interventions de sa propre moto
     if (rbac.requireAnyRole(ctx, ['CLIENT'])) {
@@ -1233,7 +1233,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — type='vert' réservé CONCESSION+
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
 
     const {type,titre,description,km,technicien,montant_ht} = b;
@@ -1274,7 +1274,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum (RAM uniquement)
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
 
     const i = DB.interventions.findIndex(function(x){return x.id===p.iid&&x.moto_id===p.id;});
@@ -1287,7 +1287,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum (RAM uniquement)
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
 
     const i = DB.interventions.findIndex(function(x){return x.id===p.iid&&x.moto_id===p.id;});
@@ -1301,7 +1301,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — outil garage
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -1316,7 +1316,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — outil garage
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -1331,7 +1331,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('POST','/motos/:id/vendre'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -1386,7 +1386,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('POST','/motos/:id/reprendre-en-stock'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -1411,7 +1411,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — outil métier atelier (vérification pendant OR)
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const {moto_id,garage_nom,garage_type,montant,km,description,qr_code,signature} = b;
     if(!montant||!km) return fail(res,'montant et km requis');
@@ -1425,7 +1425,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — historique des vérifications du garage
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -1443,7 +1443,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: PRO+ uniquement (zone admin entité) — acte juridique transfert de propriété
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -1885,7 +1885,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — lecture paramètres garage
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -1906,7 +1906,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — mise à jour paramètres garage
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -1928,7 +1928,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — tableau de bord garage
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -1962,7 +1962,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: PRO+ uniquement (zone admin entité) — raison sociale, SIRET, RIB
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -1984,7 +1984,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: tous rôles authentifiés du garage (lecture seule)
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -2002,7 +2002,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: PRO+ uniquement — MECANO ne peut pas modifier sa propre politique de session
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -2028,7 +2028,7 @@ const server = http.createServer(async function(req, res){
   if ((p = M('GET', '/billing/status')) !== null) {
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable', 404, 'NOT_FOUND');
@@ -2066,7 +2066,7 @@ const server = http.createServer(async function(req, res){
   if ((p = M('POST', '/billing/portal')) !== null) {
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
     if (!stripeClient) return fail(res, 'Stripe non configuré', 503, 'STRIPE_UNAVAILABLE');
 
@@ -2093,7 +2093,7 @@ const server = http.createServer(async function(req, res){
   if ((p = M('POST', '/billing/checkout')) !== null) {
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
     if (!stripeClient) return fail(res, 'Stripe non configuré', 503, 'STRIPE_UNAVAILABLE');
 
@@ -2127,7 +2127,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('GET','/garage/users'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -2144,7 +2144,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('POST','/garage/users'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -2171,7 +2171,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('PATCH','/garage/users/:id'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -2189,7 +2189,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('DELETE','/garage/users/:id'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -2204,7 +2204,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('GET','/garage/reclamations'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -2236,7 +2236,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('PATCH','/garage/reclamations/:id'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -2292,7 +2292,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('GET','/garage/clients'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -2616,7 +2616,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — outil garage
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -2642,7 +2642,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — création OR réservée PRO et au-dessus
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -2696,7 +2696,7 @@ const server = http.createServer(async function(req, res){
     // TODO RBAC L4 : MECANO doit voir les tâches mais pas total_mo_ht/taux_horaire ni prix_achat sur les pièces
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -2722,7 +2722,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — édition OR
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -2848,7 +2848,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — clôture engage la facturation
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -2947,7 +2947,7 @@ const server = http.createServer(async function(req, res){
     // TODO RBAC L4 : facture→annule doit être restreint CONCESSION/ADMIN
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -2998,7 +2998,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('POST','/ordres-reparation/:id/facturer'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -3033,7 +3033,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('GET','/ordres-reparation/:id/historique'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -3060,7 +3060,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('GET','/ordres-reparation/:id/facture'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -3214,7 +3214,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — atelier
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -3272,7 +3272,7 @@ const server = http.createServer(async function(req, res){
     // TODO RBAC L4 : MECANO ne doit pas modifier taux_horaire (lecture seule)
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -3310,7 +3310,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — atelier
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -3362,7 +3362,7 @@ const server = http.createServer(async function(req, res){
     // RBAC: MECANO minimum — atelier
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -3437,7 +3437,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('POST','/or-taches/:id/accepter'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Permission refusée — réservé au client propriétaire', 403, 'FORBIDDEN_ROLE');
     return await _accepterLigneRoute(req, res, p, ctx, {
       table: 'or_taches', keyName: 'tache', label: 'Tâche', ramList: 'or_taches',
@@ -3449,7 +3449,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('POST','/or-pieces/:id/accepter'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireAnyRole(ctx, ['CLIENT'])) return fail(res, 'Permission refusée — réservé au client propriétaire', 403, 'FORBIDDEN_ROLE');
     return await _accepterLigneRoute(req, res, p, ctx, {
       table: 'or_pieces', keyName: 'piece', label: 'Pièce', ramList: 'or_pieces',
@@ -3462,7 +3462,7 @@ const server = http.createServer(async function(req, res){
     // TODO RBAC L4 : MECANO et CLIENT refusés — accès financier réservé PRO+
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -3509,7 +3509,7 @@ const server = http.createServer(async function(req, res){
     // TODO RBAC L4 : MECANO et CLIENT refusés — accès financier réservé PRO+
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -3572,7 +3572,7 @@ const server = http.createServer(async function(req, res){
     // TODO RBAC L4 : MECANO autorisé en lecture, CLIENT refusé
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -3594,7 +3594,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('GET','/catalogue-pieces/by-ean/:ean'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
@@ -3616,7 +3616,7 @@ const server = http.createServer(async function(req, res){
   if((p=M('POST','/catalogue-pieces'))!==null){
     const a = authSilent(req);
     if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a.id, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
     if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
