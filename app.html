@@ -2162,7 +2162,7 @@ async function handleScannedEan(ean) {
   } catch(e) {
     var msg = (e && e.message) || '';
     if (msg.includes('non trouv') || msg.includes('introuvable') || msg.includes('NOT_FOUND')) {
-      toast('EAN ' + ean + ' introuvable');
+      openPieceInconnueModal(ean);
     } else {
       toast('Erreur EAN ' + ean + ' : ' + msg);
     }
@@ -2264,6 +2264,84 @@ function cancelEanScanner() {
 
 function eanScannerKeyHandler(e) {
   if (e.key === 'Escape') cancelEanScanner();
+}
+
+// ── PIÈCE INCONNUE (L12) — création rapide depuis EAN inconnu, avec
+// pré-remplissage optionnel par lecture d'étiquette (Anthropic Vision).
+// Réalise la modale prévue dans le backlog LIVRAISONS-OR.md (jamais construite
+// jusqu'ici — le scan EAN inconnu se contentait d'un toast, dead-end).
+var pieceInconnueEan = null;
+
+function openPieceInconnueModal(ean) {
+  pieceInconnueEan = ean;
+  document.getElementById('piEan').textContent = ean;
+  document.getElementById('piLibelle').value = '';
+  document.getElementById('piReference').value = '';
+  document.getElementById('piMarque').value = '';
+  document.getElementById('piPrix').value = '';
+  document.getElementById('piEanInput').value = ean;
+  document.getElementById('piPhotoStatus').textContent = '';
+  document.getElementById('piPhotoInput').value = '';
+  document.getElementById('pieceInconnueModal').style.display = 'flex';
+}
+
+function closePieceInconnueModal() {
+  document.getElementById('pieceInconnueModal').style.display = 'none';
+  pieceInconnueEan = null;
+}
+
+function triggerEtiquettePhoto() {
+  document.getElementById('piPhotoInput').click();
+}
+
+async function handleEtiquettePhotoChange(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var statusEl = document.getElementById('piPhotoStatus');
+  statusEl.textContent = 'Lecture de l\'étiquette…';
+  try {
+    var fd = new FormData();
+    fd.append('photo', file);
+    var headers = {};
+    if (TOKEN) headers['Authorization'] = 'Bearer ' + TOKEN;
+    var r = await fetch(API + '/catalogue-pieces/analyser-etiquette', { method: 'POST', headers: headers, body: fd });
+    var j = await r.json();
+    if (!j.success) throw new Error((j.error && j.error.message) || 'Erreur');
+    var d = j.data;
+    if (d.disponible) {
+      document.getElementById('piLibelle').value = d.champs.libelle || '';
+      document.getElementById('piReference').value = d.champs.reference || '';
+      document.getElementById('piMarque').value = d.champs.marque || '';
+      if (d.champs.ean) document.getElementById('piEanInput').value = d.champs.ean;
+      statusEl.textContent = '✅ Champs pré-remplis depuis la photo — vérifiez avant de valider';
+    } else {
+      statusEl.textContent = '⚠️ Lecture auto indisponible — saisie manuelle';
+    }
+  } catch (e) {
+    statusEl.textContent = '⚠️ Lecture auto indisponible — saisie manuelle';
+  }
+}
+
+async function submitPieceInconnue() {
+  var libelle = document.getElementById('piLibelle').value.trim();
+  var prix = document.getElementById('piPrix').value;
+  if (!libelle) { toast('Le nom de la pièce est requis'); return; }
+  if (prix === '' || parseFloat(prix) < 0) { toast('Le prix de vente est requis'); return; }
+  var payload = {
+    libelle: libelle,
+    reference: document.getElementById('piReference').value.trim() || undefined,
+    marque: document.getElementById('piMarque').value.trim() || undefined,
+    ean: document.getElementById('piEanInput').value.trim() || undefined,
+    prix_vente_ht: parseFloat(prix)
+  };
+  try {
+    var data = await api('/catalogue-pieces', 'POST', payload);
+    addEanToSession(data.piece, data.piece.ean || pieceInconnueEan);
+    closePieceInconnueModal();
+    toast('Pièce ajoutée au catalogue');
+  } catch (e) {
+    toast('Erreur : ' + e.message);
+  }
 }
 
 function openTransitionModal(nouveau_statut) {
@@ -2895,6 +2973,44 @@ function motoSelect(id, onchange) {
     <div class="ean-scanner-actions">
       <button class="btn btn-secondary btn-sm" onclick="cancelEanScanner()">Annuler</button>
       <button class="btn btn-primary btn-sm" id="eanFinishBtn" onclick="finishEanSession()">Terminer (0)</button>
+    </div>
+  </div>
+</div>
+<!-- ═══════════════════════════════════════════════════════════
+     PIÈCE INCONNUE MODAL (L12) — création rapide EAN inconnu,
+     pré-remplissage optionnel par lecture d'étiquette (Vision)
+════════════════════════════════════════════════════════════ -->
+<style>
+#pieceInconnueModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:2100;align-items:center;justify-content:center;padding:12px}
+.pi-box{background:var(--bg2);border-radius:14px;width:100%;max-width:420px;max-height:92vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.pi-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border)}
+.pi-hdr h3{margin:0;font-size:15px;font-weight:700}
+.pi-body{padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.pi-photo-btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;border:1px dashed var(--border);border-radius:8px;background:var(--bg);cursor:pointer;font-size:13px;font-weight:600;color:var(--text)}
+.pi-photo-status{font-size:12px;color:var(--text2);min-height:16px}
+.pi-field label{font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:4px}
+.pi-field input{width:100%;padding:8px 10px;font-size:14px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text)}
+.pi-actions{padding:12px 16px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border)}
+</style>
+<div id="pieceInconnueModal" onclick="if(event.target===this)closePieceInconnueModal()">
+  <div class="pi-box">
+    <div class="pi-hdr">
+      <h3>🆕 Pièce inconnue — EAN <span id="piEan"></span></h3>
+      <button class="ean-scanner-x" onclick="closePieceInconnueModal()" title="Fermer">✕</button>
+    </div>
+    <div class="pi-body">
+      <button type="button" class="pi-photo-btn" onclick="triggerEtiquettePhoto()">📷 Photo de l'étiquette (pré-remplissage auto)</button>
+      <input type="file" id="piPhotoInput" accept="image/*" capture="environment" style="display:none" onchange="handleEtiquettePhotoChange(this)">
+      <div class="pi-photo-status" id="piPhotoStatus"></div>
+      <div class="pi-field"><label>Nom / désignation *</label><input type="text" id="piLibelle" placeholder="Plaquettes de frein avant"></div>
+      <div class="pi-field"><label>Référence</label><input type="text" id="piReference"></div>
+      <div class="pi-field"><label>Marque</label><input type="text" id="piMarque"></div>
+      <div class="pi-field"><label>EAN</label><input type="text" id="piEanInput" inputmode="numeric"></div>
+      <div class="pi-field"><label>Prix de vente HT (€) *</label><input type="number" id="piPrix" step="0.01" min="0" placeholder="Prix garage — jamais lu sur l'étiquette"></div>
+    </div>
+    <div class="pi-actions">
+      <button class="btn btn-secondary btn-sm" onclick="closePieceInconnueModal()">Annuler</button>
+      <button class="btn btn-primary btn-sm" onclick="submitPieceInconnue()">Ajouter au catalogue</button>
     </div>
   </div>
 </div>

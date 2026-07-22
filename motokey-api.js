@@ -89,6 +89,7 @@ const multer = require('multer');
 const cloudinaryService = require('./services/cloudinaryService');
 const { analyzePhoto } = require('./services/visionAnalysisService');
 const jaugeConsommables = require('./services/jaugeConsommables');
+const { analyserEtiquette } = require('./services/etiquettePieceService');
 
 // Couche Supabase (supabase.js) — chargée si SUPABASE_URL + SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_KEY) présents
 let SBLayer = null;
@@ -567,6 +568,42 @@ async function handlePhotoConsommable(req, res, motoId) {
   }
 }
 
+// Handler upload photo étiquette pièce (L12) — multipart intercepté AVANT body().
+// Contrairement à handlePhotoConsommable, ce handler est scope garage (pas moto) :
+// catalogue_pieces vit par garage_id, jamais par moto_id.
+async function handleAnalyserEtiquette(req, res) {
+  try {
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    let file;
+    try { file = await runMulter(req, res); }
+    catch (e) { if (e instanceof multer.MulterError && e.code === 'LIMIT_FILE_SIZE') return fail(res,'Photo trop volumineuse (max 5 Mo)',400,'FILE_TOO_LARGE'); return fail(res, e.message, 400, 'UPLOAD_PARSE_ERROR'); }
+    if (!file) return fail(res, 'Photo requise (champ multipart "photo", JPEG/PNG/WebP)', 400, 'VALIDATION_ERROR');
+
+    let secure_url;
+    try {
+      const up = await cloudinaryService.uploadPhoto(file.buffer, { folder: 'motokey/catalogue-etiquettes/'+garageId });
+      secure_url = up.secure_url;
+    } catch (e) {
+      return fail(res, e.message, e.statusCode || 500, e.code || 'UPLOAD_ERROR'); // D-02: 503 si non configuré, jamais placeholder
+    }
+
+    const analyse = await analyserEtiquette({ imageUrl: secure_url });
+    if (!analyse.ok) {
+      // Jamais bloquant : la modale frontend s'ouvre vide, saisie manuelle.
+      return ok(res, { disponible: false, raison: analyse.raison, photo_url: secure_url }, 'Lecture automatique indisponible — saisie manuelle');
+    }
+    return ok(res, { disponible: true, champs: analyse.data, photo_url: secure_url }, 'Étiquette analysée');
+  } catch (e) {
+    return fail(res, e.message, 500, 'SERVER_ERROR');
+  }
+}
+
 /* ─── ROUTE MATCHER ─── */
 function match(method, reqMethod, pattern, pathname) {
   if(method!==reqMethod) return null;
@@ -723,6 +760,10 @@ const server = http.createServer(async function(req, res){
   if (method === 'POST' && _ct.startsWith('multipart/form-data') && /^\/motos\/[^/]+\/photos-consommables$/.test(pathname)) {
     req.ctx = await rbac.extractRoleFromRequest(req, SBLayer);
     return handlePhotoConsommable(req, res, pathname.split('/')[2]);
+  }
+  if (method === 'POST' && _ct.startsWith('multipart/form-data') && pathname === '/catalogue-pieces/analyser-etiquette') {
+    req.ctx = await rbac.extractRoleFromRequest(req, SBLayer);
+    return handleAnalyserEtiquette(req, res);
   }
 
   let b = {};
