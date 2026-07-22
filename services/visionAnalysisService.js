@@ -1,46 +1,61 @@
 /* ══════════════════════════════════════════════════════════
-   MOTOKEY — v1.6 Phase 24 — Service d'analyse Vision (stub)
-   Contrat verrouillé, consommé identiquement par les futurs
-   endpoints/jauges (Phase 25/27/28) et par le futur moteur réel.
+   MOTOKEY — v1.6 Phase 24 puis L12 (22/07/2026) — Service d'analyse Vision
+   Contrat verrouillé, consommé identiquement par les endpoints/jauges
+   existants (Phase 25/27/28) et par le moteur réel Anthropic (L12).
 
-   ⚠️  CONTRAT CANONIQUE — ne pas changer la FORME sans revoir
-   tous les consommateurs (Phase 25/27/28) :
+   ⚠️  CONTRAT CANONIQUE — ne pas changer la FORME des 5 champs
+   originaux sans revoir tous les consommateurs (Phase 25/27/28) :
 
      analyzePhoto({ photoUrl, consommableId, typeConsommable,
-                     kmActuel, kmMontage }) → Promise<{
-       pct_usure:      int 0-100,
-       etat:           'bon' | 'moyen' | 'usé' | 'critique',
-       confiance:      int 0-100,
-       analyse_status: 'ok' | 'incertain',   // le troisième statut possible côté DB n'est jamais produit par le stub
-       engine:         'stub',               // 'anthropic-vision' au futur moteur réel
+                     kmActuel, kmMontage }, deps?) → Promise<{
+       pct_usure:      ?int 0-100,           // null si echec (jamais inventé)
+       etat:           ?'bon'|'moyen'|'usé'|'critique',
+       confiance:      ?int 0-100,
+       analyse_status: 'ok' | 'incertain' | 'echec',
+       engine:         'stub' | 'anthropic',
+       prescription?:      string,           // additif L12, enum strict — absent du stub
+       prescription_texte?: string,          // additif L12, phrase libre lisible — absent du stub
+       raison?:        string,               // additif L12, présent seulement si echec
      }>
 
    Dérivations (fonctions pures, exportées) :
      deriveEtat(pctUsure)      — seuils D-02 : <30 bon, 30-59 moyen, 60-84 usé, >=85 critique
      deriveAnalyseStatus(conf) — seuil  D-03 : <50 incertain, >=50 ok
 
-   Déterminisme (D-04) : même input (photoUrl ou consommableId) → même sortie,
-   via un seed SHA-256 dérivé de l'input, consommé par un PRNG déterministe
-   (mulberry32). Le statut d'échec (réservé au futur moteur réel : timeout API,
-   image illisible, etc.) n'est JAMAIS produit par le stub (D-05).
+   Déterminisme du stub (D-04) : même input → même sortie, via un seed
+   SHA-256 dérivé de l'input, consommé par un PRNG déterministe (mulberry32).
+   Utilisé quand VISION_ENABLED=false ou moteur réel indisponible.
+
+   Moteur réel (L12) : appelle services/anthropicVisionClient.js#callVision
+   avec le modèle claude-sonnet-5. Ne dérive JAMAIS etat/analyse_status
+   depuis la réponse du modèle — pct_usure et confiance sont les seules
+   valeurs numériques lues de l'API, etat/analyse_status restent calculés
+   localement via deriveEtat/deriveAnalyseStatus pour garantir l'invariant
+   D-02/D-03 quel que soit le moteur (stub ou réel). `prescription` est un
+   enum STRICT à 3 niveaux ('surveillance'|'intervention_pro'|'urgence_securite')
+   sur lequel le code peut réagir de façon fiable ; `prescription_texte` est
+   une phrase libre, uniquement informative pour l'humain, jamais utilisée
+   dans une condition. Sur échec (voir contrat callVision), retourne
+   analyse_status:'echec' et pct_usure:null — JAMAIS un chiffre inventé pour
+   masquer l'échec.
 
    Variables Railway :
-   - VISION_ENABLED=true     → réservé au futur moteur réel (non branché ce
-                                milestone) ; sans ANTHROPIC_API_KEY, fallback
-                                silencieux vers le stub + warning loggé (D-06),
-                                jamais de crash — même convention que
-                                EMAIL_ENABLED (services/emailService.js) et
-                                PUSH_ENABLED (services/pushService.js).
-   - ANTHROPIC_API_KEY       → clé API Anthropic (non consommée ce milestone)
+   - VISION_ENABLED=true     → active le moteur réel. Sans ANTHROPIC_API_KEY,
+                                fallback silencieux vers le stub + warning
+                                loggé (D-06), jamais de crash — même
+                                convention que EMAIL_ENABLED (emailService.js)
+                                et PUSH_ENABLED (pushService.js).
+   - ANTHROPIC_API_KEY       → clé API Anthropic
 
-   Service PUR : aucun accès DB (aucune dépendance vers le module de couche
-   données du repo), aucune requête réseau. La persistance du résultat passe
-   par les helpers CRUD dédiés (PhotosConsommables), pas par ce module.
+   Service quasi-pur : aucun accès DB direct — délègue tout appel réseau à
+   services/anthropicVisionClient.js. La persistance du résultat passe par
+   les helpers CRUD dédiés (PhotosConsommables), pas par ce module.
    ══════════════════════════════════════════════════════════ */
 
 'use strict';
 
 const crypto = require('crypto');
+const { callVision } = require('./anthropicVisionClient');
 
 const VISION_ENABLED = process.env.VISION_ENABLED === 'true';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || null;
@@ -134,22 +149,93 @@ function buildStubAnalysis({ photoUrl, consommableId, typeConsommable, kmActuel,
   return { pct_usure, etat, confiance, analyse_status, engine: 'stub' };
 }
 
+const USURE_MODEL = 'claude-sonnet-5';
+
+const USURE_SCHEMA = {
+  type: 'object',
+  properties: {
+    pct_usure:    { type: 'integer', description: "Pourcentage d'usure estimé du consommable, de 0 (neuf) à 100 (hors service). Base ton estimation sur des critères concrets et visibles sur la photo, jamais une supposition." },
+    confiance:    { type: 'integer', description: "Confiance dans cette estimation, de 0 à 100, selon la lisibilité/qualité/cadrage de la photo. Mets une confiance basse plutôt qu'un pct_usure inventé si la photo est floue ou mal cadrée." },
+    prescription: { type: 'string', enum: ['surveillance', 'intervention_pro', 'urgence_securite'], description: "Niveau d'action, EXACTEMENT l'une de ces 3 valeurs : 'surveillance' (rien d'urgent, à revoir plus tard), 'intervention_pro' (à faire contrôler/remplacer par un professionnel prochainement), 'urgence_securite' (danger, ne pas rouler / intervention immédiate). Ce champ est lu par du code — n'utilise jamais une autre valeur que ces 3." },
+    prescription_texte: { type: 'string', description: "Phrase courte et explicative en français, lisible par un humain, qui justifie la prescription choisie (ex: 'Garniture des plaquettes très fine, à remplacer sous 500 km'). Ce champ est uniquement informatif, jamais utilisé par du code." }
+  },
+  required: ['pct_usure', 'confiance', 'prescription', 'prescription_texte'],
+  additionalProperties: false
+};
+
+const CRITERES_PAR_TYPE = {
+  pneu_av: "profondeur des sculptures comparée au témoin d'usure, craquelures du flanc, usure irrégulière entre bords et centre, présence de hernies ou coupures",
+  pneu_ar: "profondeur des sculptures comparée au témoin d'usure, craquelures du flanc, usure irrégulière entre bords et centre, présence de hernies ou coupures",
+  chaine: "tension et jeu visible, présence de rouille ou manque de graissage, grippage des maillons, état des dents de la couronne/pignon si visibles sur la photo",
+  plaquettes_av: "épaisseur de la garniture restante par rapport au support métallique, usure irrégulière entre les deux côtés",
+  plaquettes_ar: "épaisseur de la garniture restante par rapport au support métallique, usure irrégulière entre les deux côtés",
+  disque_av: "épaisseur du disque, présence de rayures profondes ou de voile visible, régularité de la zone de contact",
+  disque_ar: "épaisseur du disque, présence de rayures profondes ou de voile visible, régularité de la zone de contact",
+  huile_moteur: "couleur et opacité de l'huile (du translucide au noir), présence de particules visibles",
+  liquide_frein: "couleur du liquide (du jaune clair au brun foncé/trouble), niveau visible dans le réservoir"
+};
+
+function buildUsurePrompt(typeConsommable) {
+  const critere = CRITERES_PAR_TYPE[typeConsommable] || "l'état général visible sur la photo";
+  return "Tu es un mécanicien moto expert qui évalue l'usure d'un consommable à partir d'une photo, pour un " +
+    "système de suivi d'entretien de garage. Type de consommable : " + typeConsommable + ". Évalue l'usure en " +
+    "te basant sur des critères concrets et observables : " + critere + ". Donne une prescription (champ " +
+    "`prescription`) choisie STRICTEMENT parmi 3 valeurs exactes selon la gravité : 'surveillance', " +
+    "'intervention_pro' ou 'urgence_securite' — ce champ est consommé par du code, n'invente jamais une " +
+    "4e valeur ni une phrase à sa place. Fournis séparément une phrase explicative dans `prescription_texte` " +
+    "pour justifier ce choix à l'humain. Si la photo ne permet pas d'évaluer correctement ces critères (floue, " +
+    "mal cadrée, mauvais sujet), donne une confiance basse plutôt qu'un pourcentage d'usure inventé.";
+}
+
 /**
- * Analyse une photo de consommable et renvoie le contrat verrouillé (D-01).
- * Toujours async : la signature reste stable quand le vrai moteur (réseau)
- * sera branché dans un futur milestone.
+ * Analyse une photo de consommable et renvoie le contrat verrouillé (D-01), étendu L12.
+ * Toujours async. deps.callVision permet l'injection en test (2e paramètre optionnel).
  * @param {object} params
  * @param {string} [params.photoUrl]
  * @param {string} [params.consommableId]
  * @param {string} [params.typeConsommable]
  * @param {number} [params.kmActuel]
  * @param {number} [params.kmMontage]
- * @returns {Promise<{pct_usure:number, etat:string, confiance:number, analyse_status:string, engine:string}>}
+ * @param {{callVision?:Function}} [deps]
+ * @returns {Promise<{pct_usure:?number, etat:?string, confiance:?number, analyse_status:string, prescription?:string, prescription_texte?:string, raison?:string, engine:string}>}
  */
-async function analyzePhoto(params = {}) {
+async function analyzePhoto(params = {}, deps = {}) {
+  const doCallVision = deps.callVision || callVision;
+
   if (VISION_ENABLED && visionReady) {
-    // Emplacement futur du vrai moteur Anthropic Vision — non implémenté ce milestone.
+    const result = await doCallVision({
+      imageUrl: params.photoUrl,
+      model: USURE_MODEL,
+      systemPrompt: buildUsurePrompt(params.typeConsommable || 'consommable'),
+      jsonSchema: USURE_SCHEMA,
+      maxTokens: 512
+    });
+
+    if (result.ok) {
+      const pct_usure = Math.max(0, Math.min(100, Math.round(result.data.pct_usure)));
+      const confiance = Math.max(0, Math.min(100, Math.round(result.data.confiance)));
+      return {
+        pct_usure,
+        etat: deriveEtat(pct_usure),
+        confiance,
+        analyse_status: deriveAnalyseStatus(confiance),
+        prescription: result.data.prescription,
+        prescription_texte: result.data.prescription_texte,
+        engine: 'anthropic'
+      };
+    }
+
+    console.warn('[L12] analyse Vision usure indisponible (' + result.raison + ') — aucun pct_usure calculé, jamais de valeur inventée');
+    return {
+      pct_usure: null,
+      etat: null,
+      confiance: null,
+      analyse_status: 'echec',
+      raison: result.raison,
+      engine: 'anthropic'
+    };
   }
+
   return buildStubAnalysis(params);
 }
 
