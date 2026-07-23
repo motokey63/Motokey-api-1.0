@@ -77,6 +77,52 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;ba
 .or-moto{font-size:17px;font-weight:700;color:var(--tx);}
 .or-client{font-size:14px;color:var(--tx2);}
 
+/* ── Briefing moto (L13 étape 5) ── */
+.btn-back-briefing{height:52px;padding:0 20px;font-size:16px;font-weight:700;border-radius:12px;background:#fff;border:1px solid var(--border2);color:var(--tx);cursor:pointer;margin-bottom:20px;}
+.briefing-header{margin-bottom:20px;}
+.briefing-moto-nom{font-size:22px;font-weight:800;color:var(--tx);}
+.briefing-client{font-size:15px;color:var(--tx2);margin-top:2px;}
+
+.briefing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:24px;}
+.score-card{border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:4px;}
+.score-card.vert{background:var(--gnbg);}
+.score-card.bleu{background:var(--blbg);}
+.score-card.jaune{background:var(--ywbg);}
+.score-card.rouge{background:var(--rdbg);}
+.score-value{font-size:34px;font-weight:900;}
+.score-card.vert .score-value{color:var(--gn);}
+.score-card.bleu .score-value{color:var(--bl);}
+.score-card.jaune .score-value{color:var(--yw);}
+.score-card.rouge .score-value{color:var(--rd);}
+.score-label{font-size:14px;font-weight:700;color:var(--tx2);}
+.km-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;}
+.km-value{font-size:28px;font-weight:900;color:var(--tx);}
+.km-label{font-size:14px;font-weight:700;color:var(--tx2);margin-top:4px;}
+
+.briefing-section{margin-bottom:24px;}
+.briefing-section-title{font-size:16px;font-weight:800;color:var(--tx);margin-bottom:12px;}
+
+.alert-row{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:10px;}
+.alert-row.warning{border-color:var(--yw);background:var(--ywbg);}
+.alert-row.urgent{border-color:var(--rd);background:var(--rdbg);}
+.alert-label{font-size:15px;font-weight:700;color:var(--tx);}
+.alert-detail{font-size:13px;color:var(--tx2);}
+.alert-pct{font-size:15px;font-weight:800;white-space:nowrap;}
+
+.int-row{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:10px;}
+.int-row-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.int-titre{font-size:15px;font-weight:700;color:var(--tx);}
+.int-badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap;}
+.int-badge-vert{background:var(--gnbg);color:var(--gn);}
+.int-badge-bleu{background:var(--blbg);color:var(--bl);}
+.int-badge-jaune{background:var(--ywbg);color:var(--yw);}
+.int-badge-rouge{background:var(--rdbg);color:var(--rd);}
+.int-meta{font-size:13px;color:var(--tx2);margin-top:4px;}
+
+.fraude-row{background:var(--rdbg);border:1px solid var(--rd);border-radius:12px;padding:14px 18px;margin-bottom:10px;}
+.fraude-verdict{font-size:15px;font-weight:800;color:var(--rd);}
+.fraude-meta{font-size:13px;color:var(--tx2);margin-top:2px;}
+
 .toast-container{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:1000;display:flex;flex-direction:column;gap:8px;width:min(90vw,420px);}
 .toast{background:#1a1d23;color:#fff;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.2);}
 .toast.error{background:var(--rd);}
@@ -121,9 +167,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;ba
     </div>
   </div>
   <div class="atelier-main" id="atelier-main">
-    <div id="or-stale-banner"></div>
-    <div id="or-list-content">
-      <div class="empty-state"><div class="icon">⏳</div><p>Chargement…</p></div>
+    <div id="view-liste">
+      <div id="or-stale-banner"></div>
+      <div id="or-list-content">
+        <div class="empty-state"><div class="icon">⏳</div><p>Chargement…</p></div>
+      </div>
+    </div>
+    <div id="view-briefing" style="display:none">
+      <button class="btn-back-briefing" id="btn-briefing-back">← File d'atelier</button>
+      <div id="briefing-content"></div>
     </div>
   </div>
 </div>
@@ -351,8 +403,11 @@ function renderOrList(ordres, { stale } = {}) {
   content.innerHTML = '<div class="or-grid">' + actifs.map(renderOrCard).join('') + '</div>';
 }
 
+let _lastOrdres = [];
+
 function onOrCardTap(orId) {
-  // Câblé à l'étape 5 (briefing moto)
+  const or = _lastOrdres.find(o => o.id === orId);
+  if (or && or.moto_id) openBriefing(or.moto_id);
 }
 
 async function loadFileAtelier() {
@@ -364,6 +419,7 @@ async function loadFileAtelier() {
   if (!ok) {
     const cached = cacheDataGet('ordres');
     if (cached) {
+      _lastOrdres = cached.value;
       renderOrList(cached.value, { stale: true });
     } else {
       document.getElementById('or-list-content').innerHTML =
@@ -373,8 +429,159 @@ async function loadFileAtelier() {
   }
 
   const ordres = (data.data || data).ordres || [];
+  _lastOrdres = ordres;
   cacheDataSet('ordres', ordres);
   renderOrList(ordres, { stale: false });
+}
+
+/* ═══════════════════════════════════════════════════════
+   BRIEFING MOTO (L13 étape 5) — passeport avant intervention
+═══════════════════════════════════════════════════════ */
+const COULEUR_META = {
+  vert:  { label: 'Excellent', cls: 'vert' },
+  bleu:  { label: 'Bon',       cls: 'bleu' },
+  jaune: { label: 'Moyen',     cls: 'jaune' },
+  rouge: { label: 'Insuffisant', cls: 'rouge' }
+};
+const INT_TYPE_META = {
+  vert:  { label: 'Concession', cls: 'int-badge-vert' },
+  bleu:  { label: 'Pro validé', cls: 'int-badge-bleu' },
+  jaune: { label: 'Déclaré',    cls: 'int-badge-jaune' },
+  rouge: { label: 'Malus',      cls: 'int-badge-rouge' }
+};
+const CONSO_LABELS = {
+  pneu_av: 'Pneu avant', pneu_ar: 'Pneu arrière', chaine: 'Chaîne',
+  plaquettes_av: 'Plaquettes avant', plaquettes_ar: 'Plaquettes arrière',
+  disque_av: 'Disque avant', disque_ar: 'Disque arrière',
+  huile_moteur: 'Huile moteur', liquide_frein: 'Liquide de frein'
+};
+
+function showView(view) {
+  document.getElementById('view-liste').style.display    = view === 'liste'    ? 'block' : 'none';
+  document.getElementById('view-briefing').style.display = view === 'briefing' ? 'block' : 'none';
+}
+
+function renderBriefing(motoId, { moto, consommables, planEntretien, fraudeFlags, stale }) {
+  const client = moto.client || {};
+  const couleurMeta = COULEUR_META[moto.couleur_dossier] || COULEUR_META.rouge;
+
+  const staleHtml = stale
+    ? '<div class="stale-banner">⚠ Dernières données connues (hors ligne) — peut ne plus être à jour.</div>'
+    : '';
+
+  const duBientot = []
+    .concat((planEntretien || []).filter(o => o.statut === 'urgent' || o.statut === 'warning').map(o => ({
+      cls: o.statut === 'urgent' ? 'urgent' : 'warning',
+      label: (o.icon ? o.icon + ' ' : '') + o.nom,
+      detail: o.km_restant > 0 ? ('dans ' + o.km_restant + ' km') : 'échéance dépassée',
+      pct: o.pct_usage + '%'
+    })))
+    .concat((consommables || []).filter(c => c.has_data && (c.etat === 'usé' || c.etat === 'critique')).map(c => ({
+      cls: c.etat === 'critique' ? 'urgent' : 'warning',
+      label: CONSO_LABELS[c.type_consommable] || c.type_consommable,
+      detail: c.etat,
+      pct: c.pct_usure + '% usure'
+    })));
+
+  const duBientotHtml = duBientot.length
+    ? duBientot.map(a => `
+        <div class="alert-row ${a.cls}">
+          <div><div class="alert-label">${escapeHtml(a.label)}</div><div class="alert-detail">${escapeHtml(a.detail)}</div></div>
+          <div class="alert-pct">${escapeHtml(a.pct)}</div>
+        </div>`).join('')
+    : '<div class="empty-state"><div class="icon">✅</div><p>Rien d\'urgent pour le moment.</p></div>';
+
+  const interventions = (moto.interventions || []).slice(0, 4);
+  const intHtml = interventions.length
+    ? interventions.map(i => {
+        const meta = INT_TYPE_META[i.type] || INT_TYPE_META.jaune;
+        return `
+          <div class="int-row">
+            <div class="int-row-top">
+              <span class="int-titre">${escapeHtml(i.titre)}</span>
+              <span class="int-badge ${meta.cls}">${meta.label}</span>
+            </div>
+            <div class="int-meta">${escapeHtml(i.date || '')} · ${escapeHtml(String(i.km || 0))} km</div>
+          </div>`;
+      }).join('')
+    : '<div class="empty-state"><div class="icon">🗒️</div><p>Aucune intervention enregistrée.</p></div>';
+
+  const flagsHtml = (fraudeFlags || []).length
+    ? '<div class="briefing-section"><div class="briefing-section-title">🚩 Flags anti-fraude</div>' +
+      fraudeFlags.map(f => `
+        <div class="fraude-row">
+          <div class="fraude-verdict">${f.verdict === 'fraude_suspectee' ? '🚨 Fraude suspectée' : '⚠️ Vérification partielle'}</div>
+          <div class="fraude-meta">${escapeHtml(f.garage || '—')} · ${escapeHtml(String(f.montant || 0))} € · ${escapeHtml(f.date || '')}</div>
+        </div>`).join('') +
+      '</div>'
+    : '';
+
+  document.getElementById('briefing-content').innerHTML = `
+    ${staleHtml}
+    <div class="briefing-header">
+      <div class="briefing-moto-nom">${escapeHtml([moto.marque, moto.modele].filter(Boolean).join(' '))}${moto.plaque ? ' · ' + escapeHtml(moto.plaque) : ''}</div>
+      <div class="briefing-client">${escapeHtml(client.nom || '—')}</div>
+    </div>
+    <div class="briefing-grid">
+      <div class="score-card ${couleurMeta.cls}">
+        <div class="score-value">${moto.score ?? 0}/100</div>
+        <div class="score-label">${couleurMeta.label}</div>
+      </div>
+      <div class="km-card">
+        <div class="km-value">${(moto.km || 0).toLocaleString('fr-FR')} km</div>
+        <div class="km-label">Kilométrage actuel</div>
+      </div>
+    </div>
+    <div class="briefing-section">
+      <div class="briefing-section-title">Dû bientôt</div>
+      ${duBientotHtml}
+    </div>
+    <div class="briefing-section">
+      <div class="briefing-section-title">Dernières interventions</div>
+      ${intHtml}
+    </div>
+    ${flagsHtml}
+  `;
+}
+
+async function openBriefing(motoId) {
+  showView('briefing');
+  document.getElementById('briefing-content').innerHTML =
+    '<div class="empty-state"><div class="icon">⏳</div><p>Chargement…</p></div>';
+
+  const token = getToken();
+  const [motoRes, consoRes, planRes, fraudeRes] = await Promise.all([
+    apiGet('/motos/' + motoId, token),
+    apiGet('/motos/' + motoId + '/consommables', token),
+    apiGet('/motos/' + motoId + '/plan-entretien', token),
+    apiGet('/fraude/historique', token)
+  ]);
+
+  if (motoRes.status === 401) { doLogout(); return; }
+
+  if (!motoRes.ok) {
+    const cached = cacheDataGet('briefing_' + motoId);
+    if (cached) { renderBriefing(motoId, Object.assign({}, cached.value, { stale: true })); return; }
+    document.getElementById('briefing-content').innerHTML =
+      '<div class="empty-state"><div class="icon">📡</div><p>' + escapeHtml(errMsg(motoRes.data)) + '</p></div>';
+    return;
+  }
+
+  const motoPayload = motoRes.data.data || motoRes.data;
+  const moto = Object.assign({}, motoPayload.moto, { client: motoPayload.client, interventions: motoPayload.interventions });
+  const consoPayload = consoRes.ok ? (consoRes.data.data || consoRes.data) : {};
+  const planPayload  = planRes.ok  ? (planRes.data.data  || planRes.data)  : {};
+  const fraudePayload = fraudeRes.ok ? (fraudeRes.data.data || fraudeRes.data) : {};
+  const fraudeFlags = (fraudePayload.verifications || []).filter(f => f.moto_id === motoId && f.verdict !== 'authentifie');
+
+  const bundle = {
+    moto,
+    consommables: consoPayload.consommables || [],
+    planEntretien: planPayload.plan_entretien || [],
+    fraudeFlags
+  };
+  cacheDataSet('briefing_' + motoId, bundle);
+  renderBriefing(motoId, Object.assign({}, bundle, { stale: false }));
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -385,6 +592,7 @@ document.getElementById('login-password').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('btn-login').click();
 });
 document.getElementById('btn-logout').addEventListener('click', doLogout);
+document.getElementById('btn-briefing-back').addEventListener('click', () => showView('liste'));
 
 (function boot() {
   if ('serviceWorker' in navigator) {

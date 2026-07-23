@@ -441,6 +441,20 @@ const Motos = {
       nb_interventions: (ints || []).length, par_type: pt,
       detail: { concession: pt.vert*12, pro_valide: pt.bleu*8, proprietaire: pt.jaune*5, malus: pt.rouge*5 }
     };
+  },
+
+  // L13 étape 5 : maintenance constructeur due, côté garage/MECANO (jusqu'ici
+  // exposée uniquement côté CLIENT via l'ancien GET /client/moto RAM-only).
+  // Réutilise enrichirPlan(), la même fonction pure que insererPlanSupabase().
+  async getPlanEntretien(id, garage_id) {
+    const { data: moto, error: merr } = await supabase.from('motos')
+      .select('id, km').eq('id', id).eq('garage_id', garage_id).single();
+    if (merr || !moto) throw new Error('Moto non trouvée');
+    const { data: ops, error } = await supabase.from('plan_entretien')
+      .select('*').eq('moto_id', id);
+    if (error) throw new Error(error.message);
+    const { enrichirPlan } = require('./plans_entretien');
+    return enrichirPlan(ops || [], moto.km);
   }
 };
 
