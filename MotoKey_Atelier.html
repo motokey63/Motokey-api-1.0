@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>MotoKey — Atelier</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;background:#f0f2f5;color:#1a1d23;}
+
+:root{
+  --bg:#f0f2f5;--card:#ffffff;--border:#e2e5eb;--border2:#d0d4dc;
+  --tx:#1a1d23;--tx2:#5a6172;--tx3:#9ba3b4;
+  --acc:#ff6b00;--acc2:#ff8c33;
+  --gn:#16a34a;--gnbg:#f0fdf4;
+  --rd:#dc2626;--rdbg:#fef2f2;
+  --bl:#2563eb;--blbg:#eff6ff;
+  --yw:#d97706;--ywbg:#fffbeb;
+}
+
+/* ── Écrans plein cadre, un seul visible à la fois ── */
+.screen{display:none;min-height:100vh;}
+.screen.active{display:flex;flex-direction:column;}
+
+/* ── Login ── */
+#screen-login.active{align-items:center;justify-content:center;padding:24px;}
+.login-box{width:100%;max-width:420px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:36px 32px;box-shadow:0 4px 16px rgba(0,0,0,.08);}
+.login-logo{font-size:26px;font-weight:900;color:var(--tx);text-align:center;margin-bottom:4px;}
+.login-logo em{color:var(--acc);font-style:normal;}
+.login-sub{text-align:center;color:var(--tx2);font-size:15px;margin-bottom:28px;}
+.field{margin-bottom:18px;}
+.field label{display:block;font-size:14px;font-weight:600;color:var(--tx2);margin-bottom:6px;}
+.field input{width:100%;height:52px;padding:0 16px;font-size:17px;border:1px solid var(--border2);border-radius:10px;background:#fff;color:var(--tx);}
+.field input:focus{outline:none;border-color:var(--acc);}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:56px;padding:0 24px;font-size:17px;font-weight:700;border-radius:12px;border:none;cursor:pointer;width:100%;}
+.btn-primary{background:var(--acc);color:#fff;}
+.btn-primary:active{background:var(--acc2);}
+.btn-primary:disabled{opacity:.6;}
+.btn-ghost{background:transparent;color:var(--tx2);border:1px solid var(--border2);}
+.login-error{background:var(--rdbg);color:var(--rd);border-radius:10px;padding:12px 14px;font-size:14px;font-weight:600;margin-bottom:18px;display:none;}
+.login-error.show{display:block;}
+
+/* ── Écran atelier ── */
+#screen-atelier.active{display:flex;flex-direction:column;height:100vh;}
+.topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:64px;flex-shrink:0;}
+.topbar-left{display:flex;align-items:center;gap:12px;min-width:0;}
+.topbar-logo{font-size:19px;font-weight:900;white-space:nowrap;}
+.topbar-logo em{color:var(--acc);font-style:normal;}
+.topbar-garage{font-size:15px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.topbar-right{display:flex;align-items:center;gap:14px;flex-shrink:0;}
+
+.net-indicator{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;padding:7px 12px;border-radius:20px;}
+.net-indicator.online{background:var(--gnbg);color:var(--gn);}
+.net-indicator.offline{background:var(--rdbg);color:var(--rd);}
+.net-dot{width:8px;height:8px;border-radius:50%;background:currentColor;}
+
+.btn-logout{height:44px;padding:0 18px;font-size:14px;font-weight:700;border-radius:10px;background:transparent;border:1px solid var(--border2);color:var(--tx2);cursor:pointer;}
+
+.atelier-main{flex:1;overflow-y:auto;padding:24px;}
+.empty-state{max-width:520px;margin:60px auto;text-align:center;color:var(--tx3);}
+.empty-state .icon{font-size:48px;margin-bottom:16px;}
+.empty-state p{font-size:16px;line-height:1.5;}
+
+/* ── File d'atelier (OR) ── */
+.stale-banner{background:var(--ywbg);color:var(--yw);border-radius:10px;padding:12px 16px;font-size:14px;font-weight:600;margin-bottom:16px;}
+.or-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+.or-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:10px;min-height:120px;}
+.or-card:active{border-color:var(--acc);background:#fffaf5;}
+.or-card-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.or-numero{font-size:18px;font-weight:800;color:var(--tx);}
+.or-badge{font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;}
+.or-badge-attente{background:var(--ywbg);color:var(--yw);}
+.or-badge-en_cours{background:var(--blbg);color:var(--bl);}
+.or-badge-termine{background:var(--gnbg);color:var(--gn);}
+.or-moto{font-size:17px;font-weight:700;color:var(--tx);}
+.or-client{font-size:14px;color:var(--tx2);}
+
+/* ── Briefing moto (L13 étape 5) ── */
+.btn-back-briefing{height:52px;padding:0 20px;font-size:16px;font-weight:700;border-radius:12px;background:#fff;border:1px solid var(--border2);color:var(--tx);cursor:pointer;margin-bottom:20px;}
+.briefing-header{margin-bottom:20px;}
+.briefing-moto-nom{font-size:22px;font-weight:800;color:var(--tx);}
+.briefing-client{font-size:15px;color:var(--tx2);margin-top:2px;}
+
+.briefing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:24px;}
+.score-card{border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:4px;}
+.score-card.vert{background:var(--gnbg);}
+.score-card.bleu{background:var(--blbg);}
+.score-card.jaune{background:var(--ywbg);}
+.score-card.rouge{background:var(--rdbg);}
+.score-value{font-size:34px;font-weight:900;}
+.score-card.vert .score-value{color:var(--gn);}
+.score-card.bleu .score-value{color:var(--bl);}
+.score-card.jaune .score-value{color:var(--yw);}
+.score-card.rouge .score-value{color:var(--rd);}
+.score-label{font-size:14px;font-weight:700;color:var(--tx2);}
+.km-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;}
+.km-value{font-size:28px;font-weight:900;color:var(--tx);}
+.km-label{font-size:14px;font-weight:700;color:var(--tx2);margin-top:4px;}
+
+.briefing-section{margin-bottom:24px;}
+.briefing-section-title{font-size:16px;font-weight:800;color:var(--tx);margin-bottom:12px;}
+
+.alert-row{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:10px;}
+.alert-row.warning{border-color:var(--yw);background:var(--ywbg);}
+.alert-row.urgent{border-color:var(--rd);background:var(--rdbg);}
+.alert-label{font-size:15px;font-weight:700;color:var(--tx);}
+.alert-detail{font-size:13px;color:var(--tx2);}
+.alert-pct{font-size:15px;font-weight:800;white-space:nowrap;}
+
+.int-row{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:10px;}
+.int-row-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.int-titre{font-size:15px;font-weight:700;color:var(--tx);}
+.int-badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap;}
+.int-badge-vert{background:var(--gnbg);color:var(--gn);}
+.int-badge-bleu{background:var(--blbg);color:var(--bl);}
+.int-badge-jaune{background:var(--ywbg);color:var(--yw);}
+.int-badge-rouge{background:var(--rdbg);color:var(--rd);}
+.int-meta{font-size:13px;color:var(--tx2);margin-top:4px;}
+
+.fraude-row{background:var(--rdbg);border:1px solid var(--rd);border-radius:12px;padding:14px 18px;margin-bottom:10px;}
+.fraude-verdict{font-size:15px;font-weight:800;color:var(--rd);}
+.fraude-meta{font-size:13px;color:var(--tx2);margin-top:2px;}
+
+.toast-container{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:1000;display:flex;flex-direction:column;gap:8px;width:min(90vw,420px);}
+.toast{background:#1a1d23;color:#fff;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.2);}
+.toast.error{background:var(--rd);}
+.toast.success{background:var(--gn);}
+</style>
+</head>
+<body>
+
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ═══════ ÉCRAN LOGIN ═══════ -->
+<div class="screen active" id="screen-login">
+  <div class="login-box">
+    <div class="login-logo">MOTO<em>KEY</em> Atelier</div>
+    <div class="login-sub">Espace mécano — connexion garage</div>
+    <div class="login-error" id="login-error"></div>
+    <div class="field">
+      <label for="login-email">Email</label>
+      <input type="email" id="login-email" placeholder="mecano@garage.fr" autocomplete="username">
+    </div>
+    <div class="field">
+      <label for="login-password">Mot de passe</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="btn-login">Se connecter</button>
+  </div>
+</div>
+
+<!-- ═══════ ÉCRAN ATELIER ═══════ -->
+<div class="screen" id="screen-atelier">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">MOTO<em>KEY</em></div>
+      <div class="topbar-garage" id="topbar-garage-nom">—</div>
+    </div>
+    <div class="topbar-right">
+      <div class="net-indicator online" id="net-indicator">
+        <span class="net-dot"></span>
+        <span id="net-indicator-label">En ligne</span>
+      </div>
+      <button class="btn-logout" id="btn-logout">Déconnexion</button>
+    </div>
+  </div>
+  <div class="atelier-main" id="atelier-main">
+    <div id="view-liste">
+      <div id="or-stale-banner"></div>
+      <div id="or-list-content">
+        <div class="empty-state"><div class="icon">⏳</div><p>Chargement…</p></div>
+      </div>
+    </div>
+    <div id="view-briefing" style="display:none">
+      <button class="btn-back-briefing" id="btn-briefing-back">← File d'atelier</button>
+      <div id="briefing-content"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════
+   CONFIG — même pattern que MotoKey_Client.html
+═══════════════════════════════════════════════════════ */
+const API_BASE = (window.location.protocol === 'file:') ? 'https://motokey11-production.up.railway.app' : window.location.origin;
+const LS_TOKEN     = 'mk_atelier_token';
+const LS_ROLE      = 'mk_atelier_rbac_role';
+const LS_EMAIL     = 'mk_atelier_email';
+const LS_GARAGE    = 'mk_atelier_garage';
+
+/* ═══════════════════════════════════════════════════════
+   API
+═══════════════════════════════════════════════════════ */
+async function apiFetch(method, path, body, token, timeoutMs = 15000) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(API_BASE + path, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal
+    });
+    let data;
+    try { data = await res.json(); } catch { data = {}; }
+    return { ok: res.ok, status: res.status, data };
+  } catch (e) {
+    const timedOut = e && e.name === 'AbortError';
+    return { ok: false, status: 0, data: { error: { message: timedOut ? 'Délai dépassé — réessaie.' : "Serveur inaccessible — vérifie ta connexion." } } };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+const apiPost = (path, body, token) => apiFetch('POST', path, body, token);
+const apiGet  = (path, token)       => apiFetch('GET',  path, null, token);
+
+function errMsg(data) {
+  return data?.error?.message || data?.message || 'Erreur inattendue.';
+}
+
+/* ═══════════════════════════════════════════════════════
+   TOKEN localStorage — persistant pour tolérer les coupures
+   réseau atelier sans perdre la session (contrairement à
+   app.html qui garde le token en mémoire uniquement).
+═══════════════════════════════════════════════════════ */
+function saveSession(token, rbac_role, email, garageNom) {
+  localStorage.setItem(LS_TOKEN, token);
+  localStorage.setItem(LS_ROLE, rbac_role);
+  localStorage.setItem(LS_EMAIL, email);
+  localStorage.setItem(LS_GARAGE, garageNom || '');
+}
+function clearSession() {
+  [LS_TOKEN, LS_ROLE, LS_EMAIL, LS_GARAGE].forEach(k => localStorage.removeItem(k));
+}
+function getToken() { return localStorage.getItem(LS_TOKEN); }
+
+/* ═══════════════════════════════════════════════════════
+   CACHE LOCAL DES DERNIÈRES DONNÉES (L13 étape 3) — lecture
+   seule : une coupure réseau en cours de session ne doit pas
+   vider l'écran. Les étapes suivantes (file d'atelier,
+   briefing moto) appellent cacheDataSet/cacheDataGet.
+═══════════════════════════════════════════════════════ */
+const DATA_CACHE_PREFIX = 'mk_atelier_cache_';
+function cacheDataSet(key, value) {
+  try { localStorage.setItem(DATA_CACHE_PREFIX + key, JSON.stringify({ value, cachedAt: Date.now() })); } catch {}
+}
+function cacheDataGet(key) {
+  try {
+    const raw = localStorage.getItem(DATA_CACHE_PREFIX + key);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+/* Le JWT legacy (motokey-api.js jwtSign) est un simple base64url de JSON,
+   pas de vérification de signature côté client — on l'utilise seulement
+   pour lire exp et éviter un appel réseau au démarrage. */
+function decodeTokenPayload(token) {
+  try {
+    const part = token.split('.')[1] || token; // tolère un format non-JWT-standard
+    return JSON.parse(atob(part.replace(/-/g,'+').replace(/_/g,'/')));
+  } catch { return null; }
+}
+function isTokenValid(token) {
+  const payload = decodeTokenPayload(token);
+  return !!(payload && payload.exp && payload.exp > Date.now());
+}
+
+/* ═══════════════════════════════════════════════════════
+   UI
+═══════════════════════════════════════════════════════ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+function toast(msg, type = 'info', ms = 4000) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(() => t.remove(), ms);
+}
+function setLoading(btn, on, label) {
+  if (on) { btn._lbl = btn.textContent; btn.textContent = label || 'Connexion…'; btn.disabled = true; }
+  else    { btn.textContent = btn._lbl || btn.textContent; btn.disabled = false; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   INDICATEUR RÉSEAU
+═══════════════════════════════════════════════════════ */
+function updateNetIndicator() {
+  const el    = document.getElementById('net-indicator');
+  const label = document.getElementById('net-indicator-label');
+  if (navigator.onLine) {
+    el.classList.remove('offline'); el.classList.add('online');
+    label.textContent = 'En ligne';
+  } else {
+    el.classList.remove('online'); el.classList.add('offline');
+    label.textContent = 'Hors ligne';
+  }
+}
+window.addEventListener('online',  updateNetIndicator);
+window.addEventListener('offline', updateNetIndicator);
+
+/* ═══════════════════════════════════════════════════════
+   AUTH
+═══════════════════════════════════════════════════════ */
+async function doLogin() {
+  const btn   = document.getElementById('btn-login');
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.classList.remove('show');
+
+  if (!email || !pass) {
+    errEl.textContent = 'Email et mot de passe requis.';
+    errEl.classList.add('show');
+    return;
+  }
+
+  setLoading(btn, true);
+  const { ok, data } = await apiPost('/auth/login', { email, password: pass, role: 'garage' });
+  setLoading(btn, false);
+
+  if (!ok) {
+    errEl.textContent = errMsg(data);
+    errEl.classList.add('show');
+    return;
+  }
+
+  const payload    = data.data || data;
+  const rbac_role  = payload.rbac_role || 'CONCESSION';
+  if (rbac_role !== 'MECANO') {
+    errEl.textContent = "Ce compte n'est pas un compte mécano — connecte-toi sur l'application principale.";
+    errEl.classList.add('show');
+    return;
+  }
+
+  saveSession(payload.token, rbac_role, email, payload.garage?.nom);
+  enterAtelier();
+}
+
+function doLogout() {
+  clearSession();
+  showScreen('login');
+}
+
+function enterAtelier() {
+  document.getElementById('topbar-garage-nom').textContent = localStorage.getItem(LS_GARAGE) || '—';
+  updateNetIndicator();
+  showScreen('atelier');
+  loadFileAtelier();
+}
+
+/* ═══════════════════════════════════════════════════════
+   FILE D'ATELIER (L13 étape 4) — OR actifs du garage
+═══════════════════════════════════════════════════════ */
+const OR_STATUTS_ACTIFS = ['en_cours', 'attente', 'termine']; // ordre de priorité mécano
+const OR_STATUT_META = {
+  attente:  { label: 'En attente', cls: 'or-badge-attente' },
+  en_cours: { label: 'En cours',   cls: 'or-badge-en_cours' },
+  termine:  { label: 'Terminé',    cls: 'or-badge-termine' }
+};
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+/* La forme des dates diffère entre le fallback RAM (date déjà formatée fr,
+   ex. "05/02/2026") et Supabase (colonnes ISO date_intervention/created_at)
+   — les deux chemins sont exercés en prod selon la table. */
+function fmtDateFlexible(value) {
+  if (!value) return '—';
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(value)) return value; // déjà formaté (RAM)
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function renderOrCard(or) {
+  const moto   = or.motos || {};
+  const client = moto.clients || {};
+  const meta   = OR_STATUT_META[or.statut] || { label: or.statut, cls: 'or-badge-attente' };
+  const motoLabel = [moto.marque, moto.modele].filter(Boolean).join(' ') || '—';
+  return `
+    <button class="or-card" onclick="onOrCardTap('${or.id}')">
+      <div class="or-card-top">
+        <span class="or-numero">${escapeHtml(or.numero_or || or.numero || '—')}</span>
+        <span class="or-badge ${meta.cls}">${meta.label}</span>
+      </div>
+      <div class="or-moto">${escapeHtml(motoLabel)}${moto.plaque ? ' · ' + escapeHtml(moto.plaque) : ''}</div>
+      <div class="or-client">${escapeHtml(client.nom || '—')}</div>
+    </button>`;
+}
+
+function renderOrList(ordres, { stale } = {}) {
+  const banner = document.getElementById('or-stale-banner');
+  banner.innerHTML = stale
+    ? '<div class="stale-banner">⚠ Dernières données connues (hors ligne) — peut ne plus être à jour.</div>'
+    : '';
+
+  const actifs = (ordres || [])
+    .filter(o => OR_STATUTS_ACTIFS.includes(o.statut))
+    .sort((a, b) => {
+      const pa = OR_STATUTS_ACTIFS.indexOf(a.statut), pb = OR_STATUTS_ACTIFS.indexOf(b.statut);
+      if (pa !== pb) return pa - pb;
+      return (a.date_ouverture || '').localeCompare(b.date_ouverture || '');
+    });
+
+  const content = document.getElementById('or-list-content');
+  if (!actifs.length) {
+    content.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>Aucun OR actif pour le moment.</p></div>';
+    return;
+  }
+  content.innerHTML = '<div class="or-grid">' + actifs.map(renderOrCard).join('') + '</div>';
+}
+
+let _lastOrdres = [];
+
+function onOrCardTap(orId) {
+  const or = _lastOrdres.find(o => o.id === orId);
+  if (or && or.moto_id) openBriefing(or.moto_id);
+}
+
+async function loadFileAtelier() {
+  const token = getToken();
+  const { ok, status, data } = await apiGet('/ordres-reparation', token);
+
+  if (status === 401) { doLogout(); return; }
+
+  if (!ok) {
+    const cached = cacheDataGet('ordres');
+    if (cached) {
+      _lastOrdres = cached.value;
+      renderOrList(cached.value, { stale: true });
+    } else {
+      document.getElementById('or-list-content').innerHTML =
+        '<div class="empty-state"><div class="icon">📡</div><p>' + escapeHtml(errMsg(data)) + '</p></div>';
+    }
+    return;
+  }
+
+  const ordres = (data.data || data).ordres || [];
+  _lastOrdres = ordres;
+  cacheDataSet('ordres', ordres);
+  renderOrList(ordres, { stale: false });
+}
+
+/* ═══════════════════════════════════════════════════════
+   BRIEFING MOTO (L13 étape 5) — passeport avant intervention
+═══════════════════════════════════════════════════════ */
+const COULEUR_META = {
+  vert:  { label: 'Excellent', cls: 'vert' },
+  bleu:  { label: 'Bon',       cls: 'bleu' },
+  jaune: { label: 'Moyen',     cls: 'jaune' },
+  rouge: { label: 'Insuffisant', cls: 'rouge' }
+};
+const INT_TYPE_META = {
+  vert:  { label: 'Concession', cls: 'int-badge-vert' },
+  bleu:  { label: 'Pro validé', cls: 'int-badge-bleu' },
+  jaune: { label: 'Déclaré',    cls: 'int-badge-jaune' },
+  rouge: { label: 'Malus',      cls: 'int-badge-rouge' }
+};
+const CONSO_LABELS = {
+  pneu_av: 'Pneu avant', pneu_ar: 'Pneu arrière', chaine: 'Chaîne',
+  plaquettes_av: 'Plaquettes avant', plaquettes_ar: 'Plaquettes arrière',
+  disque_av: 'Disque avant', disque_ar: 'Disque arrière',
+  huile_moteur: 'Huile moteur', liquide_frein: 'Liquide de frein'
+};
+
+function showView(view) {
+  document.getElementById('view-liste').style.display    = view === 'liste'    ? 'block' : 'none';
+  document.getElementById('view-briefing').style.display = view === 'briefing' ? 'block' : 'none';
+}
+
+function renderBriefing(motoId, { moto, consommables, planEntretien, fraudeFlags, stale }) {
+  const client = moto.client || {};
+  const couleurMeta = COULEUR_META[moto.couleur_dossier] || COULEUR_META.rouge;
+
+  const staleHtml = stale
+    ? '<div class="stale-banner">⚠ Dernières données connues (hors ligne) — peut ne plus être à jour.</div>'
+    : '';
+
+  const duBientot = []
+    .concat((planEntretien || []).filter(o => o.statut === 'urgent' || o.statut === 'warning').map(o => ({
+      cls: o.statut === 'urgent' ? 'urgent' : 'warning',
+      label: (o.icon ? o.icon + ' ' : '') + o.nom,
+      detail: o.km_restant > 0 ? ('dans ' + o.km_restant + ' km') : 'échéance dépassée',
+      pct: o.pct_usage + '%'
+    })))
+    .concat((consommables || []).filter(c => c.has_data && (c.etat === 'usé' || c.etat === 'critique')).map(c => ({
+      cls: c.etat === 'critique' ? 'urgent' : 'warning',
+      label: CONSO_LABELS[c.type_consommable] || c.type_consommable,
+      detail: c.etat,
+      pct: c.pct_usure + '% usure'
+    })));
+
+  const duBientotHtml = duBientot.length
+    ? duBientot.map(a => `
+        <div class="alert-row ${a.cls}">
+          <div><div class="alert-label">${escapeHtml(a.label)}</div><div class="alert-detail">${escapeHtml(a.detail)}</div></div>
+          <div class="alert-pct">${escapeHtml(a.pct)}</div>
+        </div>`).join('')
+    : '<div class="empty-state"><div class="icon">✅</div><p>Rien d\'urgent pour le moment.</p></div>';
+
+  const interventions = (moto.interventions || []).slice(0, 4);
+  const intHtml = interventions.length
+    ? interventions.map(i => {
+        const meta = INT_TYPE_META[i.type] || INT_TYPE_META.jaune;
+        return `
+          <div class="int-row">
+            <div class="int-row-top">
+              <span class="int-titre">${escapeHtml(i.titre)}</span>
+              <span class="int-badge ${meta.cls}">${meta.label}</span>
+            </div>
+            <div class="int-meta">${escapeHtml(fmtDateFlexible(i.date_intervention || i.date))} · ${escapeHtml(String(i.km || 0))} km</div>
+          </div>`;
+      }).join('')
+    : '<div class="empty-state"><div class="icon">🗒️</div><p>Aucune intervention enregistrée.</p></div>';
+
+  const flagsHtml = (fraudeFlags || []).length
+    ? '<div class="briefing-section"><div class="briefing-section-title">🚩 Flags anti-fraude</div>' +
+      fraudeFlags.map(f => `
+        <div class="fraude-row">
+          <div class="fraude-verdict">${f.verdict === 'fraude_suspectee' ? '🚨 Fraude suspectée' : '⚠️ Vérification partielle'}</div>
+          <div class="fraude-meta">${escapeHtml(f.garage_nom || f.garage || '—')} · ${escapeHtml(String(f.montant || 0))} € · ${escapeHtml(fmtDateFlexible(f.created_at || f.date))}</div>
+        </div>`).join('') +
+      '</div>'
+    : '';
+
+  document.getElementById('briefing-content').innerHTML = `
+    ${staleHtml}
+    <div class="briefing-header">
+      <div class="briefing-moto-nom">${escapeHtml([moto.marque, moto.modele].filter(Boolean).join(' '))}${moto.plaque ? ' · ' + escapeHtml(moto.plaque) : ''}</div>
+      <div class="briefing-client">${escapeHtml(client.nom || '—')}</div>
+    </div>
+    <div class="briefing-grid">
+      <div class="score-card ${couleurMeta.cls}">
+        <div class="score-value">${moto.score ?? 0}/100</div>
+        <div class="score-label">${couleurMeta.label}</div>
+      </div>
+      <div class="km-card">
+        <div class="km-value">${(moto.km || 0).toLocaleString('fr-FR')} km</div>
+        <div class="km-label">Kilométrage actuel</div>
+      </div>
+    </div>
+    <div class="briefing-section">
+      <div class="briefing-section-title">Dû bientôt</div>
+      ${duBientotHtml}
+    </div>
+    <div class="briefing-section">
+      <div class="briefing-section-title">Dernières interventions</div>
+      ${intHtml}
+    </div>
+    ${flagsHtml}
+  `;
+}
+
+function _settledOrFallback(settled, fallbackMsg) {
+  if (settled.status === 'fulfilled') return settled.value;
+  return { ok: false, status: 0, data: { error: { message: fallbackMsg } } };
+}
+
+async function openBriefing(motoId) {
+  showView('briefing');
+  document.getElementById('briefing-content').innerHTML =
+    '<div class="empty-state"><div class="icon">⏳</div><p>Chargement…</p></div>';
+
+  try {
+    const token = getToken();
+    // allSettled : un appel en échec (timeout, exception réseau) n'empêche jamais
+    // les autres d'être lus, et ne doit jamais laisser l'écran bloqué en chargement.
+    const [motoS, consoS, planS, fraudeS] = await Promise.allSettled([
+      apiGet('/motos/' + motoId, token),
+      apiGet('/motos/' + motoId + '/consommables', token),
+      apiGet('/motos/' + motoId + '/plan-entretien', token),
+      apiGet('/fraude/historique', token)
+    ]);
+
+    const motoRes   = _settledOrFallback(motoS,   'Erreur inattendue lors du chargement de la moto.');
+    const consoRes  = _settledOrFallback(consoS,  'Jauges consommables indisponibles.');
+    const planRes   = _settledOrFallback(planS,   'Maintenance constructeur indisponible.');
+    const fraudeRes = _settledOrFallback(fraudeS, 'Historique anti-fraude indisponible.');
+
+    if (motoRes.status === 401) { doLogout(); return; }
+
+    if (!motoRes.ok) {
+      const cached = cacheDataGet('briefing_' + motoId);
+      if (cached) { renderBriefing(motoId, Object.assign({}, cached.value, { stale: true })); return; }
+      document.getElementById('briefing-content').innerHTML =
+        '<div class="empty-state"><div class="icon">📡</div><p>' + escapeHtml(errMsg(motoRes.data)) + '</p></div>';
+      return;
+    }
+
+    const motoPayload = motoRes.data.data || motoRes.data;
+    const moto = Object.assign({}, motoPayload.moto, { client: motoPayload.client, interventions: motoPayload.interventions });
+    const consoPayload = consoRes.ok ? (consoRes.data.data || consoRes.data) : {};
+    const planPayload  = planRes.ok  ? (planRes.data.data  || planRes.data)  : {};
+    const fraudePayload = fraudeRes.ok ? (fraudeRes.data.data || fraudeRes.data) : {};
+    const fraudeFlags = (fraudePayload.verifications || []).filter(f => f.moto_id === motoId && f.verdict !== 'authentifie');
+
+    const bundle = {
+      moto,
+      consommables: consoPayload.consommables || [],
+      planEntretien: planPayload.plan_entretien || [],
+      fraudeFlags
+    };
+    cacheDataSet('briefing_' + motoId, bundle);
+    renderBriefing(motoId, Object.assign({}, bundle, { stale: false }));
+  } catch (e) {
+    // Garde-fou final : quoi qu'il arrive (erreur de rendu, forme de donnée
+    // inattendue...), l'écran ne doit JAMAIS rester bloqué sur "Chargement…".
+    console.error('[openBriefing] erreur inattendue:', e);
+    const cached = cacheDataGet('briefing_' + motoId);
+    if (cached) {
+      renderBriefing(motoId, Object.assign({}, cached.value, { stale: true }));
+    } else {
+      document.getElementById('briefing-content').innerHTML =
+        '<div class="empty-state"><div class="icon">⚠️</div><p>Erreur inattendue au chargement du briefing'
+        + (e && e.message ? (' : ' + escapeHtml(e.message)) : '') + '. Réessaie.</p></div>';
+    }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════════════════ */
+document.getElementById('btn-login').addEventListener('click', doLogin);
+document.getElementById('login-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-login').click();
+});
+document.getElementById('btn-logout').addEventListener('click', doLogout);
+document.getElementById('btn-briefing-back').addEventListener('click', () => showView('liste'));
+
+(function boot() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw-atelier.js').catch(() => {});
+  }
+  const token = getToken();
+  if (token && isTokenValid(token)) {
+    enterAtelier();
+  } else {
+    clearSession();
+    showScreen('login');
+  }
+})();
+</script>
+</body>
+</html>

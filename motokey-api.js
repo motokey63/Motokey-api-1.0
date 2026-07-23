@@ -677,6 +677,18 @@ function getClientHTML() {
   return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>MotoKey — Espace Client</title></head><body style="font-family:sans-serif;padding:2rem"><h1>MotoKey — Espace Client</h1><p>En cours de déploiement…</p></body></html>';
 }
 
+function getAtelierHTML() {
+  // Lire MotoKey_Atelier.html depuis le disque (priorité sur fallback embarqué) — L13
+  try {
+    const _fs   = require('fs');
+    const _path = require('path');
+    const local = _fs.readFileSync(_path.join(__dirname, 'MotoKey_Atelier.html'), 'utf8');
+    if (local && local.length > 100) return local;
+  } catch(e) {}
+  // Fallback minimal si le fichier n'existe pas encore
+  return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>MotoKey — Atelier</title></head><body style="font-family:sans-serif;padding:2rem"><h1>MotoKey — Atelier</h1><p>En cours de déploiement…</p></body></html>';
+}
+
 const server = http.createServer(async function(req, res){
   const parsed   = url.parse(req.url, true);
   const pathname = parsed.pathname.replace(/\/+$/,'') || '/';
@@ -705,6 +717,26 @@ const server = http.createServer(async function(req, res){
   if(pathname==='/client' && method==='GET'){
     res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS','Access-Control-Allow-Headers':'Content-Type,Authorization','Cache-Control':'no-cache, no-store, must-revalidate','Pragma':'no-cache','Expires':'0'});
     res.end(getClientHTML());
+    return;
+  }
+
+  // ── Servir l'écran atelier MÉCANO sur /atelier (L13)
+  if(pathname==='/atelier' && method==='GET'){
+    res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS','Access-Control-Allow-Headers':'Content-Type,Authorization','Cache-Control':'no-cache, no-store, must-revalidate','Pragma':'no-cache','Expires':'0'});
+    res.end(getAtelierHTML());
+    return;
+  }
+
+  // ── Service worker de la coquille atelier (L13 étape 3) — lecture disque à chaque requête
+  if(pathname==='/sw-atelier.js' && method==='GET'){
+    let sw = '';
+    try {
+      const _fs   = require('fs');
+      const _path = require('path');
+      sw = _fs.readFileSync(_path.join(__dirname, 'sw-atelier.js'), 'utf8');
+    } catch(e) {}
+    res.writeHead(200,{'Content-Type':'application/javascript; charset=utf-8','Access-Control-Allow-Origin':'*','Cache-Control':'no-cache, no-store, must-revalidate'});
+    res.end(sw);
     return;
   }
 
@@ -1153,6 +1185,31 @@ const server = http.createServer(async function(req, res){
     const pt = {vert:0,bleu:0,jaune:0,rouge:0};
     is.forEach(function(i){pt[i.type]=(pt[i.type]||0)+1;});
     return ok(res,{score:sc,couleur:couleur(sc),nb_interventions:is.length,par_type:pt,detail:{concession:pt.vert*12,pro_valide:pt.bleu*8,proprietaire:pt.jaune*5,malus:pt.rouge*5}});
+  }
+
+  /* MAINTENANCE CONSTRUCTEUR (L13 étape 5) — jusqu'ici exposée uniquement côté
+     CLIENT (GET /client/moto, RAM-only) ; ce mince endpoint la rend accessible
+     au garage/MECANO pour le briefing atelier. */
+  if((p=M('GET','/motos/:id/plan-entretien'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+
+    if (USE_SUPABASE && SBLayer) {
+      try {
+        const plan_entretien = await SBLayer.Motos.getPlanEntretien(p.id, garageId);
+        const nb_alertes = plan_entretien.filter(function(o){ return o.statut==='urgent'||o.statut==='warning'; }).length;
+        return ok(res, { plan_entretien, nb_alertes });
+      } catch(e) { return fail(res, 'Moto non trouvée', 404, 'NOT_FOUND'); }
+    }
+    // ── RAM fallback ──
+    const m = DB.motos.find(function(x){return x.id===p.id&&x.garage_id===garageId;});
+    if (!m) return fail(res, 'Moto non trouvée', 404, 'NOT_FOUND');
+    const pl = enrichPlan(DB.plans[m.id]||[], m.km);
+    return ok(res, { plan_entretien: pl, nb_alertes: pl.filter(function(o){return o.statut==='urgent'||o.statut==='warning';}).length });
   }
 
   /* KILOMÉTRAGE (KM-02/KM-03) — route JSON (sans photo) ; le multipart est intercepté avant body() */
