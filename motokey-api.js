@@ -677,6 +677,18 @@ function getClientHTML() {
   return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>MotoKey — Espace Client</title></head><body style="font-family:sans-serif;padding:2rem"><h1>MotoKey — Espace Client</h1><p>En cours de déploiement…</p></body></html>';
 }
 
+function getAtelierHTML() {
+  // Lire MotoKey_Atelier.html depuis le disque (priorité sur fallback embarqué) — L13
+  try {
+    const _fs   = require('fs');
+    const _path = require('path');
+    const local = _fs.readFileSync(_path.join(__dirname, 'MotoKey_Atelier.html'), 'utf8');
+    if (local && local.length > 100) return local;
+  } catch(e) {}
+  // Fallback minimal si le fichier n'existe pas encore
+  return '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><title>MotoKey — Atelier</title></head><body style="font-family:sans-serif;padding:2rem"><h1>MotoKey — Atelier</h1><p>En cours de déploiement…</p></body></html>';
+}
+
 const server = http.createServer(async function(req, res){
   const parsed   = url.parse(req.url, true);
   const pathname = parsed.pathname.replace(/\/+$/,'') || '/';
@@ -705,6 +717,13 @@ const server = http.createServer(async function(req, res){
   if(pathname==='/client' && method==='GET'){
     res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS','Access-Control-Allow-Headers':'Content-Type,Authorization','Cache-Control':'no-cache, no-store, must-revalidate','Pragma':'no-cache','Expires':'0'});
     res.end(getClientHTML());
+    return;
+  }
+
+  // ── Servir l'écran atelier MÉCANO sur /atelier (L13)
+  if(pathname==='/atelier' && method==='GET'){
+    res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS','Access-Control-Allow-Headers':'Content-Type,Authorization','Cache-Control':'no-cache, no-store, must-revalidate','Pragma':'no-cache','Expires':'0'});
+    res.end(getAtelierHTML());
     return;
   }
 

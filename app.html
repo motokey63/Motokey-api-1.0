@@ -396,6 +396,15 @@ async function doLogin() {
   err.style.display = 'none';
   try {
     const data = await api('/auth/login', 'POST', { email, password: pass, role: 'garage' });
+    if ((data.rbac_role || 'CONCESSION') === 'MECANO') {
+      // L13 : le MÉCANO n'utilise plus app.html — écran atelier dédié
+      localStorage.setItem('mk_atelier_token', data.token);
+      localStorage.setItem('mk_atelier_rbac_role', data.rbac_role);
+      localStorage.setItem('mk_atelier_email', email);
+      localStorage.setItem('mk_atelier_garage', data.garage?.nom || '');
+      window.location.href = '/atelier';
+      return;
+    }
     TOKEN = data.token;
     CURRENT_ROLE = data.rbac_role || 'CONCESSION';
     document.getElementById('loginScreen').style.display = 'none';
