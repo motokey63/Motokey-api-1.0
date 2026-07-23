@@ -123,6 +123,44 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;ba
 .fraude-verdict{font-size:15px;font-weight:800;color:var(--rd);}
 .fraude-meta{font-size:13px;color:var(--tx2);margin-top:2px;}
 
+/* ── OR actif — écran de travail (L14 étape 1) ── */
+.or-actif-header{margin-bottom:20px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.or-actif-numero{font-size:20px;font-weight:900;color:var(--tx);}
+.or-actif-moto{font-size:16px;font-weight:700;color:var(--tx);margin-top:2px;}
+.or-actif-client{font-size:14px;color:var(--tx2);margin-top:2px;}
+.btn-passeport{height:44px;padding:0 16px;font-size:14px;font-weight:700;border-radius:10px;background:#fff;border:1px solid var(--border2);color:var(--tx);cursor:pointer;white-space:nowrap;}
+
+.offline-banner{background:var(--rdbg);color:var(--rd);border-radius:10px;padding:12px 16px;font-size:14px;font-weight:700;margin-bottom:16px;}
+
+.statut-section{margin-bottom:24px;}
+.statut-current{display:inline-block;font-size:14px;font-weight:700;padding:8px 16px;border-radius:20px;margin-bottom:14px;}
+.statut-actions{display:flex;gap:12px;flex-wrap:wrap;}
+.btn-action{height:60px;padding:0 24px;font-size:16px;font-weight:800;border-radius:14px;border:none;cursor:pointer;color:#fff;}
+.btn-action.go{background:var(--acc);}
+.btn-action.pause{background:var(--yw);}
+.btn-action.finish{background:var(--gn);}
+.btn-action:disabled{opacity:.4;cursor:not-allowed;}
+.statut-hint{font-size:13px;color:var(--tx2);margin-top:10px;}
+
+.lignes-section{margin-bottom:24px;}
+.ligne-row{background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:10px;display:flex;align-items:center;gap:14px;}
+.ligne-check{width:36px;height:36px;border-radius:8px;border:2px solid var(--border2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;background:#fff;}
+.ligne-check.fait{background:var(--gn);border-color:var(--gn);color:#fff;}
+.ligne-check.disabled{cursor:not-allowed;opacity:.4;}
+.ligne-body{flex:1;min-width:0;}
+.ligne-libelle{font-size:15px;font-weight:700;color:var(--tx);}
+.ligne-meta{font-size:13px;color:var(--tx2);margin-top:2px;}
+.ligne-blocked-badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;background:var(--rdbg);color:var(--rd);white-space:nowrap;}
+
+.btn-add-ligne{height:56px;padding:0 20px;font-size:15px;font-weight:700;border-radius:12px;background:#fff;border:2px dashed var(--border2);color:var(--tx2);cursor:pointer;width:100%;margin-bottom:10px;}
+.btn-add-ligne:disabled{opacity:.4;cursor:not-allowed;}
+
+.add-form{background:#f8f9fb;border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px;}
+.add-form-actions{display:flex;gap:10px;margin-top:4px;}
+
+.motif-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+.btn-motif{height:52px;font-size:14px;font-weight:700;border-radius:10px;background:#fff;border:1px solid var(--border2);color:var(--tx);cursor:pointer;}
+
 .toast-container{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:1000;display:flex;flex-direction:column;gap:8px;width:min(90vw,420px);}
 .toast{background:#1a1d23;color:#fff;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.2);}
 .toast.error{background:var(--rd);}
@@ -177,6 +215,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;ba
       <button class="btn-back-briefing" id="btn-briefing-back">← File d'atelier</button>
       <div id="briefing-content"></div>
     </div>
+    <div id="view-or-actif" style="display:none">
+      <button class="btn-back-briefing" id="btn-or-actif-back">← File d'atelier</button>
+      <div id="or-actif-content"></div>
+    </div>
   </div>
 </div>
 
@@ -217,8 +259,9 @@ async function apiFetch(method, path, body, token, timeoutMs = 15000) {
     clearTimeout(timer);
   }
 }
-const apiPost = (path, body, token) => apiFetch('POST', path, body, token);
-const apiGet  = (path, token)       => apiFetch('GET',  path, null, token);
+const apiPost  = (path, body, token) => apiFetch('POST',  path, body, token);
+const apiGet   = (path, token)       => apiFetch('GET',   path, null, token);
+const apiPatch = (path, body, token) => apiFetch('PATCH', path, body, token);
 
 function errMsg(data) {
   return data?.error?.message || data?.message || 'Erreur inattendue.';
@@ -423,8 +466,7 @@ function renderOrList(ordres, { stale } = {}) {
 let _lastOrdres = [];
 
 function onOrCardTap(orId) {
-  const or = _lastOrdres.find(o => o.id === orId);
-  if (or && or.moto_id) openBriefing(or.moto_id);
+  openOrActif(orId);
 }
 
 async function loadFileAtelier() {
@@ -476,6 +518,7 @@ const CONSO_LABELS = {
 function showView(view) {
   document.getElementById('view-liste').style.display    = view === 'liste'    ? 'block' : 'none';
   document.getElementById('view-briefing').style.display = view === 'briefing' ? 'block' : 'none';
+  document.getElementById('view-or-actif').style.display = view === 'or-actif' ? 'block' : 'none';
 }
 
 function renderBriefing(motoId, { moto, consommables, planEntretien, fraudeFlags, stale }) {
@@ -628,6 +671,353 @@ async function openBriefing(motoId) {
 }
 
 /* ═══════════════════════════════════════════════════════
+   OR ACTIF — écran de travail mains sales (L14 étape 1)
+   Écritures EN LIGNE uniquement (cadrage L14) : toute action qui
+   modifie des données est désactivée hors-ligne, jamais une action
+   qui semble passer et se perd. La file d'écriture hors-ligne est
+   hors scope (reportée à L14-bis).
+═══════════════════════════════════════════════════════ */
+const OR_STATUT_BADGE_FULL = {
+  brouillon: { label: 'Brouillon',  bg: 'var(--border)', color: 'var(--tx2)' },
+  accepte:   { label: 'Accepté',    bg: 'var(--blbg)',    color: 'var(--bl)' },
+  en_cours:  { label: 'En cours',   bg: 'var(--blbg)',    color: 'var(--bl)' },
+  attente:   { label: 'En attente', bg: 'var(--ywbg)',    color: 'var(--yw)' },
+  termine:   { label: 'Terminé',    bg: 'var(--gnbg)',    color: 'var(--gn)' },
+  facture:   { label: 'Facturé',    bg: 'var(--gnbg)',    color: 'var(--gn)' },
+  annule:    { label: 'Annulé',     bg: 'var(--rdbg)',    color: 'var(--rd)' },
+  refuse:    { label: 'Refusé',     bg: 'var(--rdbg)',    color: 'var(--rd)' }
+};
+const MOTIF_ATTENTE_PRESETS = ['Pièce manquante', 'Attente accord client', 'Pause déjeuner'];
+
+let _currentOrId = null;
+let _currentOrBundle = null; // { ordre_reparation, moto, taches, pieces, totaux }
+let _orActifUi = { showAddTache: false, showAddPiece: false, showMotifPicker: false, showMotifAutre: false, showCloturer: false };
+
+function isOffline() { return !navigator.onLine; }
+
+async function openOrActif(orId) {
+  _currentOrId = orId;
+  _currentOrBundle = null;
+  _orActifUi = { showAddTache: false, showAddPiece: false, showMotifPicker: false, showMotifAutre: false, showCloturer: false };
+  showView('or-actif');
+  document.getElementById('or-actif-content').innerHTML =
+    '<div class="empty-state"><div class="icon">⏳</div><p>Chargement…</p></div>';
+  await reloadOrActif({ initial: true });
+}
+
+async function reloadOrActif({ initial } = {}) {
+  const token = getToken();
+  const { ok, status, data } = await apiGet('/ordres-reparation/' + _currentOrId, token);
+
+  if (status === 401) { doLogout(); return; }
+
+  if (!ok) {
+    if (initial) {
+      const cached = cacheDataGet('or_actif_' + _currentOrId);
+      if (cached) {
+        _currentOrBundle = cached.value;
+        renderOrActifScreen({ stale: true });
+        return;
+      }
+    }
+    document.getElementById('or-actif-content').innerHTML =
+      '<div class="empty-state"><div class="icon">📡</div><p>' + escapeHtml(errMsg(data)) + '</p></div>';
+    return;
+  }
+
+  const payload = data.data || data;
+  _currentOrBundle = {
+    ordre_reparation: payload.ordre_reparation,
+    moto: payload.moto,
+    taches: payload.taches || [],
+    pieces: payload.pieces || [],
+    totaux: payload.totaux || {}
+  };
+  cacheDataSet('or_actif_' + _currentOrId, _currentOrBundle);
+  renderOrActifScreen({ stale: false });
+}
+
+function renderOfflineBanner() {
+  return isOffline()
+    ? '<div class="offline-banner">📡 Hors ligne — les actions sont désactivées jusqu\'au retour du réseau.</div>'
+    : '';
+}
+
+function renderOrActifScreen({ stale } = {}) {
+  if (!_currentOrBundle) return;
+  const { ordre_reparation: or, moto, taches, pieces } = _currentOrBundle;
+  const offline = isOffline();
+  const badge = OR_STATUT_BADGE_FULL[or.statut] || { label: or.statut, bg: 'var(--border)', color: 'var(--tx2)' };
+  const motoLabel = [moto?.marque, moto?.modele].filter(Boolean).join(' ') || '—';
+  const client = moto?.clients || moto?.client || {};
+
+  const lignesEnAttente = taches.some(t => t.en_attente_acceptation_client) || pieces.some(p => p.en_attente_acceptation_client);
+
+  const staleHtml = stale
+    ? '<div class="stale-banner">⚠ Dernières données connues (hors ligne) — peut ne plus être à jour.</div>'
+    : '';
+
+  document.getElementById('or-actif-content').innerHTML = `
+    ${staleHtml}
+    ${renderOfflineBanner()}
+    <div class="or-actif-header">
+      <div>
+        <div class="or-actif-numero">${escapeHtml(or.numero_or || or.numero || '—')}</div>
+        <div class="or-actif-moto">${escapeHtml(motoLabel)}${moto?.plaque ? ' · ' + escapeHtml(moto.plaque) : ''}</div>
+        <div class="or-actif-client">${escapeHtml(client.nom || '—')}</div>
+      </div>
+      ${or.moto_id ? `<button class="btn-passeport" onclick="openBriefing('${or.moto_id}')">📋 Voir le passeport</button>` : ''}
+    </div>
+
+    <div class="statut-section">
+      <span class="statut-current" style="background:${badge.bg};color:${badge.color}">${escapeHtml(badge.label)}</span>
+      ${renderStatutActions(or, { offline, lignesEnAttente })}
+    </div>
+
+    <div class="lignes-section">
+      <div class="briefing-section-title">Tâches</div>
+      ${renderLignesTaches(taches, offline)}
+      ${_orActifUi.showAddTache ? renderAddTacheForm(offline) : `<button class="btn-add-ligne" ${offline ? 'disabled' : ''} onclick="toggleAddTache()">+ Ajouter une tâche</button>`}
+    </div>
+
+    <div class="lignes-section">
+      <div class="briefing-section-title">Pièces</div>
+      ${renderLignesPieces(pieces)}
+      ${_orActifUi.showAddPiece ? renderAddPieceForm(offline) : `<button class="btn-add-ligne" ${offline ? 'disabled' : ''} onclick="toggleAddPiece()">+ Ajouter une pièce</button>`}
+    </div>
+  `;
+}
+
+function renderStatutActions(or, { offline, lignesEnAttente }) {
+  const dis = offline ? 'disabled' : '';
+
+  if (_orActifUi.showMotifPicker) return renderMotifPicker(offline);
+  if (_orActifUi.showCloturer)     return renderCloturerForm(or, offline);
+
+  if (or.statut === 'accepte') {
+    return `<div class="statut-actions"><button class="btn-action go" ${dis} onclick="demarrerOr()">▶ Démarrer les travaux</button></div>`;
+  }
+  if (or.statut === 'en_cours') {
+    return `<div class="statut-actions">
+      <button class="btn-action pause" ${dis} onclick="toggleMotifPicker()">⏸ Mettre en attente</button>
+      <button class="btn-action finish" ${dis} onclick="toggleCloturerForm()">✅ Terminer l'OR</button>
+    </div>`;
+  }
+  if (or.statut === 'attente') {
+    const blocked = lignesEnAttente;
+    return `<div class="statut-actions">
+      <button class="btn-action go" ${(offline || blocked) ? 'disabled' : ''} onclick="reprendreOr()">▶ Reprendre les travaux</button>
+    </div>
+    ${blocked ? '<div class="statut-hint">🔴 Des lignes complémentaires attendent encore l\'accord du client — impossible de reprendre tant qu\'elles ne sont pas validées.</div>' : ''}`;
+  }
+  if (or.statut === 'termine' || or.statut === 'facture') {
+    return '<div class="statut-hint">OR terminé — la facturation se gère depuis l\'espace de gestion.</div>';
+  }
+  return '<div class="statut-hint">Aucune action disponible pour ce statut depuis l\'atelier.</div>';
+}
+
+function renderMotifPicker(offline) {
+  const dis = offline ? 'disabled' : '';
+  const presets = MOTIF_ATTENTE_PRESETS.map(m =>
+    `<button class="btn-motif" ${dis} onclick="mettreEnAttente('${escapeHtml(m).replace(/'/g,"\\'")}')">${escapeHtml(m)}</button>`
+  ).join('');
+  const autreForm = _orActifUi.showMotifAutre
+    ? `<div class="add-form" style="margin-top:14px">
+        <div class="field"><input type="text" id="motif-autre-input" placeholder="Motif de la pause..." style="width:100%;height:52px;padding:0 16px;font-size:16px;border:1px solid var(--border2);border-radius:10px"></div>
+        <div class="add-form-actions">
+          <button class="btn-action pause" ${dis} onclick="confirmerMotifAutre()">Confirmer la pause</button>
+          <button class="btn-passeport" onclick="toggleMotifPicker()">Annuler</button>
+        </div>
+      </div>`
+    : '';
+  return `
+    <div class="statut-hint" style="margin-bottom:0">Pourquoi mettre l'OR en attente ?</div>
+    <div class="motif-grid">
+      ${presets}
+      <button class="btn-motif" ${dis} onclick="toggleMotifAutre()">Autre…</button>
+    </div>
+    ${autreForm}
+    ${!_orActifUi.showMotifAutre ? `<div class="add-form-actions" style="margin-top:14px"><button class="btn-passeport" onclick="toggleMotifPicker()">Annuler</button></div>` : ''}
+  `;
+}
+
+function renderCloturerForm(or, offline) {
+  const dis = offline ? 'disabled' : '';
+  const kmMin = or.km_entree || 0;
+  return `
+    <div class="add-form">
+      <div class="statut-hint" style="margin-top:0">Kilométrage sortie (doit être ≥ ${kmMin} km) :</div>
+      <div class="field" style="margin-top:10px"><input type="number" id="km-sortie-input" min="${kmMin}" placeholder="${kmMin}" style="width:100%;height:52px;padding:0 16px;font-size:16px;border:1px solid var(--border2);border-radius:10px"></div>
+      <div class="add-form-actions">
+        <button class="btn-action finish" ${dis} onclick="confirmerCloture()">Confirmer la clôture</button>
+        <button class="btn-passeport" onclick="toggleCloturerForm()">Annuler</button>
+      </div>
+    </div>`;
+}
+
+function renderLignesTaches(taches, offline) {
+  if (!taches.length) return '<div class="empty-state"><div class="icon">🗒️</div><p>Aucune tâche pour le moment.</p></div>';
+  return taches.map(t => {
+    const fait = t.statut === 'fait';
+    const blocked = !!t.en_attente_acceptation_client;
+    const checkDisabled = offline || blocked;
+    return `
+      <div class="ligne-row">
+        <div class="ligne-check ${fait ? 'fait' : ''} ${checkDisabled ? 'disabled' : ''}"
+             ${checkDisabled ? '' : `onclick="toggleTache('${t.id}', ${fait})"`}>${fait ? '✓' : ''}</div>
+        <div class="ligne-body">
+          <div class="ligne-libelle">${escapeHtml(t.libelle)}</div>
+          <div class="ligne-meta">${t.duree_h || 0} h${t.technicien_id ? '' : ''}</div>
+        </div>
+        ${blocked ? '<span class="ligne-blocked-badge">🔴 En attente d\'accord client</span>' : ''}
+      </div>`;
+  }).join('');
+}
+
+function renderLignesPieces(pieces) {
+  if (!pieces.length) return '<div class="empty-state"><div class="icon">🔧</div><p>Aucune pièce pour le moment.</p></div>';
+  return pieces.map(p => {
+    const blocked = !!p.en_attente_acceptation_client;
+    return `
+      <div class="ligne-row">
+        <div class="ligne-body">
+          <div class="ligne-libelle">${escapeHtml(p.libelle)}${p.reference ? ' · ' + escapeHtml(p.reference) : ''}</div>
+          <div class="ligne-meta">Qté ${p.qte || 1} · ${(p.pu_ht || 0).toLocaleString('fr-FR')} € HT/u</div>
+        </div>
+        ${blocked ? '<span class="ligne-blocked-badge">🔴 En attente d\'accord client</span>' : ''}
+      </div>`;
+  }).join('');
+}
+
+function renderAddTacheForm(offline) {
+  const dis = offline ? 'disabled' : '';
+  return `
+    <div class="add-form">
+      <div class="field"><input type="text" id="add-tache-libelle" placeholder="Libellé (ex: Vidange + filtre)" style="width:100%;height:52px;padding:0 16px;font-size:16px;border:1px solid var(--border2);border-radius:10px"></div>
+      <div class="field"><input type="number" id="add-tache-duree" placeholder="Durée (heures)" step="0.1" min="0" style="width:100%;height:52px;padding:0 16px;font-size:16px;border:1px solid var(--border2);border-radius:10px"></div>
+      <div class="add-form-actions">
+        <button class="btn-action go" ${dis} onclick="submitAddTache()">Ajouter la tâche</button>
+        <button class="btn-passeport" onclick="toggleAddTache()">Annuler</button>
+      </div>
+    </div>`;
+}
+
+function renderAddPieceForm(offline) {
+  const dis = offline ? 'disabled' : '';
+  return `
+    <div class="add-form">
+      <div class="field"><input type="text" id="add-piece-libelle" placeholder="Désignation (ex: Plaquettes avant)" style="width:100%;height:52px;padding:0 16px;font-size:16px;border:1px solid var(--border2);border-radius:10px"></div>
+      <div class="field"><input type="text" id="add-piece-reference" placeholder="Référence (optionnel)" style="width:100%;height:52px;padding:0 16px;font-size:16px;border:1px solid var(--border2);border-radius:10px"></div>
+      <div class="field"><input type="number" id="add-piece-qte" placeholder="Quantité" min="1" value="1" style="width:100%;height:52px;padding:0 16px;font-size:16px;border:1px solid var(--border2);border-radius:10px"></div>
+      <div class="field"><input type="number" id="add-piece-prix" placeholder="Prix unitaire HT (€)" step="0.01" min="0" style="width:100%;height:52px;padding:0 16px;font-size:16px;border:1px solid var(--border2);border-radius:10px"></div>
+      <div class="add-form-actions">
+        <button class="btn-action go" ${dis} onclick="submitAddPiece()">Ajouter la pièce</button>
+        <button class="btn-passeport" onclick="toggleAddPiece()">Annuler</button>
+      </div>
+    </div>`;
+}
+
+function toggleAddTache()  { _orActifUi.showAddTache  = !_orActifUi.showAddTache;  renderOrActifScreen(); }
+function toggleAddPiece()  { _orActifUi.showAddPiece  = !_orActifUi.showAddPiece;  renderOrActifScreen(); }
+function toggleMotifPicker() { _orActifUi.showMotifPicker = !_orActifUi.showMotifPicker; _orActifUi.showMotifAutre = false; renderOrActifScreen(); }
+function toggleMotifAutre()  { _orActifUi.showMotifAutre  = !_orActifUi.showMotifAutre;  renderOrActifScreen(); }
+function toggleCloturerForm() { _orActifUi.showCloturer = !_orActifUi.showCloturer; renderOrActifScreen(); }
+
+async function demarrerOr() {
+  if (isOffline()) { toast('Hors ligne — action indisponible.', 'error'); return; }
+  const { ok, data } = await apiPatch('/ordres-reparation/' + _currentOrId + '/statut', { nouveau_statut: 'en_cours' }, getToken());
+  if (!ok) { toast(errMsg(data), 'error'); return; }
+  toast('OR démarré.', 'success');
+  await reloadOrActif();
+}
+
+async function reprendreOr() {
+  if (isOffline()) { toast('Hors ligne — action indisponible.', 'error'); return; }
+  const { ok, data } = await apiPatch('/ordres-reparation/' + _currentOrId + '/statut', { nouveau_statut: 'en_cours' }, getToken());
+  if (!ok) { toast(errMsg(data), 'error'); return; }
+  toast('OR repris.', 'success');
+  await reloadOrActif();
+}
+
+async function mettreEnAttente(motif) {
+  if (isOffline()) { toast('Hors ligne — action indisponible.', 'error'); return; }
+  const { ok, data } = await apiPatch('/ordres-reparation/' + _currentOrId + '/statut', { nouveau_statut: 'attente', attente_motif: motif }, getToken());
+  if (!ok) { toast(errMsg(data), 'error'); return; }
+  _orActifUi.showMotifPicker = false;
+  _orActifUi.showMotifAutre = false;
+  toast('OR mis en attente : ' + motif, 'success');
+  await reloadOrActif();
+}
+
+function confirmerMotifAutre() {
+  const val = (document.getElementById('motif-autre-input').value || '').trim();
+  if (!val) { toast('Motif requis.', 'error'); return; }
+  mettreEnAttente(val);
+}
+
+async function confirmerCloture() {
+  if (isOffline()) { toast('Hors ligne — action indisponible.', 'error'); return; }
+  const kmSortie = parseInt(document.getElementById('km-sortie-input').value, 10);
+  if (!kmSortie || kmSortie <= 0) { toast('Kilométrage de sortie requis.', 'error'); return; }
+  const { ok, data } = await apiPost('/ordres-reparation/' + _currentOrId + '/cloturer', { km_sortie: kmSortie }, getToken());
+  if (!ok) { toast(errMsg(data), 'error'); return; }
+  _orActifUi.showCloturer = false;
+  toast('OR clôturé.', 'success');
+  await reloadOrActif();
+}
+
+async function toggleTache(tacheId, currentlyFait) {
+  if (isOffline()) { toast('Hors ligne — action indisponible.', 'error'); return; }
+  const nouveauStatut = currentlyFait ? 'a_faire' : 'fait';
+  const { ok, data } = await apiPatch('/or-taches/' + tacheId, { statut: nouveauStatut }, getToken());
+  if (!ok) { toast(errMsg(data), 'error'); return; }
+  await reloadOrActif();
+}
+
+function _lignerAjouteeMessage(ligne, orMaj) {
+  if (ligne && ligne.en_attente_acceptation_client) {
+    toast('Ligne ajoutée — en attente d\'accord du client, OR mis en pause.', 'info', 6000);
+  } else {
+    toast('Ligne ajoutée.', 'success');
+  }
+}
+
+async function submitAddTache() {
+  if (isOffline()) { toast('Hors ligne — action indisponible.', 'error'); return; }
+  const libelle = (document.getElementById('add-tache-libelle').value || '').trim();
+  const duree_h = document.getElementById('add-tache-duree').value;
+  if (!libelle) { toast('Libellé requis.', 'error'); return; }
+  const { ok, data } = await apiPost('/ordres-reparation/' + _currentOrId + '/taches', { libelle, duree_h }, getToken());
+  if (!ok) { toast(errMsg(data), 'error'); return; }
+  const payload = data.data || data;
+  _orActifUi.showAddTache = false;
+  _lignerAjouteeMessage(payload.tache, payload.ordre_reparation);
+  await reloadOrActif();
+}
+
+async function submitAddPiece() {
+  if (isOffline()) { toast('Hors ligne — action indisponible.', 'error'); return; }
+  const libelle    = (document.getElementById('add-piece-libelle').value || '').trim();
+  const reference  = (document.getElementById('add-piece-reference').value || '').trim();
+  const qte        = document.getElementById('add-piece-qte').value;
+  const pu_ht      = document.getElementById('add-piece-prix').value;
+  if (!libelle) { toast('Désignation requise.', 'error'); return; }
+  const { ok, data } = await apiPost('/ordres-reparation/' + _currentOrId + '/pieces', { libelle, reference, qte, pu_ht }, getToken());
+  if (!ok) { toast(errMsg(data), 'error'); return; }
+  const payload = data.data || data;
+  _orActifUi.showAddPiece = false;
+  _lignerAjouteeMessage(payload.piece, payload.ordre_reparation);
+  await reloadOrActif();
+}
+
+/* Re-render (pas de rechargement réseau) quand la connectivité change, pour
+   activer/désactiver les boutons d'action immédiatement — cadrage L14 :
+   l'état hors-ligne doit être explicite, jamais une action qui semble
+   passer et se perd. */
+window.addEventListener('online',  () => { if (_currentOrBundle) renderOrActifScreen(); });
+window.addEventListener('offline', () => { if (_currentOrBundle) renderOrActifScreen(); });
+
+/* ═══════════════════════════════════════════════════════
    BOOT
 ═══════════════════════════════════════════════════════ */
 document.getElementById('btn-login').addEventListener('click', doLogin);
@@ -636,6 +1026,7 @@ document.getElementById('login-password').addEventListener('keydown', e => {
 });
 document.getElementById('btn-logout').addEventListener('click', doLogout);
 document.getElementById('btn-briefing-back').addEventListener('click', () => showView('liste'));
+document.getElementById('btn-or-actif-back').addEventListener('click', () => { showView('liste'); loadFileAtelier(); });
 
 (function boot() {
   if ('serviceWorker' in navigator) {
