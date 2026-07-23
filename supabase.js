@@ -148,7 +148,7 @@ const Auth = {
       .from('garages').select('*')
       .eq('auth_user_id', data.user.id)
       .maybeSingle();
-    if (g1) return { session: data.session, garage: g1 };
+    if (g1) return { session: data.session, garage: g1, via: 'owner' };
 
     // 2. Fallback — MECANO/PRO employés via garage_users
     const { data: gu } = await supabase
@@ -162,7 +162,7 @@ const Auth = {
       .eq('id', gu.garage_id)
       .maybeSingle();
     if (!g2) throw new Error('Garage introuvable');
-    return { session: data.session, garage: g2 };
+    return { session: data.session, garage: g2, via: 'employee' };
   },
 
   async loginClient({ email, password }) {

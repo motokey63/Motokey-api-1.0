@@ -887,7 +887,25 @@ const server = http.createServer(async function(req, res){
         if (role === 'garage') {
           const result = await SBLayer.Auth.loginGarage({ email, password });
           const g = result.garage;
-          const rbac_role = result.session?.user?.app_metadata?.role || 'CONCESSION';
+
+          // Fail-closed : le rôle propriétaire se DÉRIVE de garages.auth_user_id
+          // (source de vérité légitime, jamais un fallback — ne rejette jamais ce
+          // chemin, sinon un propriétaire pourrait se retrouver verrouillé hors de
+          // son propre garage). Un employé (garage_users) DOIT avoir un rôle
+          // exploitable dans app_metadata — sinon rejet explicite, aucun rôle par
+          // défaut n'est jamais attribué.
+          let rbac_role;
+          if (result.via === 'owner') {
+            rbac_role = 'CONCESSION';
+          } else {
+            const claimedRole = result.session?.user?.app_metadata?.role;
+            if (!claimedRole || !rbac.VALID_ROLES.includes(claimedRole)) {
+              console.error('[auth/login] compte garage_users sans rôle exploitable — user_id:', result.session?.user?.id, '| email:', email);
+              return fail(res, 'Compte incomplet, contactez l\'administrateur du garage', 403, 'ROLE_MISSING');
+            }
+            rbac_role = claimedRole;
+          }
+
           return ok(res, {
             token: jwtSign({ id: g.id, role: 'garage', rbac_role, email, nom: g.nom }),
             role: 'garage', rbac_role, garage: g
