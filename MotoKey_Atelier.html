@@ -151,6 +151,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;ba
 .ligne-libelle{font-size:15px;font-weight:700;color:var(--tx);}
 .ligne-meta{font-size:13px;color:var(--tx2);margin-top:2px;}
 .ligne-blocked-badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;background:var(--rdbg);color:var(--rd);white-space:nowrap;}
+.ligne-accepted-badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;background:var(--gnbg);color:var(--gn);white-space:nowrap;}
 
 .btn-add-ligne{height:56px;padding:0 20px;font-size:15px;font-weight:700;border-radius:12px;background:#fff;border:2px dashed var(--border2);color:var(--tx2);cursor:pointer;width:100%;margin-bottom:10px;}
 .btn-add-ligne:disabled{opacity:.4;cursor:not-allowed;}
@@ -856,6 +857,17 @@ function renderCloturerForm(or, offline) {
     </div>`;
 }
 
+// L14 étape 2 : badge binaire 🔴/🟢 en LECTURE SEULE — Jordan (mécano) voit où
+// en est l'acceptation client mais ne peut ni valider ni refuser depuis l'atelier
+// (l'acceptation reste CLIENT-only, garantie juridique). Une ligne qui n'a jamais
+// requis d'accord (ajoutee_en_cours falsy — posée à la création de l'OR) n'affiche
+// aucun badge.
+function ligneAcceptationBadge(ligne) {
+  if (!ligne.ajoutee_en_cours) return '';
+  if (ligne.en_attente_acceptation_client) return '<span class="ligne-blocked-badge">🔴 En attente d\'accord client</span>';
+  return '<span class="ligne-accepted-badge">🟢 Accepté par le client</span>';
+}
+
 function renderLignesTaches(taches, offline) {
   if (!taches.length) return '<div class="empty-state"><div class="icon">🗒️</div><p>Aucune tâche pour le moment.</p></div>';
   return taches.map(t => {
@@ -870,7 +882,7 @@ function renderLignesTaches(taches, offline) {
           <div class="ligne-libelle">${escapeHtml(t.libelle)}</div>
           <div class="ligne-meta">${t.duree_h || 0} h${t.technicien_id ? '' : ''}</div>
         </div>
-        ${blocked ? '<span class="ligne-blocked-badge">🔴 En attente d\'accord client</span>' : ''}
+        ${ligneAcceptationBadge(t)}
       </div>`;
   }).join('');
 }
@@ -878,14 +890,13 @@ function renderLignesTaches(taches, offline) {
 function renderLignesPieces(pieces) {
   if (!pieces.length) return '<div class="empty-state"><div class="icon">🔧</div><p>Aucune pièce pour le moment.</p></div>';
   return pieces.map(p => {
-    const blocked = !!p.en_attente_acceptation_client;
     return `
       <div class="ligne-row">
         <div class="ligne-body">
           <div class="ligne-libelle">${escapeHtml(p.libelle)}${p.reference ? ' · ' + escapeHtml(p.reference) : ''}</div>
           <div class="ligne-meta">Qté ${p.qte || 1} · ${(p.pu_ht || 0).toLocaleString('fr-FR')} € HT/u</div>
         </div>
-        ${blocked ? '<span class="ligne-blocked-badge">🔴 En attente d\'accord client</span>' : ''}
+        ${ligneAcceptationBadge(p)}
       </div>`;
   }).join('');
 }
