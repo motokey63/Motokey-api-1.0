@@ -63,6 +63,20 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;ba
 .empty-state .icon{font-size:48px;margin-bottom:16px;}
 .empty-state p{font-size:16px;line-height:1.5;}
 
+/* ── File d'atelier (OR) ── */
+.stale-banner{background:var(--ywbg);color:var(--yw);border-radius:10px;padding:12px 16px;font-size:14px;font-weight:600;margin-bottom:16px;}
+.or-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+.or-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:10px;min-height:120px;}
+.or-card:active{border-color:var(--acc);background:#fffaf5;}
+.or-card-top{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.or-numero{font-size:18px;font-weight:800;color:var(--tx);}
+.or-badge{font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;}
+.or-badge-attente{background:var(--ywbg);color:var(--yw);}
+.or-badge-en_cours{background:var(--blbg);color:var(--bl);}
+.or-badge-termine{background:var(--gnbg);color:var(--gn);}
+.or-moto{font-size:17px;font-weight:700;color:var(--tx);}
+.or-client{font-size:14px;color:var(--tx2);}
+
 .toast-container{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:1000;display:flex;flex-direction:column;gap:8px;width:min(90vw,420px);}
 .toast{background:#1a1d23;color:#fff;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.2);}
 .toast.error{background:var(--rd);}
@@ -107,9 +121,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;ba
     </div>
   </div>
   <div class="atelier-main" id="atelier-main">
-    <div class="empty-state">
-      <div class="icon">🔧</div>
-      <p>File d'atelier à venir.</p>
+    <div id="or-stale-banner"></div>
+    <div id="or-list-content">
+      <div class="empty-state"><div class="icon">⏳</div><p>Chargement…</p></div>
     </div>
   </div>
 </div>
@@ -282,6 +296,85 @@ function enterAtelier() {
   document.getElementById('topbar-garage-nom').textContent = localStorage.getItem(LS_GARAGE) || '—';
   updateNetIndicator();
   showScreen('atelier');
+  loadFileAtelier();
+}
+
+/* ═══════════════════════════════════════════════════════
+   FILE D'ATELIER (L13 étape 4) — OR actifs du garage
+═══════════════════════════════════════════════════════ */
+const OR_STATUTS_ACTIFS = ['en_cours', 'attente', 'termine']; // ordre de priorité mécano
+const OR_STATUT_META = {
+  attente:  { label: 'En attente', cls: 'or-badge-attente' },
+  en_cours: { label: 'En cours',   cls: 'or-badge-en_cours' },
+  termine:  { label: 'Terminé',    cls: 'or-badge-termine' }
+};
+
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+
+function renderOrCard(or) {
+  const moto   = or.motos || {};
+  const client = moto.clients || {};
+  const meta   = OR_STATUT_META[or.statut] || { label: or.statut, cls: 'or-badge-attente' };
+  const motoLabel = [moto.marque, moto.modele].filter(Boolean).join(' ') || '—';
+  return `
+    <button class="or-card" onclick="onOrCardTap('${or.id}')">
+      <div class="or-card-top">
+        <span class="or-numero">${escapeHtml(or.numero_or || or.numero || '—')}</span>
+        <span class="or-badge ${meta.cls}">${meta.label}</span>
+      </div>
+      <div class="or-moto">${escapeHtml(motoLabel)}${moto.plaque ? ' · ' + escapeHtml(moto.plaque) : ''}</div>
+      <div class="or-client">${escapeHtml(client.nom || '—')}</div>
+    </button>`;
+}
+
+function renderOrList(ordres, { stale } = {}) {
+  const banner = document.getElementById('or-stale-banner');
+  banner.innerHTML = stale
+    ? '<div class="stale-banner">⚠ Dernières données connues (hors ligne) — peut ne plus être à jour.</div>'
+    : '';
+
+  const actifs = (ordres || [])
+    .filter(o => OR_STATUTS_ACTIFS.includes(o.statut))
+    .sort((a, b) => {
+      const pa = OR_STATUTS_ACTIFS.indexOf(a.statut), pb = OR_STATUTS_ACTIFS.indexOf(b.statut);
+      if (pa !== pb) return pa - pb;
+      return (a.date_ouverture || '').localeCompare(b.date_ouverture || '');
+    });
+
+  const content = document.getElementById('or-list-content');
+  if (!actifs.length) {
+    content.innerHTML = '<div class="empty-state"><div class="icon">✅</div><p>Aucun OR actif pour le moment.</p></div>';
+    return;
+  }
+  content.innerHTML = '<div class="or-grid">' + actifs.map(renderOrCard).join('') + '</div>';
+}
+
+function onOrCardTap(orId) {
+  // Câblé à l'étape 5 (briefing moto)
+}
+
+async function loadFileAtelier() {
+  const token = getToken();
+  const { ok, status, data } = await apiGet('/ordres-reparation', token);
+
+  if (status === 401) { doLogout(); return; }
+
+  if (!ok) {
+    const cached = cacheDataGet('ordres');
+    if (cached) {
+      renderOrList(cached.value, { stale: true });
+    } else {
+      document.getElementById('or-list-content').innerHTML =
+        '<div class="empty-state"><div class="icon">📡</div><p>' + escapeHtml(errMsg(data)) + '</p></div>';
+    }
+    return;
+  }
+
+  const ordres = (data.data || data).ordres || [];
+  cacheDataSet('ordres', ordres);
+  renderOrList(ordres, { stale: false });
 }
 
 /* ═══════════════════════════════════════════════════════
