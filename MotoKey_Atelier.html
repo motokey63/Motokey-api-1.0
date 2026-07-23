@@ -195,20 +195,26 @@ const LS_GARAGE    = 'mk_atelier_garage';
 /* ═══════════════════════════════════════════════════════
    API
 ═══════════════════════════════════════════════════════ */
-async function apiFetch(method, path, body, token) {
+async function apiFetch(method, path, body, token, timeoutMs = 15000) {
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = 'Bearer ' + token;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(API_BASE + path, {
       method,
       headers,
-      body: body ? JSON.stringify(body) : undefined
+      body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal
     });
     let data;
     try { data = await res.json(); } catch { data = {}; }
     return { ok: res.ok, status: res.status, data };
-  } catch {
-    return { ok: false, status: 0, data: { error: { message: "Serveur inaccessible — vérifie ta connexion." } } };
+  } catch (e) {
+    const timedOut = e && e.name === 'AbortError';
+    return { ok: false, status: 0, data: { error: { message: timedOut ? 'Délai dépassé — réessaie.' : "Serveur inaccessible — vérifie ta connexion." } } };
+  } finally {
+    clearTimeout(timer);
   }
 }
 const apiPost = (path, body, token) => apiFetch('POST', path, body, token);
@@ -555,44 +561,70 @@ function renderBriefing(motoId, { moto, consommables, planEntretien, fraudeFlags
   `;
 }
 
+function _settledOrFallback(settled, fallbackMsg) {
+  if (settled.status === 'fulfilled') return settled.value;
+  return { ok: false, status: 0, data: { error: { message: fallbackMsg } } };
+}
+
 async function openBriefing(motoId) {
   showView('briefing');
   document.getElementById('briefing-content').innerHTML =
     '<div class="empty-state"><div class="icon">⏳</div><p>Chargement…</p></div>';
 
-  const token = getToken();
-  const [motoRes, consoRes, planRes, fraudeRes] = await Promise.all([
-    apiGet('/motos/' + motoId, token),
-    apiGet('/motos/' + motoId + '/consommables', token),
-    apiGet('/motos/' + motoId + '/plan-entretien', token),
-    apiGet('/fraude/historique', token)
-  ]);
+  try {
+    const token = getToken();
+    // allSettled : un appel en échec (timeout, exception réseau) n'empêche jamais
+    // les autres d'être lus, et ne doit jamais laisser l'écran bloqué en chargement.
+    const [motoS, consoS, planS, fraudeS] = await Promise.allSettled([
+      apiGet('/motos/' + motoId, token),
+      apiGet('/motos/' + motoId + '/consommables', token),
+      apiGet('/motos/' + motoId + '/plan-entretien', token),
+      apiGet('/fraude/historique', token)
+    ]);
 
-  if (motoRes.status === 401) { doLogout(); return; }
+    const motoRes   = _settledOrFallback(motoS,   'Erreur inattendue lors du chargement de la moto.');
+    const consoRes  = _settledOrFallback(consoS,  'Jauges consommables indisponibles.');
+    const planRes   = _settledOrFallback(planS,   'Maintenance constructeur indisponible.');
+    const fraudeRes = _settledOrFallback(fraudeS, 'Historique anti-fraude indisponible.');
 
-  if (!motoRes.ok) {
+    if (motoRes.status === 401) { doLogout(); return; }
+
+    if (!motoRes.ok) {
+      const cached = cacheDataGet('briefing_' + motoId);
+      if (cached) { renderBriefing(motoId, Object.assign({}, cached.value, { stale: true })); return; }
+      document.getElementById('briefing-content').innerHTML =
+        '<div class="empty-state"><div class="icon">📡</div><p>' + escapeHtml(errMsg(motoRes.data)) + '</p></div>';
+      return;
+    }
+
+    const motoPayload = motoRes.data.data || motoRes.data;
+    const moto = Object.assign({}, motoPayload.moto, { client: motoPayload.client, interventions: motoPayload.interventions });
+    const consoPayload = consoRes.ok ? (consoRes.data.data || consoRes.data) : {};
+    const planPayload  = planRes.ok  ? (planRes.data.data  || planRes.data)  : {};
+    const fraudePayload = fraudeRes.ok ? (fraudeRes.data.data || fraudeRes.data) : {};
+    const fraudeFlags = (fraudePayload.verifications || []).filter(f => f.moto_id === motoId && f.verdict !== 'authentifie');
+
+    const bundle = {
+      moto,
+      consommables: consoPayload.consommables || [],
+      planEntretien: planPayload.plan_entretien || [],
+      fraudeFlags
+    };
+    cacheDataSet('briefing_' + motoId, bundle);
+    renderBriefing(motoId, Object.assign({}, bundle, { stale: false }));
+  } catch (e) {
+    // Garde-fou final : quoi qu'il arrive (erreur de rendu, forme de donnée
+    // inattendue...), l'écran ne doit JAMAIS rester bloqué sur "Chargement…".
+    console.error('[openBriefing] erreur inattendue:', e);
     const cached = cacheDataGet('briefing_' + motoId);
-    if (cached) { renderBriefing(motoId, Object.assign({}, cached.value, { stale: true })); return; }
-    document.getElementById('briefing-content').innerHTML =
-      '<div class="empty-state"><div class="icon">📡</div><p>' + escapeHtml(errMsg(motoRes.data)) + '</p></div>';
-    return;
+    if (cached) {
+      renderBriefing(motoId, Object.assign({}, cached.value, { stale: true }));
+    } else {
+      document.getElementById('briefing-content').innerHTML =
+        '<div class="empty-state"><div class="icon">⚠️</div><p>Erreur inattendue au chargement du briefing'
+        + (e && e.message ? (' : ' + escapeHtml(e.message)) : '') + '. Réessaie.</p></div>';
+    }
   }
-
-  const motoPayload = motoRes.data.data || motoRes.data;
-  const moto = Object.assign({}, motoPayload.moto, { client: motoPayload.client, interventions: motoPayload.interventions });
-  const consoPayload = consoRes.ok ? (consoRes.data.data || consoRes.data) : {};
-  const planPayload  = planRes.ok  ? (planRes.data.data  || planRes.data)  : {};
-  const fraudePayload = fraudeRes.ok ? (fraudeRes.data.data || fraudeRes.data) : {};
-  const fraudeFlags = (fraudePayload.verifications || []).filter(f => f.moto_id === motoId && f.verdict !== 'authentifie');
-
-  const bundle = {
-    moto,
-    consommables: consoPayload.consommables || [],
-    planEntretien: planPayload.plan_entretien || [],
-    fraudeFlags
-  };
-  cacheDataSet('briefing_' + motoId, bundle);
-  renderBriefing(motoId, Object.assign({}, bundle, { stale: false }));
 }
 
 /* ═══════════════════════════════════════════════════════
