@@ -1566,7 +1566,19 @@ const GarageUsers = {
       authData.user.id,
       { app_metadata: { role } }
     );
-    if (roleErr) console.warn('[GarageUsers.create] role assignment failed —', roleErr.message);
+    if (roleErr) {
+      // Jamais de compte à moitié configuré (sans rôle) : on tente de défaire la
+      // création Auth, puis on échoue bruyamment dans tous les cas — succès ou
+      // échec du rollback. Le rollback lui-même peut échouer (vécu en pratique
+      // avec un compte de test resté bloqué côté Supabase) : on le logue distinctement.
+      const { error: rollbackErr } = await supabase.auth.admin.deleteUser(authData.user.id);
+      if (rollbackErr) {
+        console.error('[GarageUsers.create] ROLLBACK ÉCHOUÉ — compte Auth orphelin sans rôle, suppression manuelle requise :', authData.user.id, email, '—', rollbackErr.message);
+      } else {
+        console.error('[GarageUsers.create] rollback effectué — compte Auth', authData.user.id, email, 'supprimé après échec de pose du rôle :', roleErr.message);
+      }
+      throw new Error(`Impossible de poser le rôle du compte — création annulée (${roleErr.message})`);
+    }
 
     const row = await insert('garage_users', {
       auth_user_id: authData.user.id,
