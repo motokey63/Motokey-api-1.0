@@ -105,12 +105,24 @@ const Auth = {
     });
     if (authError) throw new Error(`Auth: ${authError.message}`);
 
-    // 1b. Poser le rôle CONCESSION dans app_metadata (non falsifiable côté client)
+    // 1b. Poser le rôle CONCESSION dans app_metadata (non falsifiable côté client).
+    // Le login legacy (/auth/login → inferLegacyRole) ne dépend plus de app_metadata
+    // pour un propriétaire (dérivé de garages.auth_user_id), mais un JWT Supabase
+    // natif (extractRoleFromRequest) en dépend directement — même discipline que
+    // GarageUsers.create() : jamais de compte à moitié configuré.
     const { error: roleErr } = await supabase.auth.admin.updateUserById(
       authData.user.id,
       { app_metadata: { role: 'CONCESSION' } }
     );
-    if (roleErr) console.warn('[register] role assignment failed for', authData.user.id, '—', roleErr.message);
+    if (roleErr) {
+      const { error: rollbackErr } = await supabase.auth.admin.deleteUser(authData.user.id);
+      if (rollbackErr) {
+        console.error('[registerGarage] ROLLBACK ÉCHOUÉ — compte Auth orphelin sans rôle, suppression manuelle requise :', authData.user.id, email, '—', rollbackErr.message);
+      } else {
+        console.error('[registerGarage] rollback effectué — compte Auth', authData.user.id, email, 'supprimé après échec de pose du rôle :', roleErr.message);
+      }
+      throw new Error(`Impossible de poser le rôle du compte — inscription annulée (${roleErr.message})`);
+    }
 
     // 2. Créer le profil garage
     const garage = await insert('garages', {
@@ -136,7 +148,7 @@ const Auth = {
       .from('garages').select('*')
       .eq('auth_user_id', data.user.id)
       .maybeSingle();
-    if (g1) return { session: data.session, garage: g1 };
+    if (g1) return { session: data.session, garage: g1, via: 'owner' };
 
     // 2. Fallback — MECANO/PRO employés via garage_users
     const { data: gu } = await supabase
@@ -150,7 +162,7 @@ const Auth = {
       .eq('id', gu.garage_id)
       .maybeSingle();
     if (!g2) throw new Error('Garage introuvable');
-    return { session: data.session, garage: g2 };
+    return { session: data.session, garage: g2, via: 'employee' };
   },
 
   async loginClient({ email, password }) {
@@ -1566,7 +1578,19 @@ const GarageUsers = {
       authData.user.id,
       { app_metadata: { role } }
     );
-    if (roleErr) console.warn('[GarageUsers.create] role assignment failed —', roleErr.message);
+    if (roleErr) {
+      // Jamais de compte à moitié configuré (sans rôle) : on tente de défaire la
+      // création Auth, puis on échoue bruyamment dans tous les cas — succès ou
+      // échec du rollback. Le rollback lui-même peut échouer (vécu en pratique
+      // avec un compte de test resté bloqué côté Supabase) : on le logue distinctement.
+      const { error: rollbackErr } = await supabase.auth.admin.deleteUser(authData.user.id);
+      if (rollbackErr) {
+        console.error('[GarageUsers.create] ROLLBACK ÉCHOUÉ — compte Auth orphelin sans rôle, suppression manuelle requise :', authData.user.id, email, '—', rollbackErr.message);
+      } else {
+        console.error('[GarageUsers.create] rollback effectué — compte Auth', authData.user.id, email, 'supprimé après échec de pose du rôle :', roleErr.message);
+      }
+      throw new Error(`Impossible de poser le rôle du compte — création annulée (${roleErr.message})`);
+    }
 
     const row = await insert('garage_users', {
       auth_user_id: authData.user.id,
@@ -1588,10 +1612,19 @@ const GarageUsers = {
     if (fetchErr || !current) throw new Error('garage_user introuvable dans ce garage');
 
     if (patches.role !== undefined) {
-      await supabase.auth.admin.updateUserById(
+      // L'erreur n'était même pas capturée : un échec de restriction de droits
+      // (ex. rétrograder un PRO en MECANO) passait inaperçu, et garage_users.role
+      // pouvait dériver de app_metadata.role (source de vérité réelle pour l'auth).
+      // On échoue AVANT de toucher la ligne garage_users, pour ne jamais laisser
+      // les deux désynchronisés.
+      const { error: roleErr } = await supabase.auth.admin.updateUserById(
         current.auth_user_id,
         { app_metadata: { role: patches.role } }
       );
+      if (roleErr) {
+        console.error('[GarageUsers.update] échec de la pose du rôle — garage_users NON modifié pour rester cohérent avec app_metadata :', current.auth_user_id, id, '—', roleErr.message);
+        throw new Error(`Impossible de modifier le rôle — opération annulée (${roleErr.message})`);
+      }
     }
     const ALLOWED = ['role', 'actif'];
     const clean = Object.fromEntries(
