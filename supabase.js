@@ -824,8 +824,10 @@ const OrdresReparation = {
   },
 
   async getById(id, garage_id) {
+    // L14 étape 3 : profil_transmission ajouté au select — pilote la checklist
+    // consommables adaptative de l'écran atelier (voir motos(id) pour le doctrine L11).
     const { data, error } = await supabase.from('ordres_reparation')
-      .select('*, motos(marque, modele, plaque, clients(nom, email)), or_taches(*), or_pieces(*)')
+      .select('*, motos(id, marque, modele, plaque, profil_transmission, clients(nom, email)), or_taches(*), or_pieces(*)')
       .eq('id', id).eq('garage_id', garage_id).single();
     if (error) throw new Error(error.message);
     const { or_taches, or_pieces, motos, ...or } = data;
