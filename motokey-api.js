@@ -740,6 +740,19 @@ const server = http.createServer(async function(req, res){
     return;
   }
 
+  // ── Guides photo SVG partagés client + atelier (L14) — source unique, doctrine L11
+  if(pathname==='/guides-photo-consommables.js' && method==='GET'){
+    let js = '';
+    try {
+      const _fs   = require('fs');
+      const _path = require('path');
+      js = _fs.readFileSync(_path.join(__dirname, 'guides-photo-consommables.js'), 'utf8');
+    } catch(e) {}
+    res.writeHead(200,{'Content-Type':'application/javascript; charset=utf-8','Access-Control-Allow-Origin':'*','Cache-Control':'no-cache, no-store, must-revalidate'});
+    res.end(js);
+    return;
+  }
+
   // ── POST /stripe/webhook ── monté AVANT body() pour conserver les bytes bruts
   if (pathname === '/stripe/webhook' && method === 'POST') {
     const sig = req.headers['stripe-signature'];
