@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<title>MotoKey — Atelier</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;background:#f0f2f5;color:#1a1d23;}
+
+:root{
+  --bg:#f0f2f5;--card:#ffffff;--border:#e2e5eb;--border2:#d0d4dc;
+  --tx:#1a1d23;--tx2:#5a6172;--tx3:#9ba3b4;
+  --acc:#ff6b00;--acc2:#ff8c33;
+  --gn:#16a34a;--gnbg:#f0fdf4;
+  --rd:#dc2626;--rdbg:#fef2f2;
+  --bl:#2563eb;--blbg:#eff6ff;
+  --yw:#d97706;--ywbg:#fffbeb;
+}
+
+/* ── Écrans plein cadre, un seul visible à la fois ── */
+.screen{display:none;min-height:100vh;}
+.screen.active{display:flex;flex-direction:column;}
+
+/* ── Login ── */
+#screen-login.active{align-items:center;justify-content:center;padding:24px;}
+.login-box{width:100%;max-width:420px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:36px 32px;box-shadow:0 4px 16px rgba(0,0,0,.08);}
+.login-logo{font-size:26px;font-weight:900;color:var(--tx);text-align:center;margin-bottom:4px;}
+.login-logo em{color:var(--acc);font-style:normal;}
+.login-sub{text-align:center;color:var(--tx2);font-size:15px;margin-bottom:28px;}
+.field{margin-bottom:18px;}
+.field label{display:block;font-size:14px;font-weight:600;color:var(--tx2);margin-bottom:6px;}
+.field input{width:100%;height:52px;padding:0 16px;font-size:17px;border:1px solid var(--border2);border-radius:10px;background:#fff;color:var(--tx);}
+.field input:focus{outline:none;border-color:var(--acc);}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:56px;padding:0 24px;font-size:17px;font-weight:700;border-radius:12px;border:none;cursor:pointer;width:100%;}
+.btn-primary{background:var(--acc);color:#fff;}
+.btn-primary:active{background:var(--acc2);}
+.btn-primary:disabled{opacity:.6;}
+.btn-ghost{background:transparent;color:var(--tx2);border:1px solid var(--border2);}
+.login-error{background:var(--rdbg);color:var(--rd);border-radius:10px;padding:12px 14px;font-size:14px;font-weight:600;margin-bottom:18px;display:none;}
+.login-error.show{display:block;}
+
+/* ── Écran atelier ── */
+#screen-atelier.active{display:flex;flex-direction:column;height:100vh;}
+.topbar{background:#fff;border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:64px;flex-shrink:0;}
+.topbar-left{display:flex;align-items:center;gap:12px;min-width:0;}
+.topbar-logo{font-size:19px;font-weight:900;white-space:nowrap;}
+.topbar-logo em{color:var(--acc);font-style:normal;}
+.topbar-garage{font-size:15px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.topbar-right{display:flex;align-items:center;gap:14px;flex-shrink:0;}
+
+.net-indicator{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:700;padding:7px 12px;border-radius:20px;}
+.net-indicator.online{background:var(--gnbg);color:var(--gn);}
+.net-indicator.offline{background:var(--rdbg);color:var(--rd);}
+.net-dot{width:8px;height:8px;border-radius:50%;background:currentColor;}
+
+.btn-logout{height:44px;padding:0 18px;font-size:14px;font-weight:700;border-radius:10px;background:transparent;border:1px solid var(--border2);color:var(--tx2);cursor:pointer;}
+
+.atelier-main{flex:1;overflow-y:auto;padding:24px;}
+.empty-state{max-width:520px;margin:60px auto;text-align:center;color:var(--tx3);}
+.empty-state .icon{font-size:48px;margin-bottom:16px;}
+.empty-state p{font-size:16px;line-height:1.5;}
+
+.toast-container{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:1000;display:flex;flex-direction:column;gap:8px;width:min(90vw,420px);}
+.toast{background:#1a1d23;color:#fff;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,.2);}
+.toast.error{background:var(--rd);}
+.toast.success{background:var(--gn);}
+</style>
+</head>
+<body>
+
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ═══════ ÉCRAN LOGIN ═══════ -->
+<div class="screen active" id="screen-login">
+  <div class="login-box">
+    <div class="login-logo">MOTO<em>KEY</em> Atelier</div>
+    <div class="login-sub">Espace mécano — connexion garage</div>
+    <div class="login-error" id="login-error"></div>
+    <div class="field">
+      <label for="login-email">Email</label>
+      <input type="email" id="login-email" placeholder="mecano@garage.fr" autocomplete="username">
+    </div>
+    <div class="field">
+      <label for="login-password">Mot de passe</label>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary" id="btn-login">Se connecter</button>
+  </div>
+</div>
+
+<!-- ═══════ ÉCRAN ATELIER ═══════ -->
+<div class="screen" id="screen-atelier">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">MOTO<em>KEY</em></div>
+      <div class="topbar-garage" id="topbar-garage-nom">—</div>
+    </div>
+    <div class="topbar-right">
+      <div class="net-indicator online" id="net-indicator">
+        <span class="net-dot"></span>
+        <span id="net-indicator-label">En ligne</span>
+      </div>
+      <button class="btn-logout" id="btn-logout">Déconnexion</button>
+    </div>
+  </div>
+  <div class="atelier-main" id="atelier-main">
+    <div class="empty-state">
+      <div class="icon">🔧</div>
+      <p>File d'atelier à venir.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════
+   CONFIG — même pattern que MotoKey_Client.html
+═══════════════════════════════════════════════════════ */
+const API_BASE = (window.location.protocol === 'file:') ? 'https://motokey11-production.up.railway.app' : window.location.origin;
+const LS_TOKEN     = 'mk_atelier_token';
+const LS_ROLE      = 'mk_atelier_rbac_role';
+const LS_EMAIL     = 'mk_atelier_email';
+const LS_GARAGE    = 'mk_atelier_garage';
+
+/* ═══════════════════════════════════════════════════════
+   API
+═══════════════════════════════════════════════════════ */
+async function apiFetch(method, path, body, token) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = 'Bearer ' + token;
+  try {
+    const res = await fetch(API_BASE + path, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined
+    });
+    let data;
+    try { data = await res.json(); } catch { data = {}; }
+    return { ok: res.ok, status: res.status, data };
+  } catch {
+    return { ok: false, status: 0, data: { error: { message: "Serveur inaccessible — vérifie ta connexion." } } };
+  }
+}
+const apiPost = (path, body, token) => apiFetch('POST', path, body, token);
+const apiGet  = (path, token)       => apiFetch('GET',  path, null, token);
+
+function errMsg(data) {
+  return data?.error?.message || data?.message || 'Erreur inattendue.';
+}
+
+/* ═══════════════════════════════════════════════════════
+   TOKEN localStorage — persistant pour tolérer les coupures
+   réseau atelier sans perdre la session (contrairement à
+   app.html qui garde le token en mémoire uniquement).
+═══════════════════════════════════════════════════════ */
+function saveSession(token, rbac_role, email, garageNom) {
+  localStorage.setItem(LS_TOKEN, token);
+  localStorage.setItem(LS_ROLE, rbac_role);
+  localStorage.setItem(LS_EMAIL, email);
+  localStorage.setItem(LS_GARAGE, garageNom || '');
+}
+function clearSession() {
+  [LS_TOKEN, LS_ROLE, LS_EMAIL, LS_GARAGE].forEach(k => localStorage.removeItem(k));
+}
+function getToken() { return localStorage.getItem(LS_TOKEN); }
+
+/* Le JWT legacy (motokey-api.js jwtSign) est un simple base64url de JSON,
+   pas de vérification de signature côté client — on l'utilise seulement
+   pour lire exp et éviter un appel réseau au démarrage. */
+function decodeTokenPayload(token) {
+  try {
+    const part = token.split('.')[1] || token; // tolère un format non-JWT-standard
+    return JSON.parse(atob(part.replace(/-/g,'+').replace(/_/g,'/')));
+  } catch { return null; }
+}
+function isTokenValid(token) {
+  const payload = decodeTokenPayload(token);
+  return !!(payload && payload.exp && payload.exp > Date.now());
+}
+
+/* ═══════════════════════════════════════════════════════
+   UI
+═══════════════════════════════════════════════════════ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  document.getElementById('screen-' + id).classList.add('active');
+}
+function toast(msg, type = 'info', ms = 4000) {
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  document.getElementById('toast-container').appendChild(t);
+  setTimeout(() => t.remove(), ms);
+}
+function setLoading(btn, on, label) {
+  if (on) { btn._lbl = btn.textContent; btn.textContent = label || 'Connexion…'; btn.disabled = true; }
+  else    { btn.textContent = btn._lbl || btn.textContent; btn.disabled = false; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   INDICATEUR RÉSEAU
+═══════════════════════════════════════════════════════ */
+function updateNetIndicator() {
+  const el    = document.getElementById('net-indicator');
+  const label = document.getElementById('net-indicator-label');
+  if (navigator.onLine) {
+    el.classList.remove('offline'); el.classList.add('online');
+    label.textContent = 'En ligne';
+  } else {
+    el.classList.remove('online'); el.classList.add('offline');
+    label.textContent = 'Hors ligne';
+  }
+}
+window.addEventListener('online',  updateNetIndicator);
+window.addEventListener('offline', updateNetIndicator);
+
+/* ═══════════════════════════════════════════════════════
+   AUTH
+═══════════════════════════════════════════════════════ */
+async function doLogin() {
+  const btn   = document.getElementById('btn-login');
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-error');
+  errEl.classList.remove('show');
+
+  if (!email || !pass) {
+    errEl.textContent = 'Email et mot de passe requis.';
+    errEl.classList.add('show');
+    return;
+  }
+
+  setLoading(btn, true);
+  const { ok, data } = await apiPost('/auth/login', { email, password: pass, role: 'garage' });
+  setLoading(btn, false);
+
+  if (!ok) {
+    errEl.textContent = errMsg(data);
+    errEl.classList.add('show');
+    return;
+  }
+
+  const payload    = data.data || data;
+  const rbac_role  = payload.rbac_role || 'CONCESSION';
+  if (rbac_role !== 'MECANO') {
+    errEl.textContent = "Ce compte n'est pas un compte mécano — connecte-toi sur l'application principale.";
+    errEl.classList.add('show');
+    return;
+  }
+
+  saveSession(payload.token, rbac_role, email, payload.garage?.nom);
+  enterAtelier();
+}
+
+function doLogout() {
+  clearSession();
+  showScreen('login');
+}
+
+function enterAtelier() {
+  document.getElementById('topbar-garage-nom').textContent = localStorage.getItem(LS_GARAGE) || '—';
+  updateNetIndicator();
+  showScreen('atelier');
+}
+
+/* ═══════════════════════════════════════════════════════
+   BOOT
+═══════════════════════════════════════════════════════ */
+document.getElementById('btn-login').addEventListener('click', doLogin);
+document.getElementById('login-password').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-login').click();
+});
+document.getElementById('btn-logout').addEventListener('click', doLogout);
+
+(function boot() {
+  const token = getToken();
+  if (token && isTokenValid(token)) {
+    enterAtelier();
+  } else {
+    clearSession();
+    showScreen('login');
+  }
+})();
+</script>
+</body>
+</html>
