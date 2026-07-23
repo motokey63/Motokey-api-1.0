@@ -365,6 +365,17 @@ function escapeHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 
+/* La forme des dates diffère entre le fallback RAM (date déjà formatée fr,
+   ex. "05/02/2026") et Supabase (colonnes ISO date_intervention/created_at)
+   — les deux chemins sont exercés en prod selon la table. */
+function fmtDateFlexible(value) {
+  if (!value) return '—';
+  if (/^\d{2}\/\d{2}\/\d{4}/.test(value)) return value; // déjà formaté (RAM)
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 function renderOrCard(or) {
   const moto   = or.motos || {};
   const client = moto.clients || {};
@@ -501,7 +512,7 @@ function renderBriefing(motoId, { moto, consommables, planEntretien, fraudeFlags
               <span class="int-titre">${escapeHtml(i.titre)}</span>
               <span class="int-badge ${meta.cls}">${meta.label}</span>
             </div>
-            <div class="int-meta">${escapeHtml(i.date || '')} · ${escapeHtml(String(i.km || 0))} km</div>
+            <div class="int-meta">${escapeHtml(fmtDateFlexible(i.date_intervention || i.date))} · ${escapeHtml(String(i.km || 0))} km</div>
           </div>`;
       }).join('')
     : '<div class="empty-state"><div class="icon">🗒️</div><p>Aucune intervention enregistrée.</p></div>';
@@ -511,7 +522,7 @@ function renderBriefing(motoId, { moto, consommables, planEntretien, fraudeFlags
       fraudeFlags.map(f => `
         <div class="fraude-row">
           <div class="fraude-verdict">${f.verdict === 'fraude_suspectee' ? '🚨 Fraude suspectée' : '⚠️ Vérification partielle'}</div>
-          <div class="fraude-meta">${escapeHtml(f.garage || '—')} · ${escapeHtml(String(f.montant || 0))} € · ${escapeHtml(f.date || '')}</div>
+          <div class="fraude-meta">${escapeHtml(f.garage_nom || f.garage || '—')} · ${escapeHtml(String(f.montant || 0))} € · ${escapeHtml(fmtDateFlexible(f.created_at || f.date))}</div>
         </div>`).join('') +
       '</div>'
     : '';
