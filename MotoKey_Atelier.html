@@ -168,6 +168,23 @@ function clearSession() {
 }
 function getToken() { return localStorage.getItem(LS_TOKEN); }
 
+/* ═══════════════════════════════════════════════════════
+   CACHE LOCAL DES DERNIÈRES DONNÉES (L13 étape 3) — lecture
+   seule : une coupure réseau en cours de session ne doit pas
+   vider l'écran. Les étapes suivantes (file d'atelier,
+   briefing moto) appellent cacheDataSet/cacheDataGet.
+═══════════════════════════════════════════════════════ */
+const DATA_CACHE_PREFIX = 'mk_atelier_cache_';
+function cacheDataSet(key, value) {
+  try { localStorage.setItem(DATA_CACHE_PREFIX + key, JSON.stringify({ value, cachedAt: Date.now() })); } catch {}
+}
+function cacheDataGet(key) {
+  try {
+    const raw = localStorage.getItem(DATA_CACHE_PREFIX + key);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
 /* Le JWT legacy (motokey-api.js jwtSign) est un simple base64url de JSON,
    pas de vérification de signature côté client — on l'utilise seulement
    pour lire exp et éviter un appel réseau au démarrage. */
@@ -277,6 +294,9 @@ document.getElementById('login-password').addEventListener('keydown', e => {
 document.getElementById('btn-logout').addEventListener('click', doLogout);
 
 (function boot() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw-atelier.js').catch(() => {});
+  }
   const token = getToken();
   if (token && isTokenValid(token)) {
     enterAtelier();

@@ -727,6 +727,19 @@ const server = http.createServer(async function(req, res){
     return;
   }
 
+  // ── Service worker de la coquille atelier (L13 étape 3) — lecture disque à chaque requête
+  if(pathname==='/sw-atelier.js' && method==='GET'){
+    let sw = '';
+    try {
+      const _fs   = require('fs');
+      const _path = require('path');
+      sw = _fs.readFileSync(_path.join(__dirname, 'sw-atelier.js'), 'utf8');
+    } catch(e) {}
+    res.writeHead(200,{'Content-Type':'application/javascript; charset=utf-8','Access-Control-Allow-Origin':'*','Cache-Control':'no-cache, no-store, must-revalidate'});
+    res.end(sw);
+    return;
+  }
+
   // ── POST /stripe/webhook ── monté AVANT body() pour conserver les bytes bruts
   if (pathname === '/stripe/webhook' && method === 'POST') {
     const sig = req.headers['stripe-signature'];
