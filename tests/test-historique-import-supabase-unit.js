@@ -142,6 +142,31 @@ async function run() {
     restoreFrom();
   }
 
+  // ── valider (déjà validé — rejet double promotion) ────────────────────
+  console.log('\n── valider (déjà validé — rejet double promotion) ────────────────');
+  try {
+    const trace = mockFrom({
+      factures_scannees: [
+        { data: { id: 'fs-99', moto_id: 'moto-1', acteur_type: 'client', validated_at: '2026-07-20T00:00:00.000Z' }, error: null }, // select staging — déjà validé
+      ],
+    });
+    let threw = null;
+    try {
+      await HistoriqueImport.valider('fs-99', 'garage-1', { email: 'test@example.com' }, {
+        plaque_declaree: 'AB-123-CD', date_document: '2018-03-01', km_declare: 5000,
+        siret_declare: null, nom_garage_declare: null, description_travaux: null
+      });
+    } catch (e) { threw = e; }
+    check('lève une erreur (déjà validé)', !!threw, 'aucune erreur levée');
+    check('message mentionne déjà validé', threw && /valid/i.test(threw.message), threw && threw.message);
+    const fromCalls = trace.filter(t => t.method === 'from');
+    check('un seul appel .from() (early return avant toute autre requête)', fromCalls.length === 1, `${fromCalls.length} appels trouvés`);
+  } catch (e) {
+    check('valider (double promotion) sans exception inattendue', false, e.message);
+  } finally {
+    restoreFrom();
+  }
+
   // ── valider : km incohérent → rejeté, AUCUNE intervention créée ─────────
   console.log('\n── valider (km incohérent) ──────────────────────────────────────');
   try {
