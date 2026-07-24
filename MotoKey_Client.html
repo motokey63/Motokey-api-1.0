@@ -1105,6 +1105,8 @@ let _historiqueListCache = [];
 
 function openHistoriqueImport(motoId) {
   _historiqueMotoId = motoId;
+  _historiqueUploadQueue = [];
+  renderHistoriqueUploadQueue();
   showScreen('historique-import');
   loadHistoriqueImport();
 }
@@ -1226,8 +1228,10 @@ async function validerToutHistorique() {
     }
   }
 
-  if (successCount) toast(successCount + ' document(s) validé(s) et ajouté(s) à l\'historique.', 'success');
-  if (errorCount)   toast(errorCount + ' document(s) n\'ont pas pu être validés — vérifiez les champs en rouge.', 'error');
+  if (successCount === 1) toast('1 document validé et ajouté à l\'historique.', 'success');
+  else if (successCount > 1) toast(successCount + ' documents validés et ajoutés à l\'historique.', 'success');
+  if (errorCount === 1) toast('1 document n\'a pas pu être validé — vérifiez les champs en rouge.', 'error');
+  else if (errorCount > 1) toast(errorCount + ' documents n\'ont pas pu être validés — vérifiez les champs en rouge.', 'error');
 
   await loadHistoriqueImport();
   loadMotos(); // rafraîchit le score/historique de la moto concernée
@@ -1280,7 +1284,15 @@ async function handleHistoriquePhotosSelected(fileList) {
     renderHistoriqueUploadQueue();
   }
 
-  toast('Import terminé — vérifiez la liste ci-dessous.', 'success');
+  const doneCount  = _historiqueUploadQueue.filter(function(item) { return item.status === 'done'; }).length;
+  const errorCount = _historiqueUploadQueue.filter(function(item) { return item.status === 'error'; }).length;
+  if (doneCount && !errorCount) {
+    toast('Import terminé — vérifiez la liste ci-dessous.', 'success');
+  } else if (doneCount && errorCount) {
+    toast('Import partiel — certains fichiers ont échoué, vérifiez la liste ci-dessous.', 'error');
+  } else {
+    toast('Échec de l\'import — vérifiez la liste ci-dessous.', 'error');
+  }
   loadHistoriqueImport();
 }
 
