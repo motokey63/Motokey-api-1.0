@@ -80,13 +80,17 @@ async function run() {
   // ── list : filtre par moto_id, tri created_at desc ───────────────────────
   console.log('\n── list ──────────────────────────────────────────────────────────');
   try {
-    mockFrom({
+    const trace = mockFrom({
       factures_scannees: [
         { data: [{ id: 'fs-2', moto_id: 'moto-1' }, { id: 'fs-1', moto_id: 'moto-1' }], error: null },
       ],
     });
     const rows = await HistoriqueImport.list('moto-1');
     check('retourne les lignes', Array.isArray(rows) && rows.length === 2, JSON.stringify(rows));
+    const eqCall = trace.find(c => c.table === 'factures_scannees' && c.method === 'eq' && c.args[0] === 'moto_id');
+    check('appelle .eq(moto_id, moto-1)', eqCall && eqCall.args[1] === 'moto-1', JSON.stringify(eqCall?.args));
+    const orderCall = trace.find(c => c.table === 'factures_scannees' && c.method === 'order' && c.args[0] === 'created_at');
+    check('appelle .order(created_at, { ascending: false })', orderCall && orderCall.args[1] && orderCall.args[1].ascending === false, JSON.stringify(orderCall?.args));
   } catch (e) {
     check('list sans exception', false, e.message);
   } finally {
