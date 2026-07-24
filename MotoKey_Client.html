@@ -447,6 +447,27 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
   </div>
 </div>
 
+<!-- ══════════════════════════════════════════
+     ÉCRAN 9 — IMPORTER MON HISTORIQUE
+════════════════════════════════════════════ -->
+<div id="screen-historique-import" style="display:none;">
+  <div class="app-wrap">
+    <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h2 style="font-size:20px;font-weight:600;margin:0">Importer mon historique</h2>
+      <button class="btn btn-secondary btn-sm" id="btn-back-from-historique-import">← Mes motos</button>
+    </div>
+    <div class="card" style="margin-bottom:16px">
+      <p style="font-size:13px;color:var(--tx3);margin-bottom:12px">Ajoutez une ou plusieurs photos de vos anciennes factures d'entretien. Nous lisons automatiquement la date, la plaque et le kilométrage — vous validez avant l'ajout définitif.</p>
+      <button class="btn btn-primary" id="btn-choisir-photos">📷 Choisir des photos</button>
+      <input type="file" id="input-historique-photos" accept="image/jpeg,image/png,image/webp" multiple style="display:none">
+    </div>
+    <div id="historique-upload-queue"></div>
+    <div id="historique-review-content">
+      <div class="empty-state"><div class="empty-icon">⏳</div><p>Chargement…</p></div>
+    </div>
+  </div>
+</div>
+
 <script>
 'use strict';
 
@@ -468,10 +489,10 @@ let pendingEmail = '';
    UI
 ═══════════════════════════════════════════════════════ */
 function showScreen(id) {
-  ['login','register','verify','reset-request','reset-confirm','app','account','interventions'].forEach(s => {
+  ['login','register','verify','reset-request','reset-confirm','app','account','interventions','historique-import'].forEach(s => {
     const el = document.getElementById('screen-' + s);
     if (el) el.style.display = (s === id)
-      ? (s === 'app' || s === 'account' || s === 'interventions' ? 'block' : 'flex')
+      ? (s === 'app' || s === 'account' || s === 'interventions' || s === 'historique-import' ? 'block' : 'flex')
       : 'none';
   });
 }
@@ -810,6 +831,7 @@ function renderMotoCard(moto) {
       <div class="moto-section">
         <div class="moto-section-title">Historique · ${intervs.length} intervention${intervs.length !== 1 ? 's' : ''}</div>
         <div class="interv-list">${intervHtml}</div>
+        <button class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="openHistoriqueImport('${esc(moto.id)}')">📄 Importer un historique</button>
       </div>
 
       ${planHtml}${jaugesSectionClient(moto)}
@@ -1078,6 +1100,60 @@ let _interventionsListCache = [];
 let _interventionsCache     = {}; // or_id -> détail complet (or_taches/or_pieces), rempli à la demande
 let _interventionsOpen      = {}; // or_id -> bool, carte dépliée ou non
 
+let _historiqueMotoId    = null;
+let _historiqueListCache = [];
+
+function openHistoriqueImport(motoId) {
+  _historiqueMotoId = motoId;
+  showScreen('historique-import');
+  loadHistoriqueImport();
+}
+
+async function loadHistoriqueImport() {
+  const at  = localStorage.getItem(LS_AT);
+  const box = document.getElementById('historique-review-content');
+  box.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><p>Chargement…</p></div>';
+
+  const { ok, data } = await apiGet('/motos/' + _historiqueMotoId + '/historique', at);
+  if (!ok) {
+    box.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠</div><p>' + esc(errMsg(data)) + '</p></div>';
+    return;
+  }
+
+  _historiqueListCache = _unwrap(data, 'historique') || [];
+  renderHistoriqueList();
+}
+
+function renderHistoriqueList() {
+  const box = document.getElementById('historique-review-content');
+  if (!box) return;
+  if (!_historiqueListCache.length) {
+    box.innerHTML = '<div class="empty-state"><div class="empty-icon">📄</div><p>Aucun document importé pour le moment.</p></div>';
+    return;
+  }
+  box.innerHTML = _historiqueListCache.map(renderHistoriqueCard).join('');
+}
+
+function renderHistoriqueCard(doc) {
+  if (doc.validated_at) {
+    return '<div class="card" style="margin-bottom:16px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">' +
+        '<div>' +
+          '<div style="font-weight:700;font-size:15px">' + esc(doc.plaque_declaree || '—') + '</div>' +
+          '<div style="font-size:12px;color:var(--tx3)">' + fmtDate(doc.date_document) + (doc.km_declare != null ? ' · ' + Number(doc.km_declare).toLocaleString('fr-FR') + ' km' : '') + '</div>' +
+        '</div>' +
+        '<span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:color-mix(in srgb,var(--gn) 15%,transparent);color:var(--gn)">✓ Validé</span>' +
+      '</div>' +
+    '</div>';
+  }
+  return '<div class="card" style="margin-bottom:16px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">' +
+      '<div style="font-size:13px;color:var(--tx3)">Document importé — en attente de validation</div>' +
+      '<span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:color-mix(in srgb,var(--yw) 15%,transparent);color:var(--yw)">⏳ À valider</span>' +
+    '</div>' +
+  '</div>';
+}
+
 async function loadClientInterventions() {
   const at = localStorage.getItem(LS_AT);
   const box = document.getElementById('interventions-list-content');
@@ -1233,6 +1309,7 @@ document.getElementById('btn-interventions').addEventListener('click', () => {
   loadClientInterventions();
 });
 document.getElementById('btn-back-from-interventions').addEventListener('click', () => showScreen('app'));
+document.getElementById('btn-back-from-historique-import').addEventListener('click', () => showScreen('app'));
 
 /* ═══════════════════════════════════════════════════════
    ÉCRAN 7 — MON COMPTE
