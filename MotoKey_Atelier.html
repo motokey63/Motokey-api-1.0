@@ -851,6 +851,23 @@ function renderOrActifScreen({ stale } = {}) {
   `;
 }
 
+// Amendement review 24/07/2026 (décision 9) : le client n'a pas pu être prévenu par email — le
+// mécano doit le savoir pour le prévenir lui-même, sinon il attend un accord qui n'arrivera
+// jamais. notif_attente_echec_motif est posé par OrdresReparation._notifierClientAttenteOR /
+// _marquerNonNotifiable côté serveur (supabase.js), remis à NULL dès qu'un envoi réussit ou
+// qu'une ligne est acceptée.
+const NON_NOTIFIABLE_LABELS = {
+  moto_sans_client:  "Cette moto n'a pas de client associé.",
+  client_sans_email: "Ce client n'a pas d'email enregistré.",
+  echec_envoi:       "L'envoi de l'email au client a échoué.",
+};
+function renderNonNotifiableHint(or) {
+  const motif = or.notif_attente_echec_motif;
+  if (!motif) return '';
+  const label = NON_NOTIFIABLE_LABELS[motif] || "Le client n'a pas pu être notifié.";
+  return `<div class="statut-hint" style="background:#fef3c7;border-color:#f59e0b;color:#92400e">⚠️ Client non notifiable — préviens-le directement. ${escapeHtml(label)}</div>`;
+}
+
 function renderStatutActions(or, { offline, lignesEnAttente }) {
   const dis = offline ? 'disabled' : '';
 
@@ -871,7 +888,8 @@ function renderStatutActions(or, { offline, lignesEnAttente }) {
     return `<div class="statut-actions">
       <button class="btn-action go" ${(offline || blocked) ? 'disabled' : ''} onclick="reprendreOr()">▶ Reprendre les travaux</button>
     </div>
-    ${blocked ? '<div class="statut-hint">🔴 Des lignes complémentaires attendent encore l\'accord du client — impossible de reprendre tant qu\'elles ne sont pas validées.</div>' : ''}`;
+    ${blocked ? '<div class="statut-hint">🔴 Des lignes complémentaires attendent encore l\'accord du client — impossible de reprendre tant qu\'elles ne sont pas validées.</div>' : ''}
+    ${renderNonNotifiableHint(or)}`;
   }
   if (or.statut === 'termine' || or.statut === 'facture') {
     return '<div class="statut-hint">OR terminé — la facturation se gère depuis l\'espace de gestion.</div>';
