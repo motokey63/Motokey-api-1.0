@@ -121,3 +121,38 @@ flux L15 — les nouveaux imports écrivent dans `photo_url` via `cloudinaryServ
   simple sans lecture de `niveau_preuve` (voir amendement a) ci-dessus). À corriger indépendamment
   de L15 — la réécriture du moteur de score mérite sa propre livraison, pas un correctif de
   documentation seul.
+
+### Dette issue de la revue finale de branche (socle backend, 24/07/2026)
+
+Trois trous réels dans le modèle de confiance, bornés par l'amendement (a) (le moteur de score
+n'est de toute façon pas branché sur `niveau_preuve` aujourd'hui) — non bloquants pour le merge
+du socle, mais à traiter avant ou pendant le chantier séparé de réécriture du moteur de score
+(ou avant les Plans 2/3 si l'un d'eux les touche indirectement) :
+
+- **Un import GARAGE ne peut jamais atteindre `type='bleu'`** : `contresigner` refuse de
+  contre-signer un import déjà `acteur_type='garage'` avec le motif "déjà au niveau de confiance
+  maximal" (`supabase.js`, `HistoriqueImport.contresigner`), mais `valider` promeut TOUT import
+  (client ou garage) avec `type:'jaune'` — aucun chemin ne fait passer un import garage à `bleu`.
+  Résultat : un import client contre-signé (`bleu`) est mieux noté qu'un import garage qui
+  "fait foi" par construction (décision 1), qui reste `jaune` indéfiniment. Le commentaire du
+  code et le comportement réel se contredisent. À trancher : soit corriger le commentaire (un
+  import garage reste `jaune`, assumé), soit faire promouvoir directement en `bleu` un import
+  `acteur_type='garage'` dans `valider`.
+
+- **La divergence est tracée mais l'ancienne intervention n'est jamais neutralisée → double
+  comptage potentiel au score** : quand un garage corrige un import client déjà validé,
+  `HistoriqueImport.valider` pose bien `divergence_de` sur la nouvelle ligne `factures_scannees`
+  (traçage de la correction, décision 1 respectée au niveau du document) mais crée une SECONDE
+  ligne `interventions` sans rien faire à la première — les deux restent actives et comptent
+  chacune dans `recalc_score_moto()` pour un seul événement d'entretien réel. "La version garage
+  fait foi" n'est donc pas réalisé au niveau du score, seulement au niveau de la traçabilité
+  documentaire. À adresser probablement en même temps que la réécriture du moteur de score
+  (ex: exclure du `SUM` une intervention dont `factures_scannees.divergence_de` pointe vers elle).
+
+- **Un CLIENT qui importe sur une moto sans `garage_id` produit un 500 opaque** :
+  `resolveMotoForCtx` (motokey-api.js, code existant hors périmètre L15) anticipe explicitement
+  ce cas (`garage_id: moto.garage_id || null`), mais `interventions.garage_id` est `NOT NULL` —
+  l'insert échoue et remonte en 500 générique plutôt qu'un message clair. À vérifier si ce cas
+  est réellement atteignable en pratique (toutes les motos vues en session avaient un
+  `garage_id` posé), et si oui ajouter un garde-fou 4xx explicite dans `POST
+  /historique/:id/valider`.
