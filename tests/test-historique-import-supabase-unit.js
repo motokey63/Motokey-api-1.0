@@ -109,6 +109,103 @@ async function run() {
     restoreFrom();
   }
 
+  // ── valider : cas nominal, cohérent, sans divergence ─────────────────────
+  console.log('\n── valider (nominal, cohérent) ──────────────────────────────────');
+  try {
+    const trace = mockFrom({
+      factures_scannees: [
+        { data: { id: 'fs-10', moto_id: 'moto-1', acteur_type: 'client', validated_at: null }, error: null }, // select staging
+        { data: [], error: null }, // select divergentes (aucune)
+        { data: { id: 'fs-10', moto_id: 'moto-1', validated_at: '2026-07-24T00:00:00.000Z', intervention_id: 'int-10' }, error: null }, // update final
+      ],
+      interventions: [
+        { data: [{ date_intervention: '2015-01-10', km: 6000 }], error: null }, // select existantes pour cohérence
+        { data: { id: 'int-10' }, error: null }, // insert() de Interventions.create
+        { data: { id: 'int-10' }, error: null }, // update niveau_preuve/facture_id/photo_url
+      ],
+      motos: [
+        { data: { score: 42, couleur_dossier: 'jaune' }, error: null }, // select score/couleur dans Interventions.create — table SÉPARÉE, compteur indépendant de 'interventions'
+      ],
+    });
+    const result = await HistoriqueImport.valider('fs-10', 'garage-1', { email: 'client@example.com' }, {
+      plaque_declaree: 'AB-123-CD', date_document: '2018-03-01', km_declare: 6800,
+      siret_declare: null, nom_garage_declare: 'Garage du Centre', description_travaux: 'Vidange'
+    });
+    check('retourne facture_scannee', !!result.facture_scannee, JSON.stringify(result));
+    check('retourne intervention', !!result.intervention, JSON.stringify(result));
+    const interInsert = trace.find(c => c.table === 'interventions' && c.method === 'insert');
+    check('intervention créée avec type=jaune', interInsert && interInsert.args[0].type === 'jaune', JSON.stringify(interInsert));
+    check('intervention créée avec km déclaré', interInsert && interInsert.args[0].km === 6800, JSON.stringify(interInsert));
+  } catch (e) {
+    check('valider (nominal) sans exception', false, e.message);
+  } finally {
+    restoreFrom();
+  }
+
+  // ── valider : km incohérent → rejeté, AUCUNE intervention créée ─────────
+  console.log('\n── valider (km incohérent) ──────────────────────────────────────');
+  try {
+    const trace = mockFrom({
+      factures_scannees: [
+        { data: { id: 'fs-11', moto_id: 'moto-1', acteur_type: 'client', validated_at: null }, error: null },
+        { data: { id: 'fs-11', km_coherence_statut: 'rejete' }, error: null }, // update de traçage du rejet
+      ],
+      interventions: [
+        { data: [{ date_intervention: '2020-06-15', km: 7500 }], error: null },
+      ],
+    });
+    let threw = null;
+    try {
+      await HistoriqueImport.valider('fs-11', 'garage-1', { email: 'client@example.com' }, {
+        plaque_declaree: 'AB-123-CD', date_document: '2018-03-01', km_declare: 20000,
+        siret_declare: null, nom_garage_declare: null, description_travaux: null
+      });
+    } catch (e) { threw = e; }
+    check('lève une erreur', !!threw, 'aucune erreur levée');
+    check("code KM_INCOHERENT", threw && threw.code === 'KM_INCOHERENT', threw && threw.message);
+    check("aucun insert 'interventions' (pas de promotion)", !trace.some(t => t.table === 'interventions' && t.method === 'insert'));
+    const stagingUpdate = trace.find(c => c.table === 'factures_scannees' && c.method === 'update');
+    check("km_coherence_statut='rejete' tracé sur la ligne staging",
+      stagingUpdate && stagingUpdate.args[0].km_coherence_statut === 'rejete', JSON.stringify(stagingUpdate && stagingUpdate.args[0]));
+  } catch (e) {
+    check('valider (rejet km) sans exception inattendue', false, e.message);
+  } finally {
+    restoreFrom();
+  }
+
+  // ── valider : divergence garage corrige un import client existant ───────
+  console.log('\n── valider (divergence, garage corrige client) ──────────────────');
+  try {
+    const trace = mockFrom({
+      factures_scannees: [
+        { data: { id: 'fs-13', moto_id: 'moto-1', acteur_type: 'garage', validated_at: null }, error: null }, // select staging
+        { data: [{ id: 'fs-12', acteur_type: 'client' }], error: null }, // select divergentes → trouve fs-12
+        { data: { id: 'fs-13', divergence_de: 'fs-12', intervention_id: 'int-13' }, error: null }, // update final
+      ],
+      interventions: [
+        { data: [], error: null },
+        { data: { id: 'int-13' }, error: null },
+        { data: { id: 'int-13' }, error: null },
+      ],
+      motos: [
+        { data: { score: 50, couleur_dossier: 'bleu' }, error: null }, // table SÉPARÉE, compteur indépendant de 'interventions'
+      ],
+    });
+    const result = await HistoriqueImport.valider('fs-13', 'garage-1', { email: 'mecano@example.com' }, {
+      plaque_declaree: 'AB-123-CD', date_document: '2018-03-01', km_declare: 6800,
+      siret_declare: '12345678900012', nom_garage_declare: 'Garage du Centre', description_travaux: 'Vidange confirmée'
+    });
+    const stagingUpdate = trace.find(c => c.table === 'factures_scannees' && c.method === 'update');
+    check('divergence_de pointe vers la ligne client existante (fs-12)',
+      stagingUpdate && stagingUpdate.args[0].divergence_de === 'fs-12', JSON.stringify(stagingUpdate && stagingUpdate.args[0]));
+    check("l'ancienne ligne client (fs-12) n'est PAS supprimée ni écrasée — pas de delete émis",
+      !trace.some(t => t.table === 'factures_scannees' && t.method === 'delete'));
+  } catch (e) {
+    check('valider (divergence) sans exception', false, e.message);
+  } finally {
+    restoreFrom();
+  }
+
   console.log('\n' + '═'.repeat(60));
   console.log(`📊 ${OK}/${OK + KO} checks passés`);
   if (KO > 0) process.exitCode = 1;

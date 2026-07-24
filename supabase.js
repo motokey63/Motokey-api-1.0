@@ -27,6 +27,7 @@
 require('dotenv').config();
 
 const { createClient } = require('@supabase/supabase-js');
+const { verifierCoherenceKm } = require('./services/kmCoherenceHistorique');
 
 // ── Validation config ──────────────────────────────────────
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -589,6 +590,68 @@ const HistoriqueImport = {
       .select('*').eq('moto_id', moto_id).order('created_at', { ascending: false });
     if (error) throw new Error(error.message);
     return data || [];
+  },
+
+  // Validation humaine (décision 5) : le staging (ocr_raw) n'est jamais promu
+  // automatiquement. Vérifie la cohérence km par voisin chronologique
+  // (amendement (b) — lecture seule sur interventions, jamais releves_km),
+  // trace toute divergence garage/client sans écraser l'ancienne ligne
+  // (décision 1 — "on ne l'écrase pas : on trace la correction"), puis
+  // promeut en intervention type='jaune' / niveau_preuve='facture'.
+  async valider(id, garage_id, ctx, { plaque_declaree, date_document, km_declare, siret_declare, nom_garage_declare, description_travaux, montant_ht, montant_ttc }) {
+    const { data: staging, error: fe } = await supabase.from('factures_scannees').select('*').eq('id', id).single();
+    if (fe || !staging) throw new Error('Document non trouvé');
+    if (staging.validated_at) throw new Error('Document déjà validé');
+
+    const { data: existantes, error: ie } = await supabase.from('interventions')
+      .select('date_intervention, km').eq('moto_id', staging.moto_id);
+    if (ie) throw new Error(ie.message);
+
+    const coherence = verifierCoherenceKm(
+      { date_document, km_declare },
+      (existantes || []).map(i => ({ date_intervention: i.date_intervention, km: i.km }))
+    );
+
+    if (coherence.statut === 'rejete') {
+      await supabase.from('factures_scannees').update({
+        plaque_declaree, date_document, km_declare,
+        siret_declare: siret_declare || null, nom_garage_declare: nom_garage_declare || null,
+        km_coherence_statut: 'rejete', km_coherence_motif: coherence.motif
+      }).eq('id', id);
+      const err = new Error(coherence.motif);
+      err.code = 'KM_INCOHERENT';
+      throw err;
+    }
+
+    // Divergence : une autre ligne déjà validée pour la même plaque + date,
+    // avec un acteur différent (client vs garage) — jamais écrasée, tracée.
+    const { data: divergentes } = await supabase.from('factures_scannees')
+      .select('id, acteur_type').eq('moto_id', staging.moto_id)
+      .eq('plaque_declaree', plaque_declaree).eq('date_document', date_document)
+      .not('validated_at', 'is', null).neq('acteur_type', staging.acteur_type).neq('id', id);
+    const divergence_de = (divergentes && divergentes[0]) ? divergentes[0].id : null;
+
+    const titre = nom_garage_declare ? `Historique importé — ${nom_garage_declare}` : 'Historique importé';
+    const inter = await Interventions.create(garage_id, staging.moto_id, {
+      type: 'jaune', titre, description: description_travaux || '', km: km_declare,
+      montant_ht: montant_ht || 0, montant_ttc: montant_ttc || 0, date: date_document
+    });
+    const { error: ue2 } = await supabase.from('interventions')
+      .update({ niveau_preuve: 'facture', facture_id: id, photo_url: staging.photo_url })
+      .eq('id', inter.intervention.id);
+    if (ue2) throw new Error(ue2.message);
+
+    const { data: majStaging, error: ue } = await supabase.from('factures_scannees').update({
+      plaque_declaree, date_document, km_declare,
+      siret_declare: siret_declare || null, nom_garage_declare: nom_garage_declare || null,
+      validated_data: { plaque_declaree, date_document, km_declare, siret_declare, nom_garage_declare, description_travaux },
+      validated_at: new Date().toISOString(), validated_by: (ctx && ctx.email) || staging.acteur_type,
+      km_coherence_statut: 'valide', km_coherence_motif: null,
+      divergence_de, intervention_id: inter.intervention.id
+    }).eq('id', id).select().single();
+    if (ue) throw new Error(ue.message);
+
+    return { facture_scannee: majStaging, intervention: inter.intervention, nouveau_score: inter.nouveau_score, nouvelle_couleur: inter.nouvelle_couleur };
   }
 };
 
