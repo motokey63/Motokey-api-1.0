@@ -868,6 +868,25 @@ function renderNonNotifiableHint(or) {
   return `<div class="statut-hint" style="background:#fef3c7;border-color:#f59e0b;color:#92400e">⚠️ Client non notifiable — préviens-le directement. ${escapeHtml(label)}</div>`;
 }
 
+// Fix atelier 24/07/2026 : ordres_reparation.attente_motif est persisté (changerStatut,
+// supabase.js:1167, + bascule auto) et déjà remonté par GET /ordres-reparation/:id (getById fait
+// select('*, ...) — mais jamais affiché côté atelier avant ce fix (seule occurrence précédente :
+// l'envoi du PATCH dans mettreEnAttente). Mappe les 3 presets du picker (MOTIF_ATTENTE_PRESETS)
+// vers un libellé lisible ; un motif "Autre…" (texte libre) ou toute valeur inconnue est affichée
+// telle quelle plutôt que masquée — mieux vaut brut que muet. NULL/vide (OR mis en attente avant
+// ce fix, ou bascule auto sans motif) : absence silencieuse, pas de "motif inconnu".
+const ATTENTE_MOTIF_LABELS = {
+  'Pièce manquante':      'En attente — pièce manquante',
+  'Attente accord client': 'En attente — accord client',
+  'Pause déjeuner':        'En attente — pause déjeuner',
+};
+function renderAttenteMotifHint(or) {
+  const motif = or.attente_motif;
+  if (!motif) return '';
+  const label = ATTENTE_MOTIF_LABELS[motif] || motif;
+  return `<div class="statut-hint">⏸ ${escapeHtml(label)}</div>`;
+}
+
 function renderStatutActions(or, { offline, lignesEnAttente }) {
   const dis = offline ? 'disabled' : '';
 
@@ -888,6 +907,7 @@ function renderStatutActions(or, { offline, lignesEnAttente }) {
     return `<div class="statut-actions">
       <button class="btn-action go" ${(offline || blocked) ? 'disabled' : ''} onclick="reprendreOr()">▶ Reprendre les travaux</button>
     </div>
+    ${renderAttenteMotifHint(or)}
     ${blocked ? '<div class="statut-hint">🔴 Des lignes complémentaires attendent encore l\'accord du client — impossible de reprendre tant qu\'elles ne sont pas validées.</div>' : ''}
     ${renderNonNotifiableHint(or)}`;
   }
