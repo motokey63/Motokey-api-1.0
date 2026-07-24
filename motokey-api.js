@@ -1288,6 +1288,10 @@ const server = http.createServer(async function(req, res){
     if (!plaque_declaree || !date_document || km_declare === undefined || km_declare === null || km_declare === '') {
       return fail(res, 'plaque_declaree, date_document et km_declare requis', 400, 'VALIDATION_ERROR');
     }
+    const kmDeclareParsed = parseInt(km_declare, 10);
+    if (Number.isNaN(kmDeclareParsed)) {
+      return fail(res, 'km_declare doit être un nombre entier', 400, 'VALIDATION_ERROR');
+    }
     if (!SBLayer) return fail(res, 'Validation indisponible (mode RAM)', 501, 'NOT_IMPLEMENTED');
 
     const { data: staging0 } = await SBLayer.supabase.from('factures_scannees').select('moto_id').eq('id', p.id).maybeSingle();
@@ -1297,7 +1301,7 @@ const server = http.createServer(async function(req, res){
 
     try {
       const result = await SBLayer.HistoriqueImport.valider(p.id, resolved.garage_id, ctx, {
-        plaque_declaree, date_document, km_declare: parseInt(km_declare),
+        plaque_declaree, date_document, km_declare: kmDeclareParsed,
         siret_declare, nom_garage_declare, description_travaux, montant_ht, montant_ttc
       });
       return ok(res, result, 'Historique validé et ajouté au passeport');
