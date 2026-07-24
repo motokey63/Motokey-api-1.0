@@ -90,6 +90,7 @@ const cloudinaryService = require('./services/cloudinaryService');
 const { analyzePhoto } = require('./services/visionAnalysisService');
 const jaugeConsommables = require('./services/jaugeConsommables');
 const { analyserEtiquette } = require('./services/etiquettePieceService');
+const { analyserFactureHistorique } = require('./services/historiqueFactureService');
 
 // Couche Supabase (supabase.js) — chargée si SUPABASE_URL + SUPABASE_SECRET_KEY (ou SUPABASE_SERVICE_KEY) présents
 let SBLayer = null;
@@ -604,6 +605,50 @@ async function handleAnalyserEtiquette(req, res) {
   }
 }
 
+// Handler upload document historique (L15 socle) — multipart intercepté AVANT
+// body(). Dual CLIENT/GARAGE via resolveMotoForCtx (décision 1 du cadrage) —
+// crée UNIQUEMENT une ligne de staging (factures_scannees), jamais une
+// intervention (décision 5 : jamais d'insertion automatique sans validation
+// humaine, voir POST /historique/:id/valider).
+async function handleImporterHistorique(req, res, motoId) {
+  try {
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const resolved = await resolveMotoForCtx(ctx, motoId, a);
+    if (!resolved) return fail(res, 'Moto non trouvée', 404, 'NOT_FOUND');
+
+    let file;
+    try { file = await runMulter(req, res); }
+    catch (e) { if (e instanceof multer.MulterError && e.code === 'LIMIT_FILE_SIZE') return fail(res,'Photo trop volumineuse (max 5 Mo)',400,'FILE_TOO_LARGE'); return fail(res, e.message, 400, 'UPLOAD_PARSE_ERROR'); }
+    if (!file) return fail(res, 'Photo requise (champ multipart "photo", JPEG/PNG/WebP)', 400, 'VALIDATION_ERROR');
+
+    let secure_url;
+    try {
+      const up = await cloudinaryService.uploadPhoto(file.buffer, { folder: 'motokey/historique/'+resolved.moto.id });
+      secure_url = up.secure_url;
+    } catch (e) {
+      return fail(res, e.message, e.statusCode || 500, e.code || 'UPLOAD_ERROR');
+    }
+
+    const analyse = await analyserFactureHistorique({ imageUrl: secure_url });
+
+    if (!SBLayer) return fail(res, 'Import historique indisponible (mode RAM)', 501, 'NOT_IMPLEMENTED');
+    const staging = await SBLayer.HistoriqueImport.creerStaging({
+      moto_id: resolved.moto.id, garage_id: resolved.garage_id,
+      acteur_type: resolved.acteur_type, acteur_id: resolved.acteur_id,
+      photo_url: secure_url, ocr_raw: analyse.ok ? analyse.data : null
+    });
+
+    return ok(res, {
+      facture_scannee: staging,
+      ocr: analyse.ok ? { disponible: true, champs: analyse.data } : { disponible: false, raison: analyse.raison }
+    }, 'Document importé — en attente de validation', 201);
+  } catch (e) {
+    return fail(res, e.message, 500, 'SERVER_ERROR');
+  }
+}
+
 /* ─── ROUTE MATCHER ─── */
 function match(method, reqMethod, pattern, pathname) {
   if(method!==reqMethod) return null;
@@ -805,6 +850,10 @@ const server = http.createServer(async function(req, res){
   if (method === 'POST' && _ct.startsWith('multipart/form-data') && /^\/motos\/[^/]+\/photos-consommables$/.test(pathname)) {
     req.ctx = await rbac.extractRoleFromRequest(req, SBLayer);
     return handlePhotoConsommable(req, res, pathname.split('/')[2]);
+  }
+  if (method === 'POST' && _ct.startsWith('multipart/form-data') && /^\/motos\/[^/]+\/historique$/.test(pathname)) {
+    req.ctx = await rbac.extractRoleFromRequest(req, SBLayer);
+    return handleImporterHistorique(req, res, pathname.split('/')[2]);
   }
   if (method === 'POST' && _ct.startsWith('multipart/form-data') && pathname === '/catalogue-pieces/analyser-etiquette') {
     req.ctx = await rbac.extractRoleFromRequest(req, SBLayer);
