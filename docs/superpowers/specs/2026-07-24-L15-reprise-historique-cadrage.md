@@ -75,21 +75,44 @@ cohérence chronologique (comparaison au voisin le plus proche par date, décisi
 fait **en lecture applicative sur `interventions`**, jamais en écriture sur le circuit
 `releves_km` / `trg_sync_moto_km`. Aucun trigger existant n'est modifié par L15.
 
-### c) `factures_scannees` — structure prod à confirmer avant de planifier ce point
+### c) `factures_scannees` — structure prod confirmée (24/07)
 
-Table référencée uniquement en commentaire FK dans `schema.sql`, absente du repo. Existe en prod
-mais structure réelle inconnue depuis le code. Requête à faire lancer par Mehdi via le Supabase
-Dashboard (SQL Editor) — non exécutée par Claude Code :
+Requête `information_schema.columns` exécutée par Mehdi, résultat :
 
-```sql
-SELECT column_name, data_type, is_nullable, column_default
-FROM information_schema.columns
-WHERE table_schema = 'public' AND table_name = 'factures_scannees'
-ORDER BY ordinal_position;
-```
+| colonne | type | nullable | défaut |
+|---|---|---|---|
+| id | uuid | NO | `gen_random_uuid()` |
+| moto_id | uuid | NO | — |
+| image_base64 | text | YES | — |
+| mime_type | text | YES | — |
+| ocr_raw | jsonb | YES | — |
+| validated_data | jsonb | YES | — |
+| validated_at | timestamptz | YES | — |
+| validated_by | text | YES | — |
+| created_at | timestamptz | NO | `now()` |
 
-Le plan d'implémentation n'aborde pas la question "réutiliser `factures_scannees` vs. créer une
-table séparée pour L15" tant que le résultat de cette requête n'est pas connu.
+**Constat** : table déjà rattachée à `moto_id` uniquement (pas de `garage_id`/`client_id` —
+convient bien à la décision 1, import possible par les deux côtés sur la même ancre). Mais il
+manque tout ce dont L15 a besoin : pas de colonne pour la **date du document** (`created_at` est
+l'horodatage d'upload, pas la date de la facture — décision 3 exige date obligatoire), pas de
+`plaque_declaree` (décision 3), pas de `km_declare` (nécessaire pour la vérification voisin
+chronologique, décision 2), pas d'`acteur_type`/`acteur_id` (qui a importé : client ou garage —
+décision 1), pas de `niveau_confiance` ni de traçage de divergence (décisions 1 et 4).
+`validated_by` est un `text` libre, pas une FK — insuffisant pour distinguer client/garage de
+façon fiable. Le stockage est en `image_base64` (texte en base), pas une URL Cloudinary comme
+partout ailleurs dans l'app (`photo_url`, `facture_url` via `cloudinaryService`) — divergence de
+pattern à trancher.
+
+Aucune référence à `factures_scannees` trouvée dans `motokey-api.js` ou `supabase.js` lors de la
+recherche du 24/07 — la table semble poser un socle jamais raccordé à un endpoint, pas un flux
+actif en production actuellement.
+
+**Décision (24/07)** : étendre `factures_scannees` par migration — ajout des colonnes
+manquantes (`acteur_type`, `acteur_id`, `plaque_declaree`, `date_document`, `km_declare`,
+`niveau_confiance`, colonnes de traçage de divergence) **et** ajout d'une colonne `photo_url`
+(Cloudinary, même pattern que `photo_url`/`facture_url` ailleurs dans l'app) pour les nouveaux
+imports. `image_base64` reste en base pour compat descendante mais n'est plus alimentée par le
+flux L15 — les nouveaux imports écrivent dans `photo_url` via `cloudinaryService`.
 
 ## Dette hors périmètre L15
 
