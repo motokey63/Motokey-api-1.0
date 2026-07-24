@@ -40,6 +40,7 @@ const TEMPLATES = {
   'trial-ending':    require('../templates/emails/trial-ending'),
   'payment-failed':  require('../templates/emails/payment-failed'),
   'subscription-cancelled': require('../templates/emails/subscription-cancelled'),
+  'or-ligne-attente': require('../templates/emails/or-ligne-attente'),
 };
 
 /**
