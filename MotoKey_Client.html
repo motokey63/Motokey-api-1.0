@@ -1146,15 +1146,47 @@ function renderHistoriqueCard(doc) {
       '</div>' +
     '</div>';
   }
+  _historiqueInitFormState(doc);
+  const f = _historiqueFormState[doc.id];
+  const ocrBadge = doc.ocr_raw
+    ? '<div style="font-size:11px;color:var(--tx3);margin-bottom:10px">🤖 Pré-rempli par l\'IA — vérifiez avant de valider</div>'
+    : '<div style="font-size:11px;color:var(--tx3);margin-bottom:10px">Lecture automatique indisponible — remplissez manuellement</div>';
+  const rejetHtml = doc.km_coherence_statut === 'rejete'
+    ? '<div class="alert-inline alert-err" style="margin-bottom:10px">⚠ ' + esc(doc.km_coherence_motif || 'Kilométrage incohérent') + '</div>'
+    : '';
+
   return '<div class="card" style="margin-bottom:16px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">' +
-      '<div style="font-size:13px;color:var(--tx3)">Document importé — en attente de validation</div>' +
-      '<span style="font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:color-mix(in srgb,var(--yw) 15%,transparent);color:var(--yw)">⏳ À valider</span>' +
-    '</div>' +
+    ocrBadge + rejetHtml +
+    '<div class="form-group"><label>Plaque d\'immatriculation *</label><input type="text" value="' + esc(f.plaque_declaree) + '" oninput="historiqueFormUpdate(\'' + esc(doc.id) + '\',\'plaque_declaree\',this.value)"></div>' +
+    '<div class="form-group"><label>Date du document *</label><input type="date" value="' + esc(f.date_document) + '" oninput="historiqueFormUpdate(\'' + esc(doc.id) + '\',\'date_document\',this.value)"></div>' +
+    '<div class="form-group"><label>Kilométrage relevé *</label><input type="number" min="0" value="' + esc(f.km_declare) + '" oninput="historiqueFormUpdate(\'' + esc(doc.id) + '\',\'km_declare\',this.value)"></div>' +
+    '<div class="form-group"><label>Nom du garage</label><input type="text" value="' + esc(f.nom_garage_declare) + '" oninput="historiqueFormUpdate(\'' + esc(doc.id) + '\',\'nom_garage_declare\',this.value)"></div>' +
+    '<div class="form-group"><label>SIRET (optionnel)</label><input type="text" value="' + esc(f.siret_declare) + '" oninput="historiqueFormUpdate(\'' + esc(doc.id) + '\',\'siret_declare\',this.value)"></div>' +
+    '<div class="form-group"><label>Travaux effectués</label><input type="text" value="' + esc(f.description_travaux) + '" oninput="historiqueFormUpdate(\'' + esc(doc.id) + '\',\'description_travaux\',this.value)"></div>' +
   '</div>';
 }
 
 let _historiqueUploadQueue = []; // [{file, status:'pending'|'uploading'|'done'|'error', error?}]
+
+let _historiqueFormState = {}; // doc.id -> {plaque_declaree, date_document, km_declare, siret_declare, nom_garage_declare, description_travaux}
+
+function _historiqueInitFormState(doc) {
+  if (_historiqueFormState[doc.id]) return;
+  const ocrData = doc.ocr_raw || {};
+  _historiqueFormState[doc.id] = {
+    plaque_declaree:      ocrData.plaque || '',
+    date_document:        ocrData.date_document || '',
+    km_declare:           ocrData.km != null ? String(ocrData.km) : '',
+    siret_declare:        ocrData.siret || '',
+    nom_garage_declare:   ocrData.nom_garage || '',
+    description_travaux:  ocrData.description_travaux || ''
+  };
+}
+
+function historiqueFormUpdate(docId, field, value) {
+  if (!_historiqueFormState[docId]) _historiqueFormState[docId] = {};
+  _historiqueFormState[docId][field] = value;
+}
 
 async function uploadHistoriquePhoto(motoId, file, token) {
   const fd = new FormData();
