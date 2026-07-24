@@ -1200,9 +1200,9 @@ async function validerToutHistorique() {
   let successCount = 0, errorCount = 0;
   for (const doc of pending) {
     const f = _historiqueFormState[doc.id] || {};
-    if (!f.plaque_declaree || !f.date_document || f.km_declare === '' || f.km_declare == null) {
+    if (!f.plaque_declaree || !f.date_document || f.km_declare === '' || f.km_declare == null || !/^\d+$/.test(String(f.km_declare).trim())) {
       errorCount++;
-      continue; // champs obligatoires manquants — carte laissée visible pour correction
+      continue; // champs obligatoires manquants ou km_declare non numérique — carte laissée visible pour correction
     }
     const { ok, data } = await apiPost('/historique/' + doc.id + '/valider', {
       plaque_declaree: f.plaque_declaree,
