@@ -1280,6 +1280,33 @@ const server = http.createServer(async function(req, res){
     } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
   }
 
+  if((p=M('POST','/historique/:id/valider'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const { plaque_declaree, date_document, km_declare, siret_declare, nom_garage_declare, description_travaux, montant_ht, montant_ttc } = b;
+    if (!plaque_declaree || !date_document || km_declare === undefined || km_declare === null || km_declare === '') {
+      return fail(res, 'plaque_declaree, date_document et km_declare requis', 400, 'VALIDATION_ERROR');
+    }
+    if (!SBLayer) return fail(res, 'Validation indisponible (mode RAM)', 501, 'NOT_IMPLEMENTED');
+
+    const { data: staging0 } = await SBLayer.supabase.from('factures_scannees').select('moto_id').eq('id', p.id).maybeSingle();
+    if (!staging0) return fail(res, 'Document non trouvé', 404, 'NOT_FOUND');
+    const resolved = await resolveMotoForCtx(ctx, staging0.moto_id, a);
+    if (!resolved) return fail(res, 'Accès refusé à ce document', 403, 'FORBIDDEN');
+
+    try {
+      const result = await SBLayer.HistoriqueImport.valider(p.id, resolved.garage_id, ctx, {
+        plaque_declaree, date_document, km_declare: parseInt(km_declare),
+        siret_declare, nom_garage_declare, description_travaux, montant_ht, montant_ttc
+      });
+      return ok(res, result, 'Historique validé et ajouté au passeport');
+    } catch(e) {
+      if (e.code === 'KM_INCOHERENT') return fail(res, e.message, 409, 'KM_INCOHERENT');
+      return fail(res, e.message, e.message.includes('non trouvé') ? 404 : 500, 'DB_ERROR');
+    }
+  }
+
   /* MAINTENANCE CONSTRUCTEUR (L13 étape 5) — jusqu'ici exposée uniquement côté
      CLIENT (GET /client/moto, RAM-only) ; ce mince endpoint la rend accessible
      au garage/MECANO pour le briefing atelier. */
