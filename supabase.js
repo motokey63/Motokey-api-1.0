@@ -1056,6 +1056,76 @@ const OrdresReparation = {
     await OrdresReparation.logHistorique(or_id, 'attente', 'en_cours', 'ligne_acceptee_reprise', null, ctx);
   },
 
+  // Amendement review 24/07/2026 (voir docs/superpowers/specs/2026-07-24-notif-client-or-attente-design.md,
+  // décisions 9/10) : marque l'OR comme "client non notifiable" pour la raison donnée — lu par
+  // l'écran atelier (MotoKey_Atelier.html). Ne jamais throw : le côté serveur retourne un résultat
+  // en base, jamais une exception qui remonterait jusqu'à la création de ligne.
+  async _marquerNonNotifiable(or_id, raison, detail) {
+    if (detail) console.error(`⚠️  [L14bis] notif attente OR ${or_id} — ${raison}:`, detail);
+    const { error } = await supabase.from('ordres_reparation')
+      .update({ notif_attente_echec_motif: raison }).eq('id', or_id);
+    if (error) console.error(`⚠️  [L14bis] _marquerNonNotifiable — échec update OR ${or_id}:`, error.message);
+  },
+
+  // Amendement review 24/07/2026 (décision 1, anti-spam par OR) : un seul email par OR tant que
+  // derniere_notif_attente_envoyee_at n'a pas été réinitialisé (_reinitialiserNotifAttente, appelé
+  // depuis accepterLigne). Relit TOUTES les lignes actuellement en attente sur l'OR (pas seulement
+  // celle qui déclenche) pour l'email.
+  async _notifierClientAttenteOR(or_id) {
+    const { data: or } = await supabase.from('ordres_reparation')
+      .select('numero, moto_id, derniere_notif_attente_envoyee_at').eq('id', or_id).single();
+    if (!or || or.derniere_notif_attente_envoyee_at) return; // anti-spam : déjà notifié
+
+    const { data: moto } = await supabase.from('motos')
+      .select('marque, modele, plaque, client_id').eq('id', or.moto_id).single();
+    if (!moto || !moto.client_id) return OrdresReparation._marquerNonNotifiable(or_id, 'moto_sans_client');
+
+    const { data: client } = await supabase.from('clients')
+      .select('nom, email').eq('id', moto.client_id).single();
+    if (!client || !client.email) return OrdresReparation._marquerNonNotifiable(or_id, 'client_sans_email');
+
+    const [{ data: taches }, { data: pieces }] = await Promise.all([
+      supabase.from('or_taches').select('libelle').eq('or_id', or_id).eq('en_attente_acceptation_client', true),
+      supabase.from('or_pieces').select('libelle').eq('or_id', or_id).eq('en_attente_acceptation_client', true),
+    ]);
+    const lignes = [...(taches || []), ...(pieces || [])].map(l => l.libelle);
+    if (!lignes.length) return; // garde défensive, ne devrait pas arriver ici
+
+    // Lazy require, même pattern que consommableRappelService plus haut dans ce fichier —
+    // évite un cycle supabase.js <-> services/*.
+    const emailService = require('./services/emailService');
+    const result = await emailService.send('or-ligne-attente', client.email, {
+      client_nom: client.nom, moto: `${moto.marque} ${moto.modele}`, plaque: moto.plaque,
+      or_numero: or.numero, lignes, lien: process.env.FRONTEND_CLIENT_URL || '',
+    });
+
+    if (result && result.error) return OrdresReparation._marquerNonNotifiable(or_id, 'echec_envoi', result.error);
+
+    const { error } = await supabase.from('ordres_reparation')
+      .update({ derniere_notif_attente_envoyee_at: new Date().toISOString(), notif_attente_echec_motif: null })
+      .eq('id', or_id);
+    if (error) console.error(`⚠️  [L14bis] _notifierClientAttenteOR — échec update OR ${or_id}:`, error.message);
+  },
+
+  // Amendement review 24/07/2026 (décision 1, réarmement) : extrait en méthode dédiée (plutôt
+  // qu'inline dans accepterLigne x2) pour rester unitairement testable par mock sans dépendre du
+  // reste de accepterLigne (fetch ligne, update ligne, _revenirEnCoursSiPlusDeLigneEnAttente,
+  // recalculerTotaux — tous à I/O réelle). Appelée par OrTaches.accepterLigne et
+  // OrPieces.accepterLigne après acceptation d'une ligne.
+  //
+  // Fix review 24/07/2026 : ne jamais throw ici. Cette méthode est appelée APRÈS que
+  // l'acceptation de la ligne est déjà persistée (update en_attente_acceptation_client=false,
+  // date_acceptation_ligne, accepte_par_client_id) — un throw à ce stade ferait échouer toute la
+  // réponse HTTP alors que l'accord du client, la preuve juridique elle-même, a déjà été
+  // enregistré avec succès. Même doctrine fail-open que _marquerNonNotifiable : logger, jamais
+  // bloquer un chemin qui a déjà réussi sur le fond.
+  async _reinitialiserNotifAttente(or_id) {
+    const { error } = await supabase.from('ordres_reparation')
+      .update({ derniere_notif_attente_envoyee_at: null, notif_attente_echec_motif: null })
+      .eq('id', or_id);
+    if (error) console.error(`⚠️  [L14bis] _reinitialiserNotifAttente — échec update OR ${or_id}:`, error.message);
+  },
+
   async changerStatut(id, garage_id, ctx, { nouveau_statut, attente_motif, km_sortie, signature_base64, annulation_motif, refus_motif }) {
     const or = await OrdresReparation._getOrRaw(id, garage_id);
     const ancien = or.statut;
@@ -1207,6 +1277,7 @@ const OrTaches = {
       en_attente_acceptation_client: requiertAcceptation
     });
     if (enCoursDejaLance) await OrdresReparation._basculerEnAttentePourLigne(or_id, ctx);
+    if (requiertAcceptation) OrdresReparation._notifierClientAttenteOR(or_id).catch(e => console.error('❌ [L14bis] _notifierClientAttenteOR:', e.message));
     const orMaj = await OrdresReparation.recalculerTotaux(or_id);
     return { tache, ordre_reparation: orMaj };
   },
@@ -1229,6 +1300,7 @@ const OrTaches = {
       }).eq('id', id).select().single();
     if (error) throw new Error(error.message);
     await OrdresReparation._revenirEnCoursSiPlusDeLigneEnAttente(existing.or_id, { user_id: client_id, role: 'CLIENT' });
+    await OrdresReparation._reinitialiserNotifAttente(existing.or_id);
     const orMaj = await OrdresReparation.recalculerTotaux(existing.or_id);
     return { tache, ordre_reparation: orMaj };
   },
@@ -1307,6 +1379,7 @@ const OrPieces = {
       en_attente_acceptation_client: requiertAcceptation
     });
     if (enCoursDejaLance) await OrdresReparation._basculerEnAttentePourLigne(or_id, ctx);
+    if (requiertAcceptation) OrdresReparation._notifierClientAttenteOR(or_id).catch(e => console.error('❌ [L14bis] _notifierClientAttenteOR:', e.message));
     const orMaj = await OrdresReparation.recalculerTotaux(or_id);
     return { piece, ordre_reparation: orMaj };
   },
@@ -1326,6 +1399,7 @@ const OrPieces = {
       }).eq('id', id).select().single();
     if (error) throw new Error(error.message);
     await OrdresReparation._revenirEnCoursSiPlusDeLigneEnAttente(existing.or_id, { user_id: client_id, role: 'CLIENT' });
+    await OrdresReparation._reinitialiserNotifAttente(existing.or_id);
     const orMaj = await OrdresReparation.recalculerTotaux(existing.or_id);
     return { piece, ordre_reparation: orMaj };
   },

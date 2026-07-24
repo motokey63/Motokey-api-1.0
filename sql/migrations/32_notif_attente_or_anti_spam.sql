@@ -47,6 +47,8 @@ COMMENT ON COLUMN ordres_reparation.notif_attente_echec_motif IS
   'Raison de non-notification client : moto_sans_client | client_sans_email | echec_envoi. NULL = dernier envoi reussi ou sans objet. Affiche cote atelier.';
 
 ALTER TABLE ordres_reparation
+  DROP CONSTRAINT IF EXISTS chk_notif_attente_echec_motif;
+ALTER TABLE ordres_reparation
   ADD CONSTRAINT chk_notif_attente_echec_motif
   CHECK (notif_attente_echec_motif IS NULL
          OR notif_attente_echec_motif IN ('moto_sans_client','client_sans_email','echec_envoi'));
