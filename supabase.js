@@ -572,6 +572,27 @@ const Interventions = {
 };
 
 // ══════════════════════════════════════════════════════════
+// L15 — REPRISE D'HISTORIQUE (import factures/justificatifs anciens)
+// ══════════════════════════════════════════════════════════
+const HistoriqueImport = {
+
+  // Zone de dépôt : jamais d'intervention créée ici (décision 5 du cadrage —
+  // l'IA pré-remplit ocr_raw, l'humain valide via .valider() avant toute
+  // promotion). moto_id/garage_id/acteur_type/acteur_id résolus en amont par
+  // resolveMotoForCtx() (motokey-api.js), dual CLIENT/GARAGE.
+  async creerStaging({ moto_id, garage_id, acteur_type, acteur_id, photo_url, ocr_raw }) {
+    return insert('factures_scannees', { moto_id, garage_id, acteur_type, acteur_id, photo_url, ocr_raw });
+  },
+
+  async list(moto_id) {
+    const { data, error } = await supabase.from('factures_scannees')
+      .select('*').eq('moto_id', moto_id).order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return data || [];
+  }
+};
+
+// ══════════════════════════════════════════════════════════
 // PLAN D'ENTRETIEN
 // ══════════════════════════════════════════════════════════
 const Entretien = {
@@ -1906,6 +1927,7 @@ module.exports = {
   Motos,
   RelevesKm,
   Interventions,
+  HistoriqueImport,
   Entretien,
   Transferts,
   Storage,
