@@ -40,6 +40,7 @@ const TEMPLATES = {
   'trial-ending':    require('../templates/emails/trial-ending'),
   'payment-failed':  require('../templates/emails/payment-failed'),
   'subscription-cancelled': require('../templates/emails/subscription-cancelled'),
+  'or-ligne-attente': require('../templates/emails/or-ligne-attente'),
 };
 
 /**
@@ -52,7 +53,7 @@ async function send(template, to, data) {
   const tpl = TEMPLATES[template];
   if (!tpl) {
     console.error(`❌ [7b] emailService.send — template inconnu: "${template}"`);
-    return;
+    return { error: `template inconnu: ${template}` };
   }
 
   const subject = tpl.subject(data);
@@ -63,9 +64,11 @@ async function send(template, to, data) {
     try {
       await resendClient.emails.send({ from: RESEND_FROM, to, subject, html, text });
       console.log(`📧 [7b] Email "${template}" envoyé à ${to}`);
+      return { sent: true };
     } catch (e) {
       // On ne lève pas l'erreur : l'email ne doit pas bloquer le flux auth
       console.error(`❌ [7b] Erreur envoi email "${template}" à ${to}:`, e.message);
+      return { error: e.message };
     }
   } else {
     // Mode développement
@@ -74,6 +77,7 @@ async function send(template, to, data) {
     console.log(`   Sujet  : ${subject}`);
     console.log(`   Texte  : ${text.replace(/\n/g, '\n   ')}`);
     console.log(`──────────────────────────────────────────────────\n`);
+    return { sent: true, dev: true };
   }
 }
 
