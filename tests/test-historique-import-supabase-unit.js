@@ -231,6 +231,94 @@ async function run() {
     restoreFrom();
   }
 
+  // ── contresigner : bump jaune→bleu, décision 4 ("remonte d'un cran") ────
+  console.log('\n── contresigner (nominal) ────────────────────────────────────────');
+  try {
+    const trace = mockFrom({
+      factures_scannees: [
+        { data: { id: 'fs-20', garage_id: 'garage-1', acteur_type: 'client', validated_at: '2026-07-20T00:00:00.000Z', intervention_id: 'int-20', contresigne_par_garage_id: null }, error: null }, // select staging
+        { data: { id: 'fs-20', contresigne_par_garage_id: 'garage-1' }, error: null }, // update final
+      ],
+      interventions: [
+        { data: { id: 'int-20', moto_id: 'moto-1' }, error: null }, // update type=bleu
+      ],
+      motos: [
+        { data: { score: 55, couleur_dossier: 'bleu' }, error: null },
+      ],
+    });
+    const result = await HistoriqueImport.contresigner('fs-20', 'garage-1');
+    const interUpdate = trace.find(c => c.table === 'interventions' && c.method === 'update');
+    check("intervention passée à type='bleu'", interUpdate && interUpdate.args[0].type === 'bleu', JSON.stringify(interUpdate && interUpdate.args[0]));
+    check('résultat contient facture_scannee', !!result.facture_scannee, JSON.stringify(result));
+  } catch (e) {
+    check('contresigner (nominal) sans exception', false, e.message);
+  } finally {
+    restoreFrom();
+  }
+
+  // ── contresigner : refuse un import garage (n'a pas besoin de contre-signature) ──
+  console.log('\n── contresigner (rejet — déjà un import garage) ─────────────────');
+  try {
+    const trace = mockFrom({
+      factures_scannees: [
+        { data: { id: 'fs-21', garage_id: 'garage-1', acteur_type: 'garage', validated_at: '2026-07-20T00:00:00.000Z', intervention_id: 'int-21', contresigne_par_garage_id: null }, error: null },
+      ],
+    });
+    let threw = null;
+    try { await HistoriqueImport.contresigner('fs-21', 'garage-1'); } catch (e) { threw = e; }
+    check("refuse un import déjà de type 'garage' (message spécifique au guard acteur_type)",
+      threw && /import garage/i.test(threw.message), threw && threw.message);
+    const fromCalls = trace.filter(t => t.method === 'from');
+    check("un seul appel .from() (guard acteur_type='garage' court-circuite avant interventions/motos)",
+      fromCalls.length === 1, `${fromCalls.length} appels trouvés`);
+  } catch (e) {
+    check('contresigner (rejet garage) sans exception inattendue', false, e.message);
+  } finally {
+    restoreFrom();
+  }
+
+  // ── contresigner : refuse un garage différent du garage propriétaire ────
+  console.log('\n── contresigner (rejet — mauvais garage) ─────────────────────────');
+  try {
+    const trace = mockFrom({
+      factures_scannees: [
+        { data: { id: 'fs-22', garage_id: 'garage-1', acteur_type: 'client', validated_at: '2026-07-20T00:00:00.000Z', intervention_id: 'int-22', contresigne_par_garage_id: null }, error: null },
+      ],
+    });
+    let threw = null;
+    try { await HistoriqueImport.contresigner('fs-22', 'garage-AUTRE'); } catch (e) { threw = e; }
+    check("refuse un garage différent du garage propriétaire de la moto (message spécifique au guard garage_id)",
+      threw && /garage propriétaire/i.test(threw.message), threw && threw.message);
+    const fromCalls = trace.filter(t => t.method === 'from');
+    check("un seul appel .from() (guard garage_id court-circuite avant interventions/motos)",
+      fromCalls.length === 1, `${fromCalls.length} appels trouvés`);
+  } catch (e) {
+    check('contresigner (rejet mauvais garage) sans exception inattendue', false, e.message);
+  } finally {
+    restoreFrom();
+  }
+
+  // ── contresigner : refuse un document déjà contre-signé ─────────────────
+  console.log('\n── contresigner (rejet — déjà contre-signé) ────────────────────────');
+  try {
+    const trace = mockFrom({
+      factures_scannees: [
+        { data: { id: 'fs-23', garage_id: 'garage-1', acteur_type: 'client', validated_at: '2026-07-20T00:00:00.000Z', intervention_id: 'int-23', contresigne_par_garage_id: 'garage-1' }, error: null },
+      ],
+    });
+    let threw = null;
+    try { await HistoriqueImport.contresigner('fs-23', 'garage-1'); } catch (e) { threw = e; }
+    check("refuse un document déjà contre-signé (message spécifique au guard contresigne_par_garage_id)",
+      threw && /déjà contre-sign/i.test(threw.message), threw && threw.message);
+    const fromCalls = trace.filter(t => t.method === 'from');
+    check("un seul appel .from() (guard 'déjà contre-signé' court-circuite avant interventions/motos)",
+      fromCalls.length === 1, `${fromCalls.length} appels trouvés`);
+  } catch (e) {
+    check('contresigner (rejet déjà contre-signé) sans exception inattendue', false, e.message);
+  } finally {
+    restoreFrom();
+  }
+
   console.log('\n' + '═'.repeat(60));
   console.log(`📊 ${OK}/${OK + KO} checks passés`);
   if (KO > 0) process.exitCode = 1;

@@ -653,6 +653,33 @@ const HistoriqueImport = {
 
     return { facture_scannee: majStaging, intervention: inter.intervention, nouveau_score: inter.nouveau_score, nouvelle_couleur: inter.nouvelle_couleur };
   }
+
+  ,
+
+  // Décision 4 du cadrage : "remonte d'un cran si contre-signé par un garage
+  // PRO" — seul le garage propriétaire de la moto peut contre-signer (pas
+  // n'importe quel PRO), et seul un import CLIENT en a besoin (un import
+  // garage est déjà au niveau de confiance maximal du modèle actuel).
+  async contresigner(id, garage_id) {
+    const { data: staging, error: fe } = await supabase.from('factures_scannees').select('*').eq('id', id).single();
+    if (fe || !staging) throw new Error('Document non trouvé');
+    if (!staging.validated_at || !staging.intervention_id) throw new Error('Document pas encore validé — impossible de contre-signer');
+    if (staging.garage_id !== garage_id) throw new Error("Seul le garage propriétaire de cette moto peut contre-signer");
+    if (staging.acteur_type === 'garage') throw new Error("Un import garage n'a pas besoin de contre-signature");
+    if (staging.contresigne_par_garage_id) throw new Error('Déjà contre-signé');
+
+    const { data: inter, error: ue } = await supabase.from('interventions')
+      .update({ type: 'bleu' }).eq('id', staging.intervention_id).select('id, moto_id').single();
+    if (ue) throw new Error(ue.message);
+
+    const { data: majStaging, error: ue2 } = await supabase.from('factures_scannees').update({
+      contresigne_par_garage_id: garage_id, contresigne_at: new Date().toISOString()
+    }).eq('id', id).select().single();
+    if (ue2) throw new Error(ue2.message);
+
+    const { data: moto } = await supabase.from('motos').select('score, couleur_dossier').eq('id', inter.moto_id).single();
+    return { facture_scannee: majStaging, nouveau_score: moto?.score, nouvelle_couleur: moto?.couleur_dossier };
+  }
 };
 
 // ══════════════════════════════════════════════════════════
