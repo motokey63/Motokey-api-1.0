@@ -28,6 +28,12 @@
 -- d'implementation) — appliquer cette migration seule est sans effet sur
 -- le comportement actuel.
 --
+-- Les 3 valeurs possibles de notif_attente_echec_motif sont contraintes en
+-- base (CHECK ci-dessous) : 'moto_sans_client' | 'client_sans_email' |
+-- 'echec_envoi', ou NULL. Tout ajout futur d'un nouveau motif exige de
+-- modifier cette contrainte (DROP CONSTRAINT + ADD CONSTRAINT), pas
+-- seulement le code applicatif.
+--
 -- À appliquer manuellement via Supabase Dashboard > SQL Editor.
 -- ═══════════════════════════════════════════════════════════
 
@@ -39,3 +45,8 @@ COMMENT ON COLUMN ordres_reparation.derniere_notif_attente_envoyee_at IS
   'Anti-spam : horodatage du dernier email client envoye pour cet OR (NULL = pas encore notifie ou rearme apres acceptation de ligne). Un seul email par OR tant que non reinitialise.';
 COMMENT ON COLUMN ordres_reparation.notif_attente_echec_motif IS
   'Raison de non-notification client : moto_sans_client | client_sans_email | echec_envoi. NULL = dernier envoi reussi ou sans objet. Affiche cote atelier.';
+
+ALTER TABLE ordres_reparation
+  ADD CONSTRAINT chk_notif_attente_echec_motif
+  CHECK (notif_attente_echec_motif IS NULL
+         OR notif_attente_echec_motif IN ('moto_sans_client','client_sans_email','echec_envoi'));
