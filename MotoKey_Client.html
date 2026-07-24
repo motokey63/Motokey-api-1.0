@@ -1154,6 +1154,59 @@ function renderHistoriqueCard(doc) {
   '</div>';
 }
 
+let _historiqueUploadQueue = []; // [{file, status:'pending'|'uploading'|'done'|'error', error?}]
+
+async function uploadHistoriquePhoto(motoId, file, token) {
+  const fd = new FormData();
+  fd.append('photo', file);
+  const res = await fetch(API_BASE + '/motos/' + motoId + '/historique', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token }, // NO Content-Type
+    body: fd
+  });
+  let data; try { data = await res.json(); } catch { data = {}; }
+  return { ok: res.ok, status: res.status, data };
+}
+
+function renderHistoriqueUploadQueue() {
+  const box = document.getElementById('historique-upload-queue');
+  if (!box) return;
+  if (!_historiqueUploadQueue.length) { box.innerHTML = ''; return; }
+  const icons = { pending: '⏳', uploading: '⬆️', done: '✅', error: '❌' };
+  box.innerHTML = '<div class="card" style="margin-bottom:16px">' +
+    _historiqueUploadQueue.map(function(item) {
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px">' +
+        '<span>' + icons[item.status] + ' ' + esc(item.file.name) + '</span>' +
+        (item.status === 'error' ? '<span style="color:var(--rd);font-size:12px">' + esc(item.error || 'Échec') + '</span>' : '') +
+      '</div>';
+    }).join('') +
+  '</div>';
+}
+
+async function handleHistoriquePhotosSelected(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  const at = localStorage.getItem(LS_AT);
+  _historiqueUploadQueue = files.map(function(file) { return { file: file, status: 'pending' }; });
+  renderHistoriqueUploadQueue();
+
+  for (let i = 0; i < _historiqueUploadQueue.length; i++) {
+    _historiqueUploadQueue[i].status = 'uploading';
+    renderHistoriqueUploadQueue();
+    const r = await uploadHistoriquePhoto(_historiqueMotoId, _historiqueUploadQueue[i].file, at);
+    if (r.ok) {
+      _historiqueUploadQueue[i].status = 'done';
+    } else {
+      _historiqueUploadQueue[i].status = 'error';
+      _historiqueUploadQueue[i].error = errMsg(r.data);
+    }
+    renderHistoriqueUploadQueue();
+  }
+
+  toast('Import terminé — vérifiez la liste ci-dessous.', 'success');
+  loadHistoriqueImport();
+}
+
 async function loadClientInterventions() {
   const at = localStorage.getItem(LS_AT);
   const box = document.getElementById('interventions-list-content');
@@ -1310,6 +1363,13 @@ document.getElementById('btn-interventions').addEventListener('click', () => {
 });
 document.getElementById('btn-back-from-interventions').addEventListener('click', () => showScreen('app'));
 document.getElementById('btn-back-from-historique-import').addEventListener('click', () => showScreen('app'));
+document.getElementById('btn-choisir-photos').addEventListener('click', () => {
+  document.getElementById('input-historique-photos').click();
+});
+document.getElementById('input-historique-photos').addEventListener('change', (e) => {
+  handleHistoriquePhotosSelected(e.target.files);
+  e.target.value = ''; // permet de réimporter le(s) même(s) fichier(s) ensuite si besoin
+});
 
 /* ═══════════════════════════════════════════════════════
    ÉCRAN 7 — MON COMPTE
