@@ -1267,6 +1267,19 @@ const server = http.createServer(async function(req, res){
     return ok(res,{score:sc,couleur:couleur(sc),nb_interventions:is.length,par_type:pt,detail:{concession:pt.vert*12,pro_valide:pt.bleu*8,proprietaire:pt.jaune*5,malus:pt.rouge*5}});
   }
 
+  if((p=M('GET','/motos/:id/historique'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    const resolved = await resolveMotoForCtx(ctx, p.id, a);
+    if (!resolved) return fail(res, 'Moto non trouvée', 404, 'NOT_FOUND');
+    if (!SBLayer) return fail(res, 'Historique indisponible (mode RAM)', 501, 'NOT_IMPLEMENTED');
+    try {
+      const rows = await SBLayer.HistoriqueImport.list(resolved.moto.id);
+      return ok(res, { historique: rows }, 'OK');
+    } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
+  }
+
   /* MAINTENANCE CONSTRUCTEUR (L13 étape 5) — jusqu'ici exposée uniquement côté
      CLIENT (GET /client/moto, RAM-only) ; ce mince endpoint la rend accessible
      au garage/MECANO pour le briefing atelier. */
