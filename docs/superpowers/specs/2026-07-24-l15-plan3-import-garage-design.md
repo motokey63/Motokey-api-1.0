@@ -45,6 +45,14 @@ Voir le cadrage original pour les décisions déjà actées (1 à 6, notamment d
    actif, l'import fonctionne quand même (identique à un import client) ; le bouton "Facturer
    cette reprise" n'apparaît simplement pas.
 
+   **Correction (rédaction du plan)** : `_currentOrId` (`MotoKey_Atelier.html:732`) est un état
+   global posé uniquement par l'écran "OR actif" — une navigation indépendante de `renderBriefing`,
+   pas garanti de correspondre à la moto affichée. La détection "OR actif pour CETTE moto" utilise
+   donc `GET /ordres-reparation?moto_id=X` (filtre déjà supporté, `motokey-api.js:2860`), interrogé
+   au chargement du briefing (ajout à l'`Promise.allSettled` existant d'`openBriefing`), en
+   retenant un OR dont le statut n'est pas terminal (`termine`/`facture`/`annule`/`refuse`). L'appel
+   `POST /ordres-reparation/:id/taches` cible cet OR précis, jamais `_currentOrId`.
+
 6. **Contre-signature = clic direct, pas de modale de confirmation** — cohérent avec le reste
    de l'atelier (`toggleTache` et consorts agissent sans confirmation).
 
