@@ -1131,7 +1131,11 @@ function renderHistoriqueList() {
     box.innerHTML = '<div class="empty-state"><div class="empty-icon">📄</div><p>Aucun document importé pour le moment.</p></div>';
     return;
   }
-  box.innerHTML = _historiqueListCache.map(renderHistoriqueCard).join('');
+  const pendingCount = _historiqueListCache.filter(function(d) { return !d.validated_at; }).length;
+  const validerBtn = pendingCount
+    ? '<button class="btn btn-primary btn-full" id="btn-valider-tout-historique" onclick="validerToutHistorique()">Valider ' + pendingCount + ' document' + (pendingCount > 1 ? 's' : '') + '</button>'
+    : '';
+  box.innerHTML = _historiqueListCache.map(renderHistoriqueCard).join('') + validerBtn;
 }
 
 function renderHistoriqueCard(doc) {
@@ -1186,6 +1190,47 @@ function _historiqueInitFormState(doc) {
 function historiqueFormUpdate(docId, field, value) {
   if (!_historiqueFormState[docId]) _historiqueFormState[docId] = {};
   _historiqueFormState[docId][field] = value;
+}
+
+async function validerToutHistorique() {
+  const at = localStorage.getItem(LS_AT);
+  const pending = _historiqueListCache.filter(function(d) { return !d.validated_at; });
+  if (!pending.length) return;
+
+  let successCount = 0, errorCount = 0;
+  for (const doc of pending) {
+    const f = _historiqueFormState[doc.id] || {};
+    if (!f.plaque_declaree || !f.date_document || f.km_declare === '' || f.km_declare == null) {
+      errorCount++;
+      continue; // champs obligatoires manquants — carte laissée visible pour correction
+    }
+    const { ok, data } = await apiPost('/historique/' + doc.id + '/valider', {
+      plaque_declaree: f.plaque_declaree,
+      date_document: f.date_document,
+      km_declare: parseInt(f.km_declare, 10),
+      siret_declare: f.siret_declare || null,
+      nom_garage_declare: f.nom_garage_declare || null,
+      description_travaux: f.description_travaux || null
+    }, at);
+    if (ok) {
+      successCount++;
+    } else {
+      errorCount++;
+      const idx = _historiqueListCache.findIndex(function(d) { return d.id === doc.id; });
+      if (idx >= 0) {
+        if (data && data.error && data.error.code === 'KM_INCOHERENT') {
+          _historiqueListCache[idx].km_coherence_statut = 'rejete';
+          _historiqueListCache[idx].km_coherence_motif  = data.error.message;
+        }
+      }
+    }
+  }
+
+  if (successCount) toast(successCount + ' document(s) validé(s) et ajouté(s) à l\'historique.', 'success');
+  if (errorCount)   toast(errorCount + ' document(s) n\'ont pas pu être validés — vérifiez les champs en rouge.', 'error');
+
+  await loadHistoriqueImport();
+  loadMotos(); // rafraîchit le score/historique de la moto concernée
 }
 
 async function uploadHistoriquePhoto(motoId, file, token) {
