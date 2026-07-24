@@ -1311,6 +1311,20 @@ const server = http.createServer(async function(req, res){
     }
   }
 
+  if((p=M('POST','/historique/:id/contresigner'))!==null){
+    const a = authSilent(req);
+    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
+    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
+    if (!rbac.requireRole(ctx, 'PRO')) return fail(res, 'Permission refusée — PRO minimum requis', 403, 'FORBIDDEN_ROLE');
+    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
+    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
+    if (!SBLayer) return fail(res, 'Contre-signature indisponible (mode RAM)', 501, 'NOT_IMPLEMENTED');
+    try {
+      const result = await SBLayer.HistoriqueImport.contresigner(p.id, garageId);
+      return ok(res, result, 'Document contre-signé — niveau de confiance mis à jour');
+    } catch(e) { return fail(res, e.message, e.message.includes('non trouvé') ? 404 : 409, 'DB_ERROR'); }
+  }
+
   /* MAINTENANCE CONSTRUCTEUR (L13 étape 5) — jusqu'ici exposée uniquement côté
      CLIENT (GET /client/moto, RAM-only) ; ce mince endpoint la rend accessible
      au garage/MECANO pour le briefing atelier. */
