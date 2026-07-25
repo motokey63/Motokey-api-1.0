@@ -117,6 +117,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif;ba
 .int-badge-bleu{background:var(--blbg);color:var(--bl);}
 .int-badge-jaune{background:var(--ywbg);color:var(--yw);}
 .int-badge-rouge{background:var(--rdbg);color:var(--rd);}
+.int-badge-archive{background:var(--border);color:var(--tx3);}
 .int-meta{font-size:13px;color:var(--tx2);margin-top:4px;}
 
 .fraude-row{background:var(--rdbg);border:1px solid var(--rd);border-radius:12px;padding:14px 18px;margin-bottom:10px;}
@@ -543,10 +544,11 @@ const COULEUR_META = {
   rouge: { label: 'Insuffisant', cls: 'rouge' }
 };
 const INT_TYPE_META = {
-  vert:  { label: 'Concession', cls: 'int-badge-vert' },
-  bleu:  { label: 'Pro validé', cls: 'int-badge-bleu' },
-  jaune: { label: 'Déclaré',    cls: 'int-badge-jaune' },
-  rouge: { label: 'Malus',      cls: 'int-badge-rouge' }
+  vert:    { label: 'Concession', cls: 'int-badge-vert' },
+  bleu:    { label: 'Pro validé', cls: 'int-badge-bleu' },
+  jaune:   { label: 'Déclaré',    cls: 'int-badge-jaune' },
+  rouge:   { label: 'Malus',      cls: 'int-badge-rouge' },
+  archive: { label: '↩ Remplacée', cls: 'int-badge-archive' }
 };
 const CONSO_LABELS = {
   pneu_av: 'Pneu avant', pneu_ar: 'Pneu arrière', chaine: 'Chaîne',

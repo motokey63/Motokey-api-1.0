@@ -113,6 +113,8 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
 .interv-badge.bleu{background:var(--bl);}
 .interv-badge.jaune{background:var(--yw);}
 .interv-badge.rouge{background:var(--rd);}
+.interv-badge.archive{background:var(--tx3);}
+.interv-replaced-label{font-size:11px;color:var(--tx3);margin-top:2px;}
 .interv-body{flex:1;min-width:0;}
 .interv-title{font-size:14px;font-weight:600;color:var(--tx);}
 .interv-meta{font-size:12px;color:var(--tx3);margin-top:2px;}
@@ -787,6 +789,7 @@ function renderMotoCard(moto) {
           <div class="interv-body">
             <div class="interv-title">${esc(i.titre)}</div>
             <div class="interv-meta">${fmtDate(i.date_intervention)}${i.km ? ' · ' + i.km.toLocaleString('fr-FR') + ' km' : ''}${i.technicien_nom ? ' · ' + esc(i.technicien_nom) : ''}</div>
+            ${i.type === 'archive' ? '<div class="interv-replaced-label">Remplacée par le garage</div>' : ''}
           </div>
         </div>`).join('');
 
