@@ -545,8 +545,12 @@ const Interventions = {
       // km < km actuel de la moto). Ne touche JAMAIS motos.km (trg_update_km supprimé en 23-01).
       km:              payload.km,
       technicien_id:   payload.technicien_id || null,
-      montant_ht:      payload.montant_ht    || 0,
-      montant_ttc:     payload.montant_ttc   || 0,
+      // ?? plutôt que || : un appelant qui ne fournit aucun montant veut dire
+      // "inconnu" (NULL), pas "gratuit" (0) — seul HistoriqueImport.valider()
+      // s'appuie sur ce défaut aujourd'hui, les autres appelants passent
+      // toujours un nombre réel donc ce changement ne les affecte pas.
+      montant_ht:      payload.montant_ht    ?? null,
+      montant_ttc:     payload.montant_ttc   ?? null,
       date_intervention: payload.date        || new Date().toISOString().split('T')[0]
     });
     // Le trigger SQL recalcule le score automatiquement
@@ -640,9 +644,14 @@ const HistoriqueImport = {
     const typeIntervention = staging.acteur_type === 'garage' ? 'bleu' : 'jaune';
 
     const titre = nom_garage_declare ? `Historique importé — ${nom_garage_declare}` : 'Historique importé';
+    // Montant intentionnellement inconnu (NULL), jamais 0 : aucun écran (client,
+    // atelier, app.html) ne saisit de montant pour un import L15 aujourd'hui et
+    // l'OCR ne l'extrait pas (services/historiqueFactureService.js) — 0€ lirait
+    // à tort comme "gratuit". Jamais compté dans le CA (Garages.getStats() lit
+    // uniquement ordres_reparation, pas interventions) — cf conversation du 25/07.
     const inter = await Interventions.create(garage_id, staging.moto_id, {
       type: typeIntervention, titre, description: description_travaux || '', km: km_declare,
-      montant_ht: montant_ht || 0, montant_ttc: montant_ttc || 0, date: date_document
+      montant_ht: montant_ht ?? null, montant_ttc: montant_ttc ?? null, date: date_document
     });
     const { error: ue2 } = await supabase.from('interventions')
       .update({ niveau_preuve: 'facture', facture_id: id, photo_url: staging.photo_url })
