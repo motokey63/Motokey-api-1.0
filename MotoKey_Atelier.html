@@ -561,7 +561,10 @@ function showView(view) {
   document.getElementById('view-or-actif').style.display = view === 'or-actif' ? 'block' : 'none';
 }
 
-function renderBriefing(motoId, { moto, consommables, planEntretien, fraudeFlags, stale }) {
+function renderBriefing(motoId, { moto, consommables, planEntretien, fraudeFlags, historique, activeOrId, stale }) {
+  _historiqueMotoId = motoId;
+  _historiqueListCache = historique || [];
+  _historiqueActiveOrId = activeOrId || null;
   const client = moto.client || {};
   const couleurMeta = COULEUR_META[moto.couleur_dossier] || COULEUR_META.rouge;
 
@@ -640,8 +643,62 @@ function renderBriefing(motoId, { moto, consommables, planEntretien, fraudeFlags
       <div class="briefing-section-title">Dernières interventions</div>
       ${intHtml}
     </div>
+    <div class="briefing-section">
+      <div class="briefing-section-title">Historique importé</div>
+      <button class="btn-add-ligne" onclick="ouvrirImportHistoriqueAtelier('${escapeHtml(moto.id)}')">📄 Importer un historique</button>
+      <input type="file" id="input-historique-photos-atelier" accept="image/jpeg,image/png,image/webp" multiple style="display:none">
+      <div id="historique-upload-queue-atelier"></div>
+      <div id="historique-section-content-atelier">${renderHistoriqueSectionAtelier(_historiqueListCache)}</div>
+    </div>
     ${flagsHtml}
   `;
+}
+
+let _historiqueMotoId    = null;
+let _historiqueListCache = [];
+let _historiqueActiveOrId = null;
+
+function ouvrirImportHistoriqueAtelier(motoId) {
+  document.getElementById('input-historique-photos-atelier').click();
+}
+
+async function reloadHistoriqueAtelier() {
+  const token = getToken();
+  const { ok, data } = await apiGet('/motos/' + _historiqueMotoId + '/historique', token);
+  const box = document.getElementById('historique-section-content-atelier');
+  if (!box) return;
+  if (!ok) {
+    box.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>' + escapeHtml(errMsg(data)) + '</p></div>';
+    return;
+  }
+  const payload = data.data || data;
+  _historiqueListCache = payload.historique || [];
+  box.innerHTML = renderHistoriqueSectionAtelier(_historiqueListCache);
+}
+
+function renderHistoriqueSectionAtelier(historique) {
+  if (!historique.length) {
+    return '<div class="empty-state"><div class="icon">📄</div><p>Aucun document importé pour le moment.</p></div>';
+  }
+  return historique.map(renderHistoriqueCardAtelier).join('');
+}
+
+function renderHistoriqueCardAtelier(doc) {
+  if (doc.validated_at) {
+    return '<div class="int-row">' +
+      '<div class="int-row-top">' +
+        '<span class="int-titre">' + escapeHtml(doc.plaque_declaree || '—') + '</span>' +
+        '<span class="int-badge int-badge-vert">✓ Validé</span>' +
+      '</div>' +
+      '<div class="int-meta">' + escapeHtml(fmtDateFlexible(doc.date_document)) + (doc.km_declare != null ? ' · ' + Number(doc.km_declare).toLocaleString('fr-FR') + ' km' : '') + '</div>' +
+    '</div>';
+  }
+  return '<div class="int-row">' +
+    '<div class="int-row-top">' +
+      '<span class="int-titre">Document importé — en attente de validation</span>' +
+      '<span class="int-badge int-badge-jaune">⏳ À valider</span>' +
+    '</div>' +
+  '</div>';
 }
 
 function _settledOrFallback(settled, fallbackMsg) {
@@ -658,17 +715,21 @@ async function openBriefing(motoId) {
     const token = getToken();
     // allSettled : un appel en échec (timeout, exception réseau) n'empêche jamais
     // les autres d'être lus, et ne doit jamais laisser l'écran bloqué en chargement.
-    const [motoS, consoS, planS, fraudeS] = await Promise.allSettled([
+    const [motoS, consoS, planS, fraudeS, historiqueS, orsS] = await Promise.allSettled([
       apiGet('/motos/' + motoId, token),
       apiGet('/motos/' + motoId + '/consommables', token),
       apiGet('/motos/' + motoId + '/plan-entretien', token),
-      apiGet('/fraude/historique', token)
+      apiGet('/fraude/historique', token),
+      apiGet('/motos/' + motoId + '/historique', token),
+      apiGet('/ordres-reparation?moto_id=' + motoId, token)
     ]);
 
-    const motoRes   = _settledOrFallback(motoS,   'Erreur inattendue lors du chargement de la moto.');
-    const consoRes  = _settledOrFallback(consoS,  'Jauges consommables indisponibles.');
-    const planRes   = _settledOrFallback(planS,   'Maintenance constructeur indisponible.');
-    const fraudeRes = _settledOrFallback(fraudeS, 'Historique anti-fraude indisponible.');
+    const motoRes      = _settledOrFallback(motoS,      'Erreur inattendue lors du chargement de la moto.');
+    const consoRes     = _settledOrFallback(consoS,     'Jauges consommables indisponibles.');
+    const planRes      = _settledOrFallback(planS,      'Maintenance constructeur indisponible.');
+    const fraudeRes     = _settledOrFallback(fraudeS,    'Historique anti-fraude indisponible.');
+    const historiqueRes = _settledOrFallback(historiqueS, 'Historique importé indisponible.');
+    const orsRes        = _settledOrFallback(orsS,        'Ordres de réparation indisponibles.');
 
     if (motoRes.status === 401) { doLogout(); return; }
 
@@ -686,12 +747,19 @@ async function openBriefing(motoId) {
     const planPayload  = planRes.ok  ? (planRes.data.data  || planRes.data)  : {};
     const fraudePayload = fraudeRes.ok ? (fraudeRes.data.data || fraudeRes.data) : {};
     const fraudeFlags = (fraudePayload.verifications || []).filter(f => f.moto_id === motoId && f.verdict !== 'authentifie');
+    const historiquePayload = historiqueRes.ok ? (historiqueRes.data.data || historiqueRes.data) : {};
+    const historique = historiquePayload.historique || [];
+    const orsPayload = orsRes.ok ? (orsRes.data.data || orsRes.data) : {};
+    const orActif = (orsPayload.ordres || []).find(o => OR_STATUTS_ACTIFS.includes(o.statut));
+    const activeOrId = orActif ? orActif.id : null;
 
     const bundle = {
       moto,
       consommables: consoPayload.consommables || [],
       planEntretien: planPayload.plan_entretien || [],
-      fraudeFlags
+      fraudeFlags,
+      historique,
+      activeOrId
     };
     cacheDataSet('briefing_' + motoId, bundle);
     renderBriefing(motoId, Object.assign({}, bundle, { stale: false }));
