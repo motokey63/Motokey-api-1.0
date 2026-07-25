@@ -38,7 +38,7 @@ Système de gestion de garage moto pour Garage Motolab. Concept : "3ème clé di
 - **Photos** : Cloudinary (free tier, preset unsigned `motokey_unsigned`)
 - **IA** : Anthropic API pour OCR factures + génération de plan d'entretien
 - **VIN decoder** : NHTSA API en ligne + table WMI locale (30+ constructeurs) en fallback offline
-- **Email** : Resend — service implémenté dans `services/emailService.js` avec fallback `console.log`. **Envoi réel désactivé** tant que `RESEND_API_KEY` n'est pas configuré côté Railway env vars (flag `EMAIL_ENABLED=false` par défaut).
+- **Email** : Resend — service implémenté dans `services/emailService.js` avec fallback `console.log`. **Dormant côté délivrabilité réelle** : `EMAIL_ENABLED=true` et `RESEND_API_KEY` sont bien configurés sur Railway (vérifié `railway variables` le 25/07/2026), mais `RESEND_FROM` pointe encore vers l'adresse **sandbox** `onboarding@resend.dev` — domaine non vérifié. Resend restreint alors la délivrabilité aux destinataires vérifiés du compte, donc les emails envoyés aux vrais clients (notif OR en attente L14, reset password client L7b) sont probablement absorbés silencieusement (fail-open, sans crash). Ce qui débloque : vérifier un domaine sur Resend et mettre à jour `RESEND_FROM` sur Railway — action manuelle de Mehdi, sandbox assumé volontairement pour l'instant (confirmé 24/07/2026, voir mémoire `project_notif_client_or_attente`).
 
 ---
 
@@ -72,12 +72,14 @@ Système de gestion de garage moto pour Garage Motolab. Concept : "3ème clé di
 - 🔴 **ROUGE** (Insuffisant, <40)
 
 ### Formule de score
-- **70 % conformité + 30 % accumulation**, avec bonus pour motos faible kilométrage.
+- **Score dossier moto = somme cappée par type d'intervention** (`vert`=+12, `bleu`=+8, `jaune`=+5, `rouge`=-5), sommés sur toutes les interventions de la moto puis clampés entre 0 et 100 via `GREATEST(0, LEAST(100, SUM(...)))`. Pas de pondération 70/30. La couleur est ensuite dérivée des mêmes seuils que ci-dessus (80/60/40).
+- Recalcul automatique via trigger SQL `AFTER INSERT OR UPDATE OR DELETE ON interventions`, pas de calcul côté JS.
+- Source : `schema.sql:684-723`, fonction `recalc_score_moto()`. Aucune migration dans `sql/migrations/` ne redéfinit cette fonction — c'est la version live en prod.
+- ⚠️ **Système distinct de `niveau_preuve` ci-dessous** — ne pas confondre les deux, ils n'interagissent pas.
 
 ### Pondération anti-fraude (3 tiers)
-- `facture` = **1.0** (preuve forte)
-- `visuel` = **0.6** (photo/vidéo)
-- `declare` = **0.3** (déclaration sans preuve)
+- `niveau_preuve` = pondération anti-fraude **1.0** (`facture`, preuve forte) / **0.6** (`visuel`, photo/vidéo) / **0.3** (`declare`, déclaration sans preuve).
+- **Système DISTINCT du score dossier moto ci-dessus, inchangé** — n'entre pas dans le calcul de `recalc_score_moto()`.
 - **Cœur du système d'intégrité** — ne pas modifier sans validation explicite de Mehdi.
 
 ### Pneus (retiré en Phase 27, remplacé par Consommables)
