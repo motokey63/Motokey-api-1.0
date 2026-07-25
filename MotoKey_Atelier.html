@@ -681,7 +681,14 @@ function renderHistoriqueSectionAtelier(historique) {
   if (!historique.length) {
     return '<div class="empty-state"><div class="icon">📄</div><p>Aucun document importé pour le moment.</p></div>';
   }
-  return historique.map(renderHistoriqueCardAtelier).join('');
+  const pendingCount = historique.filter(function(d) { return !d.validated_at; }).length;
+  const validerBtn = pendingCount
+    ? '<button class="btn-add-ligne" onclick="validerToutHistoriqueAtelier()">Valider ' + pendingCount + ' document' + (pendingCount > 1 ? 's' : '') + '</button>'
+    : '';
+  const facturerBtn = _historiqueActiveOrId
+    ? '<button class="btn-add-ligne" onclick="facturerRepriseHistorique()">Facturer cette reprise (~30 €)</button>'
+    : '';
+  return historique.map(renderHistoriqueCardAtelier).join('') + validerBtn + facturerBtn;
 }
 
 function renderHistoriqueCardAtelier(doc) {
@@ -748,6 +755,56 @@ async function contresignerHistorique(docId) {
   if (!ok) { toast(errMsg(data), 'error'); return; }
   toast('Document contre-signé — niveau de confiance mis à jour.', 'success');
   reloadHistoriqueAtelier();
+}
+
+async function validerToutHistoriqueAtelier() {
+  const token = getToken();
+  const pending = _historiqueListCache.filter(function(d) { return !d.validated_at; });
+  if (!pending.length) return;
+
+  let successCount = 0, errorCount = 0;
+  for (const doc of pending) {
+    const f = _historiqueFormStateAtelier[doc.id] || {};
+    if (!f.plaque_declaree || !f.date_document || f.km_declare === '' || f.km_declare == null || !/^\d+$/.test(String(f.km_declare).trim())) {
+      errorCount++;
+      continue; // champs obligatoires manquants ou km_declare non numérique — carte laissée visible pour correction
+    }
+    const { ok, data } = await apiPost('/historique/' + doc.id + '/valider', {
+      plaque_declaree: f.plaque_declaree,
+      date_document: f.date_document,
+      km_declare: parseInt(f.km_declare, 10),
+      siret_declare: f.siret_declare || null,
+      nom_garage_declare: f.nom_garage_declare || null,
+      description_travaux: f.description_travaux || null
+    }, token);
+    if (ok) {
+      successCount++;
+    } else {
+      errorCount++;
+      const idx = _historiqueListCache.findIndex(function(d) { return d.id === doc.id; });
+      if (idx >= 0 && data && data.error && data.error.code === 'KM_INCOHERENT') {
+        _historiqueListCache[idx].km_coherence_statut = 'rejete';
+        _historiqueListCache[idx].km_coherence_motif  = data.error.message;
+      }
+    }
+  }
+
+  if (successCount === 1) toast('1 document validé et ajouté à l\'historique.', 'success');
+  else if (successCount > 1) toast(successCount + ' documents validés et ajoutés à l\'historique.', 'success');
+  if (errorCount === 1) toast('1 document n\'a pas pu être validé — vérifiez les champs en rouge.', 'error');
+  else if (errorCount > 1) toast(errorCount + ' documents n\'ont pas pu être validés — vérifiez les champs en rouge.', 'error');
+
+  await reloadHistoriqueAtelier();
+}
+
+async function facturerRepriseHistorique() {
+  if (!_historiqueActiveOrId) { toast('Aucun OR actif pour cette moto.', 'error'); return; }
+  const token = getToken();
+  const { ok, data } = await apiPost('/ordres-reparation/' + _historiqueActiveOrId + '/taches', {
+    libelle: 'Reprise d\'historique', duree_h: 1, taux_horaire: 30
+  }, token);
+  if (!ok) { toast(errMsg(data), 'error'); return; }
+  toast('Ligne "Reprise d\'historique" (30 €) ajoutée à l\'OR.', 'success');
 }
 
 async function uploadHistoriquePhotoAtelier(motoId, file, token) {
