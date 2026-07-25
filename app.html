@@ -974,6 +974,10 @@ function renderFicheTabContent() {
     c.innerHTML = `
       <div id="entretienContent"><div class="loading">Chargement plan entretien…</div></div>
       <div class="card" style="margin-top:20px;max-width:600px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:14px">Historique importé</div>
+        <div id="historiqueImporteContent"><div class="loading">Chargement…</div></div>
+      </div>
+      <div class="card" style="margin-top:20px;max-width:600px">
         <div style="font-size:13px;font-weight:700;margin-bottom:14px">Ajouter une intervention</div>
         <div id="interErr" class="alert alert-warn" style="display:none"></div>
         <div class="row-2">
@@ -996,6 +1000,7 @@ function renderFicheTabContent() {
         <button class="btn btn-primary" onclick="saveInter()">Ajouter l'intervention</button>
       </div>`;
     loadEntretien(mo.id);
+    loadHistoriqueImporteApp(mo.id);
   } else if (ficheTab === 'or') {
     c.innerHTML = '<div id="ficheORList"><div class="loading">Chargement…</div></div>';
     loadFicheORList(mo.id);
@@ -1183,6 +1188,46 @@ async function loadEntretien(id) {
     }).join('');
   } catch(e) {
     c.innerHTML = '<div class="alert alert-warn">Erreur : '+e.message+'</div>';
+  }
+}
+
+async function loadHistoriqueImporteApp(motoId) {
+  const c = document.getElementById('historiqueImporteContent');
+  if (!c) return;
+  try {
+    const data = await api('/motos/'+motoId+'/historique');
+    const historique = (data.historique || []).filter(d => d.validated_at);
+    if (!historique.length) { c.innerHTML = '<div class="alert alert-info">Aucun document importé validé pour le moment.</div>'; return; }
+    c.innerHTML = historique.map(renderHistoriqueCardApp).join('');
+  } catch(e) {
+    c.innerHTML = '<div class="alert alert-warn">Erreur : '+e.message+'</div>';
+  }
+}
+
+function renderHistoriqueCardApp(doc) {
+  const peutContresigner = doc.acteur_type === 'client' && !doc.contresigne_par_garage_id;
+  const contresignerBtn = peutContresigner
+    ? '<button class="btn btn-primary btn-sm" data-historique-id="' + escAttr(doc.id) + '" onclick="contresignerHistoriqueApp(this.dataset.historiqueId)">Contresigner</button>'
+    : '';
+  return '<div class="entretien-item">' +
+    '<div>' +
+      '<div class="entretien-nom">' + escHtml(doc.plaque_declaree || '—') + '</div>' +
+      '<div class="entretien-info">' + escHtml(fmtDateOnly(doc.date_document)) + (doc.km_declare != null ? ' · ' + Number(doc.km_declare).toLocaleString('fr-FR') + ' km' : '') + '</div>' +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:10px">' +
+      '<span class="badge badge-vert">✓ Validé</span>' +
+      contresignerBtn +
+    '</div>' +
+  '</div>';
+}
+
+async function contresignerHistoriqueApp(docId) {
+  try {
+    await api('/historique/'+docId+'/contresigner', 'POST', {});
+    toast('✅ Document contre-signé');
+    if (selectedMoto) await loadHistoriqueImporteApp(selectedMoto.id);
+  } catch(e) {
+    toast('❌ ' + e.message);
   }
 }
 

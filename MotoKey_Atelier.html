@@ -695,17 +695,12 @@ function renderHistoriqueSectionAtelier(historique) {
 
 function renderHistoriqueCardAtelier(doc) {
   if (doc.validated_at) {
-    const peutContresigner = doc.acteur_type === 'client' && !doc.contresigne_par_garage_id;
-    const contresignerBtn = peutContresigner
-      ? '<button class="btn-add-ligne" onclick="contresignerHistorique(\'' + escapeHtml(doc.id) + '\')">Contresigner</button>'
-      : '';
     return '<div class="int-row">' +
       '<div class="int-row-top">' +
         '<span class="int-titre">' + escapeHtml(doc.plaque_declaree || '—') + '</span>' +
         '<span class="int-badge int-badge-vert">✓ Validé</span>' +
       '</div>' +
       '<div class="int-meta">' + escapeHtml(fmtDateFlexible(doc.date_document)) + (doc.km_declare != null ? ' · ' + Number(doc.km_declare).toLocaleString('fr-FR') + ' km' : '') + '</div>' +
-      contresignerBtn +
     '</div>';
   }
 
@@ -749,14 +744,6 @@ function _historiqueInitFormStateAtelier(doc) {
 function historiqueFormUpdateAtelier(docId, field, value) {
   if (!_historiqueFormStateAtelier[docId]) _historiqueFormStateAtelier[docId] = {};
   _historiqueFormStateAtelier[docId][field] = value;
-}
-
-async function contresignerHistorique(docId) {
-  const token = getToken();
-  const { ok, data } = await apiPost('/historique/' + docId + '/contresigner', {}, token);
-  if (!ok) { toast(errMsg(data), 'error'); return; }
-  toast('Document contre-signé — niveau de confiance mis à jour.', 'success');
-  reloadHistoriqueAtelier();
 }
 
 async function validerToutHistoriqueAtelier() {
