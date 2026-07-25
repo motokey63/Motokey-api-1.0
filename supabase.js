@@ -625,21 +625,38 @@ const HistoriqueImport = {
 
     // Divergence : une autre ligne déjà validée pour la même plaque + date,
     // avec un acteur différent (client vs garage) — jamais écrasée, tracée.
+    // intervention_id sélectionné en plus (L15 Plan 3) pour pouvoir neutraliser
+    // au score l'intervention supplantée sans toucher recalc_score_moto().
     const { data: divergentes } = await supabase.from('factures_scannees')
-      .select('id, acteur_type').eq('moto_id', staging.moto_id)
+      .select('id, acteur_type, intervention_id').eq('moto_id', staging.moto_id)
       .eq('plaque_declaree', plaque_declaree).eq('date_document', date_document)
       .not('validated_at', 'is', null).neq('acteur_type', staging.acteur_type).neq('id', id);
-    const divergence_de = (divergentes && divergentes[0]) ? divergentes[0].id : null;
+    const divergente = (divergentes && divergentes[0]) ? divergentes[0] : null;
+    const divergence_de = divergente ? divergente.id : null;
+
+    // Import GARAGE = fait foi par construction (décision 1 du cadrage) —
+    // promotion directe en bleu, pas de contre-signature nécessaire (celle-ci
+    // reste réservée aux imports CLIENT, voir HistoriqueImport.contresigner).
+    const typeIntervention = staging.acteur_type === 'garage' ? 'bleu' : 'jaune';
 
     const titre = nom_garage_declare ? `Historique importé — ${nom_garage_declare}` : 'Historique importé';
     const inter = await Interventions.create(garage_id, staging.moto_id, {
-      type: 'jaune', titre, description: description_travaux || '', km: km_declare,
+      type: typeIntervention, titre, description: description_travaux || '', km: km_declare,
       montant_ht: montant_ht || 0, montant_ttc: montant_ttc || 0, date: date_document
     });
     const { error: ue2 } = await supabase.from('interventions')
       .update({ niveau_preuve: 'facture', facture_id: id, photo_url: staging.photo_url })
       .eq('id', inter.intervention.id);
     if (ue2) throw new Error(ue2.message);
+
+    // Neutralise l'ancienne intervention supplantée : type='archive' (0 point
+    // dans recalc_score_moto(), jamais 'rouge' qui vaut -5) — "la version
+    // garage fait foi" appliquée au score, pas seulement à la traçabilité.
+    if (divergente && divergente.intervention_id) {
+      const { error: ue3 } = await supabase.from('interventions')
+        .update({ type: 'archive' }).eq('id', divergente.intervention_id);
+      if (ue3) throw new Error(ue3.message);
+    }
 
     const { data: majStaging, error: ue } = await supabase.from('factures_scannees').update({
       plaque_declaree, date_document, km_declare,

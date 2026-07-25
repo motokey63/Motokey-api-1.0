@@ -198,19 +198,51 @@ async function run() {
     restoreFrom();
   }
 
+  // ── valider : import GARAGE sans divergence → intervention type=bleu ────
+  console.log('\n── valider (import garage, sans divergence) → bleu ──────────────');
+  try {
+    const trace = mockFrom({
+      factures_scannees: [
+        { data: { id: 'fs-14', moto_id: 'moto-1', acteur_type: 'garage', validated_at: null }, error: null }, // select staging
+        { data: [], error: null }, // select divergentes (aucune)
+        { data: { id: 'fs-14', moto_id: 'moto-1', validated_at: '2026-07-24T00:00:00.000Z', intervention_id: 'int-14' }, error: null }, // update final
+      ],
+      interventions: [
+        { data: [], error: null }, // select existantes pour cohérence
+        { data: { id: 'int-14' }, error: null }, // insert() de Interventions.create
+        { data: { id: 'int-14' }, error: null }, // update niveau_preuve/facture_id/photo_url
+      ],
+      motos: [
+        { data: { score: 60, couleur_dossier: 'bleu' }, error: null },
+      ],
+    });
+    const result = await HistoriqueImport.valider('fs-14', 'garage-1', { email: 'mecano@example.com' }, {
+      plaque_declaree: 'AB-123-CD', date_document: '2018-03-01', km_declare: 6800,
+      siret_declare: null, nom_garage_declare: 'Garage du Centre', description_travaux: 'Vidange'
+    });
+    check('retourne intervention', !!result.intervention, JSON.stringify(result));
+    const interInsert = trace.find(c => c.table === 'interventions' && c.method === 'insert');
+    check('intervention créée avec type=bleu (acteur_type=garage)', interInsert && interInsert.args[0].type === 'bleu', JSON.stringify(interInsert));
+  } catch (e) {
+    check('valider (import garage) sans exception', false, e.message);
+  } finally {
+    restoreFrom();
+  }
+
   // ── valider : divergence garage corrige un import client existant ───────
   console.log('\n── valider (divergence, garage corrige client) ──────────────────');
   try {
     const trace = mockFrom({
       factures_scannees: [
         { data: { id: 'fs-13', moto_id: 'moto-1', acteur_type: 'garage', validated_at: null }, error: null }, // select staging
-        { data: [{ id: 'fs-12', acteur_type: 'client' }], error: null }, // select divergentes → trouve fs-12
+        { data: [{ id: 'fs-12', acteur_type: 'client', intervention_id: 'int-12' }], error: null }, // select divergentes → trouve fs-12
         { data: { id: 'fs-13', divergence_de: 'fs-12', intervention_id: 'int-13' }, error: null }, // update final
       ],
       interventions: [
         { data: [], error: null },
-        { data: { id: 'int-13' }, error: null },
-        { data: { id: 'int-13' }, error: null },
+        { data: { id: 'int-13' }, error: null }, // insert() de Interventions.create
+        { data: { id: 'int-13' }, error: null }, // update niveau_preuve/facture_id/photo_url
+        { data: { id: 'int-12', type: 'archive' }, error: null }, // update neutralisation de l'ancienne intervention
       ],
       motos: [
         { data: { score: 50, couleur_dossier: 'bleu' }, error: null }, // table SÉPARÉE, compteur indépendant de 'interventions'
@@ -225,6 +257,11 @@ async function run() {
       stagingUpdate && stagingUpdate.args[0].divergence_de === 'fs-12', JSON.stringify(stagingUpdate && stagingUpdate.args[0]));
     check("l'ancienne ligne client (fs-12) n'est PAS supprimée ni écrasée — pas de delete émis",
       !trace.some(t => t.table === 'factures_scannees' && t.method === 'delete'));
+    const interInsert = trace.find(c => c.table === 'interventions' && c.method === 'insert');
+    check('nouvelle intervention créée avec type=bleu (acteur_type=garage)', interInsert && interInsert.args[0].type === 'bleu', JSON.stringify(interInsert));
+    const archiveUpdate = trace.filter(c => c.table === 'interventions' && c.method === 'update').find(c => c.args[0] && c.args[0].type === 'archive');
+    check("ancienne intervention (int-12) neutralisée en type='archive'",
+      archiveUpdate && result, JSON.stringify(archiveUpdate));
   } catch (e) {
     check('valider (divergence) sans exception', false, e.message);
   } finally {
