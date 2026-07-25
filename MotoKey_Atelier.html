@@ -565,6 +565,7 @@ function renderBriefing(motoId, { moto, consommables, planEntretien, fraudeFlags
   _historiqueMotoId = motoId;
   _historiqueListCache = historique || [];
   _historiqueActiveOrId = activeOrId || null;
+  _historiqueUploadQueueAtelier = [];
   const client = moto.client || {};
   const couleurMeta = COULEUR_META[moto.couleur_dossier] || COULEUR_META.rouge;
 
@@ -646,7 +647,7 @@ function renderBriefing(motoId, { moto, consommables, planEntretien, fraudeFlags
     <div class="briefing-section">
       <div class="briefing-section-title">Historique importé</div>
       <button class="btn-add-ligne" onclick="ouvrirImportHistoriqueAtelier('${escapeHtml(moto.id)}')">📄 Importer un historique</button>
-      <input type="file" id="input-historique-photos-atelier" accept="image/jpeg,image/png,image/webp" multiple style="display:none">
+      <input type="file" id="input-historique-photos-atelier" accept="image/jpeg,image/png,image/webp" multiple style="display:none" onchange="handleHistoriquePhotosSelectedAtelier(this.files); this.value='';">
       <div id="historique-upload-queue-atelier"></div>
       <div id="historique-section-content-atelier">${renderHistoriqueSectionAtelier(_historiqueListCache)}</div>
     </div>
@@ -699,6 +700,67 @@ function renderHistoriqueCardAtelier(doc) {
       '<span class="int-badge int-badge-jaune">⏳ À valider</span>' +
     '</div>' +
   '</div>';
+}
+
+let _historiqueUploadQueueAtelier = []; // [{file, status:'pending'|'uploading'|'done'|'error', error?}]
+
+async function uploadHistoriquePhotoAtelier(motoId, file, token) {
+  const fd = new FormData();
+  fd.append('photo', file);
+  const res = await fetch(API_BASE + '/motos/' + motoId + '/historique', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token }, // pas de Content-Type — laisser fetch poser le boundary multipart
+    body: fd
+  });
+  let data; try { data = await res.json(); } catch { data = {}; }
+  return { ok: res.ok, status: res.status, data };
+}
+
+function renderHistoriqueUploadQueueAtelier() {
+  const box = document.getElementById('historique-upload-queue-atelier');
+  if (!box) return;
+  if (!_historiqueUploadQueueAtelier.length) { box.innerHTML = ''; return; }
+  const icons = { pending: '⏳', uploading: '⬆️', done: '✅', error: '❌' };
+  box.innerHTML = '<div class="int-row">' +
+    _historiqueUploadQueueAtelier.map(function(item) {
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px">' +
+        '<span>' + icons[item.status] + ' ' + escapeHtml(item.file.name) + '</span>' +
+        (item.status === 'error' ? '<span style="color:var(--rd);font-size:12px">' + escapeHtml(item.error || 'Échec') + '</span>' : '') +
+      '</div>';
+    }).join('') +
+  '</div>';
+}
+
+async function handleHistoriquePhotosSelectedAtelier(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  const token = getToken();
+  _historiqueUploadQueueAtelier = files.map(function(file) { return { file: file, status: 'pending' }; });
+  renderHistoriqueUploadQueueAtelier();
+
+  for (let i = 0; i < _historiqueUploadQueueAtelier.length; i++) {
+    _historiqueUploadQueueAtelier[i].status = 'uploading';
+    renderHistoriqueUploadQueueAtelier();
+    const r = await uploadHistoriquePhotoAtelier(_historiqueMotoId, _historiqueUploadQueueAtelier[i].file, token);
+    if (r.ok) {
+      _historiqueUploadQueueAtelier[i].status = 'done';
+    } else {
+      _historiqueUploadQueueAtelier[i].status = 'error';
+      _historiqueUploadQueueAtelier[i].error = errMsg(r.data);
+    }
+    renderHistoriqueUploadQueueAtelier();
+  }
+
+  const doneCount  = _historiqueUploadQueueAtelier.filter(function(item) { return item.status === 'done'; }).length;
+  const errorCount = _historiqueUploadQueueAtelier.filter(function(item) { return item.status === 'error'; }).length;
+  if (doneCount && !errorCount) {
+    toast('Import terminé — vérifiez la liste ci-dessous.', 'success');
+  } else if (doneCount && errorCount) {
+    toast('Import partiel — certains fichiers ont échoué, vérifiez la liste ci-dessous.', 'error');
+  } else {
+    toast('Échec de l\'import — vérifiez la liste ci-dessous.', 'error');
+  }
+  reloadHistoriqueAtelier();
 }
 
 function _settledOrFallback(settled, fallbackMsg) {
