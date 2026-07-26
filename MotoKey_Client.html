@@ -129,6 +129,38 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
   --pp-halo:radial-gradient(90% 60% at 50% -10%,rgba(255,107,0,.07),transparent 55%);
 }
 
+/* ── Consommation des tokens registre ── */
+.moto-card[data-registre]{
+  position:relative;
+  background:var(--pp-panel);
+  border-color:var(--pp-edge);
+  border-top:4px solid var(--pp-accent);
+}
+.moto-card[data-registre]::before{
+  content:"";position:absolute;inset:0;background:var(--pp-halo);pointer-events:none;z-index:0;
+}
+.moto-card[data-registre] .moto-header,
+.moto-card[data-registre] .moto-section{
+  border-color:var(--pp-edge);
+  position:relative; /* garantit l'empilement au-dessus du ::before */
+}
+.moto-card[data-registre] .moto-marque{
+  font-family:var(--pp-display);
+  font-weight:var(--pp-dweight);
+  font-size:var(--pp-dsize);
+  letter-spacing:var(--pp-dspace);
+  text-transform:var(--pp-dcase, none);
+  color:var(--pp-ink);
+}
+.moto-card[data-registre] .moto-sub,
+.moto-card[data-registre] .garage-detail,
+.moto-card[data-registre] .plan-km{
+  color:var(--pp-faint);
+}
+.moto-card[data-registre] .moto-section-title{
+  color:var(--pp-accent);
+}
+
 /* ── Moto card ── */
 .moto-card{background:var(--card);border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);margin-bottom:24px;overflow:hidden;}
 .moto-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;}
