@@ -249,6 +249,18 @@ const Garages = {
 // ══════════════════════════════════════════════════════════
 // MOTOS
 // ══════════════════════════════════════════════════════════
+
+// Registre (Phase 35) : style visuel du passeport client, purement cosmétique,
+// strictement séparé de profil_transmission. Fonction PURE (aucun accès DB) —
+// mêmes mappings que le backfill de la migration 35. passione/heritage/boulevard
+// ne sont jamais dérivés ici : uniquement choix manuel du garage.
+const REGISTRES_VALIDES = ['apex', 'passione', 'odyssee', 'heritage', 'boulevard', 'urban'];
+function deriveRegistreParDefaut(profilTransmission) {
+  if (profilTransmission === 'courroie') return 'urban';
+  if (profilTransmission === 'cardan')   return 'odyssee';
+  return 'apex';
+}
+
 const Motos = {
 
   async list(garage_id, filters = {}) {
@@ -371,6 +383,21 @@ const Motos = {
     const { detecterProfilTransmission } = require('./services/profilTransmission');
     const detection = await detecterProfilTransmission(payload.marque, payload.modele);
 
+    // Registre — cosmétique, séparé de profil_transmission. Override manuel si le
+    // garage fournit une valeur valide de l'enum, sinon défaut déduit du profil détecté
+    // ci-dessus. Une valeur fournie mais hors enum n'est jamais bloquante pour la
+    // création moto : on log et on retombe sur le défaut auto.
+    let registre = deriveRegistreParDefaut(detection.profil);
+    let registreSource = 'auto';
+    if (payload.registre !== undefined && payload.registre !== null) {
+      if (REGISTRES_VALIDES.includes(payload.registre)) {
+        registre = payload.registre;
+        registreSource = 'manuel';
+      } else {
+        console.warn('[Motos.create] registre invalide fourni, fallback auto:', payload.registre);
+      }
+    }
+
     // Construire le payload moto selon le type de propriétaire
     const motoPayload = {
       garage_id,
@@ -382,7 +409,9 @@ const Motos = {
       km:      payload.km || 0,
       proprietaire_type,
       profil_transmission:        detection.profil,
-      profil_transmission_source: detection.source
+      profil_transmission_source: detection.source,
+      registre,
+      registre_source: registreSource
     };
 
     if (proprietaire_type === 'client') {

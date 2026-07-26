@@ -1097,7 +1097,7 @@ const server = http.createServer(async function(req, res){
     if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée — MECANO minimum requis', 403, 'FORBIDDEN_ROLE');
     // TODO RBAC L8
 
-    const {marque,modele,annee,plaque,vin,km,client_email,client_nom,client_tel,proprio_libre,mode_acquisition} = b;
+    const {marque,modele,annee,plaque,vin,km,client_email,client_nom,client_tel,proprio_libre,mode_acquisition,registre} = b;
     const proprietaire_type = b.proprietaire_type || 'client';
     if(!marque||!modele||!plaque||!vin) return fail(res,'marque, modele, plaque et vin requis');
 
@@ -1109,7 +1109,7 @@ const server = http.createServer(async function(req, res){
 
     if (USE_SUPABASE && SBLayer) {
       try {
-        const moto = await SBLayer.Motos.create(garageId, { marque, modele, annee, plaque, vin, km, client_email, client_nom, client_tel, proprietaire_type, proprio_libre, mode_acquisition });
+        const moto = await SBLayer.Motos.create(garageId, { marque, modele, annee, plaque, vin, km, client_email, client_nom, client_tel, proprietaire_type, proprio_libre, mode_acquisition, registre });
         return ok(res, { moto }, 'Dossier moto créé', 201);
       } catch(e) { return fail(res, e.message, 500, 'DB_ERROR'); }
     }
