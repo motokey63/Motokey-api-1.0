@@ -267,6 +267,9 @@ CREATE TABLE motos (
   carte_grise_photo_url    TEXT NULL,
   profil_transmission          TEXT DEFAULT 'chaine' CHECK (profil_transmission IN ('chaine','courroie','cardan')),
   profil_transmission_source   TEXT DEFAULT 'auto' CHECK (profil_transmission_source IN ('auto','manuel')),
+  -- Registre (Phase 35) : style visuel du passeport client, purement cosmétique, strictement séparé de profil_transmission — défaut déduit à la création (chaîne→apex, courroie→urban, cardan→odyssee), modifiable ensuite par le garage.
+  registre                     TEXT NOT NULL DEFAULT 'apex' CHECK (registre IN ('apex','passione','odyssee','heritage','boulevard','urban')),
+  registre_source               TEXT NOT NULL DEFAULT 'auto' CHECK (registre_source IN ('auto','manuel')),
   created_at       TIMESTAMPTZ DEFAULT NOW(),
   updated_at       TIMESTAMPTZ DEFAULT NOW(),
   CONSTRAINT moto_proprietaire_coherence CHECK (
