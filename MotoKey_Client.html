@@ -135,6 +135,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
   background:var(--pp-panel);
   border-color:var(--pp-edge);
   border-top:4px solid var(--pp-accent);
+  color:var(--pp-ink);
 }
 .moto-card[data-registre]::before{
   content:"";position:absolute;inset:0;background:var(--pp-halo);pointer-events:none;z-index:0;
@@ -160,6 +161,9 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
 .moto-card[data-registre] .moto-section-title{
   color:var(--pp-accent);
 }
+.moto-card[data-registre] .garage-name{
+  color:var(--pp-ink);
+}
 
 /* ── Moto card ── */
 .moto-card{background:var(--card);border-radius:12px;border:1px solid var(--border);box-shadow:var(--sh);margin-bottom:24px;overflow:hidden;}
@@ -167,7 +171,7 @@ body{font-family:'Inter',sans-serif;background:#f0f2f5;color:#1a1d23;min-height:
 .moto-identity{flex:1;min-width:0;}
 .moto-marque{font-size:20px;font-weight:800;color:var(--tx);}
 .moto-sub{font-size:14px;color:var(--tx2);margin-top:2px;}
-.moto-plaque{display:inline-block;background:#fff;border:2px solid #1a1d23;border-radius:6px;padding:3px 10px;font-size:14px;font-weight:800;letter-spacing:2px;margin-top:6px;}
+.moto-plaque{display:inline-block;background:#fff;color:#1a1d23;border:2px solid #1a1d23;border-radius:6px;padding:3px 10px;font-size:14px;font-weight:800;letter-spacing:2px;margin-top:6px;}
 .score-badge{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:72px;}
 .score-num{font-size:36px;font-weight:900;line-height:1;}
 .score-num.vert{color:var(--gn);}
