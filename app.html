@@ -324,6 +324,7 @@ const orPiecePicker = { searchDebounce: null };
 let CURRENT_ROLE = 'CONCESSION';
 function isMecano() { return CURRENT_ROLE === 'MECANO'; }
 function isPro()    { return CURRENT_ROLE !== 'MECANO'; }
+function isConcessionOrAdmin() { return CURRENT_ROLE === 'CONCESSION' || CURRENT_ROLE === 'ADMIN'; }
 
 // ── Timer inactivité (MECANO) ──
 let _inactTimer = null;
@@ -983,7 +984,7 @@ function renderFicheTabContent() {
         <div class="row-2">
           <div class="field"><label>Type</label>
             <select id="iType">
-              <option value="vert">🟢 Concession</option>
+              ${isConcessionOrAdmin() ? '<option value="vert">🟢 Concession</option>' : ''}
               <option value="bleu" selected>🔵 Pro validé</option>
               <option value="jaune">🟡 Propriétaire</option>
               <option value="rouge">🔴 Non effectué</option>
@@ -1138,7 +1139,7 @@ async function renderEntretien() {
       <div class="row-2">
         <div class="field"><label>Type</label>
           <select id="iType">
-            <option value="vert">🟢 Concession</option>
+            ${isConcessionOrAdmin() ? '<option value="vert">🟢 Concession</option>' : ''}
             <option value="bleu" selected>🔵 Pro validé</option>
             <option value="jaune">🟡 Propriétaire</option>
             <option value="rouge">🔴 Non effectué</option>
