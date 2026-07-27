@@ -1171,13 +1171,13 @@ async function loadEntretien(id) {
   const c = document.getElementById('entretienContent');
   c.innerHTML = '<div class="loading">Chargement plan entretien…</div>';
   try {
-    const data = await api('/motos/'+id+'/entretien');
-    const plan = data.plan || data.operations || data || [];
+    const data = await api('/motos/'+id+'/plan-entretien');
+    const plan = data.plan_entretien || [];
     if (!plan.length) { c.innerHTML = '<div class="alert alert-info">Aucun plan d\'entretien disponible pour cette moto.</div>'; return; }
     c.innerHTML = plan.map(op => {
-      const pct = op.km_interval > 0 ? Math.min(100, Math.round(((op.km_depuis||0)/op.km_interval)*100)) : 0;
-      const statut = pct>=100?'badge-rouge':pct>=80?'badge-jaune':pct>=40?'badge-bleu':'badge-vert';
-      const label = pct>=100?'En retard':pct>=80?'À planifier':pct>=40?'À prévoir':'À jour';
+      const pct = op.pct_usage || 0;
+      const statut = op.statut==='urgent'?'badge-rouge':op.statut==='warning'?'badge-jaune':op.statut==='due'?'badge-bleu':'badge-vert';
+      const label = op.statut==='urgent'?'En retard':op.statut==='warning'?'À planifier':op.statut==='due'?'À prévoir':'À jour';
       return `<div class="entretien-item">
         <div>
           <div class="entretien-nom">${op.nom||op.titre||'Opération'}</div>

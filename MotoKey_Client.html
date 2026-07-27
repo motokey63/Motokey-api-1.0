@@ -925,7 +925,7 @@ function renderMotoDetailPanel(moto) {
               <div class="plan-statut ${esc(a.statut || 'ok')}">${fmtStatut(a.statut)}</div>
               <div>
                 <div class="plan-label">${esc(a.nom || a.nom_operation || '')}</div>
-                <div class="plan-km">${a.km_prochain ? 'Prévu à ' + Number(a.km_prochain).toLocaleString('fr-FR') + ' km' : ''}</div>
+                <div class="plan-km">${a.prochain_km ? 'Prévu à ' + Number(a.prochain_km).toLocaleString('fr-FR') + ' km' : ''}</div>
               </div>
             </div>`).join('')}
         </div>
@@ -1022,15 +1022,15 @@ async function loadMotos() {
   const enriched = await Promise.all(motos.map(async moto => {
     const [ivRes, alRes, coRes] = await Promise.all([
       apiGet(`/motos/${moto.id}/interventions`, at),
-      apiGet(`/motos/${moto.id}/entretien/alertes`, at),
+      apiGet(`/motos/${moto.id}/plan-entretien`, at),
       apiGet(`/motos/${moto.id}/consommables`, at)
     ]);
     const interventions = ivRes.ok
       ? (Array.isArray(ivRes.data) ? ivRes.data : (_unwrap(ivRes.data, 'interventions') || []))
       : [];
     const alertes = alRes.ok
-      ? (Array.isArray(alRes.data) ? alRes.data : (_unwrap(alRes.data, 'alertes') || []))
-      : null; // null = non accessible (403 RBAC) → section masquée
+      ? (_unwrap(alRes.data, 'plan_entretien') || []).filter(op => op.statut === 'urgent' || op.statut === 'warning')
+      : null; // null = endpoint inaccessible pour cette moto → section masquée
     const consommables = coRes.ok ? (_unwrap(coRes.data, 'consommables') || []) : [];
     const jaugeGenerale = coRes.ok ? _unwrap(coRes.data, 'jauge_generale') : null;
     return { ...moto, interventions, alertes, consommables, jaugeGenerale };
