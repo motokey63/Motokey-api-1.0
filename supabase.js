@@ -430,6 +430,15 @@ const Motos = {
 
     const moto = await insert('motos', motoPayload);
 
+    // Plan d'entretien constructeur (L13/plan_entretien) — best-effort, ne doit jamais
+    // faire échouer la création moto : la moto doit exister même si son plan ne se pose pas.
+    try {
+      const { insererPlanSupabase } = require('./plans_entretien');
+      await insererPlanSupabase(supabase, moto.id, motoPayload.marque, motoPayload.modele, motoPayload.annee, payload.cylindree);
+    } catch (planErr) {
+      console.warn('[Motos.create] pose plan_entretien échouée (non bloquant):', planErr.message);
+    }
+
     // Insérer l'entrée initiale dans l'historique des propriétaires
     const histoPayload = {
       moto_id:                 moto.id,
