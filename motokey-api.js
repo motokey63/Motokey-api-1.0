@@ -781,6 +781,35 @@ const server = http.createServer(async function(req, res){
     return;
   }
 
+  // ── Manifests PWA par cible (installation écran d'accueil iOS) — L16
+  if (method==='GET' && /^\/manifest-(atelier|client|app)\.json$/.test(pathname)) {
+    try {
+      const _fs   = require('fs');
+      const _path = require('path');
+      const json  = _fs.readFileSync(_path.join(__dirname, pathname), 'utf8');
+      res.writeHead(200,{'Content-Type':'application/manifest+json; charset=utf-8','Access-Control-Allow-Origin':'*','Cache-Control':'no-cache, no-store, must-revalidate'});
+      res.end(json);
+    } catch(e) {
+      res.writeHead(404,{'Content-Type':'application/json'});
+      res.end(JSON.stringify({error:'manifest introuvable'}));
+    }
+    return;
+  }
+
+  // ── Icônes PWA (monogramme MK) — buffer brut, pas d'encodage utf8 (L16)
+  if (method==='GET' && /^\/icons\/icon-(180|192|512)\.png$/.test(pathname)) {
+    try {
+      const _fs   = require('fs');
+      const _path = require('path');
+      const buf   = _fs.readFileSync(_path.join(__dirname, pathname));
+      res.writeHead(200,{'Content-Type':'image/png','Access-Control-Allow-Origin':'*','Cache-Control':'public, max-age=604800'});
+      res.end(buf);
+    } catch(e) {
+      res.writeHead(404); res.end();
+    }
+    return;
+  }
+
   // ── Guides photo SVG partagés client + atelier (L14) — source unique, doctrine L11
   if(pathname==='/guides-photo-consommables.js' && method==='GET'){
     let js = '';
