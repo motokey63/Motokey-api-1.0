@@ -34,10 +34,6 @@
  *   PUT    /motos/:id/interventions/:iid    Modifier
  *   DELETE /motos/:id/interventions/:iid    Supprimer
  *
- *  [ENTRETIEN CONSTRUCTEUR]
- *   GET /motos/:id/entretien                Plan complet (Autodata)
- *   GET /motos/:id/entretien/alertes        Opérations dues
- *
  *  [ORDRES DE RÉPARATION — table canonique, remplace l'ancien flux devis (L10)]
  *   GET   /ordres-reparation              Liste des OR du garage
  *   POST  /ordres-reparation              Créer un OR (brouillon)
@@ -928,7 +924,6 @@ const server = http.createServer(async function(req, res){
         auth:['POST /auth/login','POST /auth/register','GET /auth/me'],
         motos:['GET /motos','POST /motos','GET /motos/:id','PUT /motos/:id','DELETE /motos/:id','GET /motos/:id/score'],
         interventions:['GET /motos/:id/interventions','POST /motos/:id/interventions','PUT /motos/:id/interventions/:iid','DELETE /motos/:id/interventions/:iid'],
-        entretien:['GET /motos/:id/entretien','GET /motos/:id/entretien/alertes'],
         ordres_reparation:['GET /ordres-reparation','POST /ordres-reparation','GET /ordres-reparation/:id','PATCH /ordres-reparation/:id/statut'],
         fraude:['POST /fraude/analyser','GET /fraude/historique'],
         transfert:['POST /transfert/initier','POST /transfert/confirmer-vendeur','POST /transfert/consulter','POST /transfert/finaliser','GET /transfert/:code'],
@@ -1530,37 +1525,6 @@ const server = http.createServer(async function(req, res){
     if(i<0) return fail(res,'Intervention non trouvée',404,'NOT_FOUND');
     DB.interventions.splice(i,1);
     return ok(res,{deleted_id:p.iid},'Intervention supprimée');
-  }
-
-  /* ENTRETIEN */
-  if((p=M('GET','/motos/:id/entretien'))!==null){
-    // RBAC: MECANO minimum — outil garage
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
-    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
-    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
-    const m = DB.motos.find(function(x){return x.id===p.id&&x.garage_id===garageId;});
-    if(!m) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
-    const km   = parseInt(query.km)||m.km;
-    const plan = enrichPlan(DB.plans[p.id]||[], km);
-    return ok(res,{plan,km_actuel:km,source:'Autodata · ETAI',total:plan.length});
-  }
-
-  if((p=M('GET','/motos/:id/entretien/alertes'))!==null){
-    // RBAC: MECANO minimum — outil garage
-    const a = authSilent(req);
-    if (!a && !req.ctx) return fail(res, 'Non authentifié', 401, 'UNAUTHORIZED');
-    const ctx = req.ctx || (SBLayer ? await rbac.inferLegacyRole(a, SBLayer) : {role:'CONCESSION',level:4,user_id:null,email:null,client_type:null});
-    if (!rbac.requireRole(ctx, 'MECANO')) return fail(res, 'Permission refusée', 403, 'FORBIDDEN_ROLE');
-    const garageId = a ? a.id : await rbac.getGarageIdForUser(ctx, SBLayer);
-    if (!garageId) return fail(res, 'Garage introuvable pour ce compte', 404, 'NOT_FOUND');
-    const m = DB.motos.find(function(x){return x.id===p.id&&x.garage_id===garageId;});
-    if(!m) return fail(res,'Moto non trouvée',404,'NOT_FOUND');
-    const plan = enrichPlan(DB.plans[p.id]||[], m.km);
-    const al   = plan.filter(function(op){return op.statut==='urgent'||op.statut==='warning';});
-    return ok(res,{alertes:al,nb_alertes:al.length,nb_urgentes:al.filter(function(x){return x.statut==='urgent';}).length});
   }
 
   // POST /motos/:id/vendre (PRO+) — vente d'une moto en stock vers un client — TODO RBAC L8
