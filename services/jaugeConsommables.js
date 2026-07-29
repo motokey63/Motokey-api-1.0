@@ -57,6 +57,8 @@ function pickChainAnalysis(photos) {
  * la photo la plus récente ayant une analyse exploitable (analyse_ia.pct_usure).
  * Un consommable sans row DB, ou avec row mais sans photo analysée, a
  * has_data:false — jamais de pct_usure/etat fabriqué (Pitfall 1).
+ * engine ('stub'|'anthropic'|null) est repris tel quel de analyse_ia.engine,
+ * pour que le front distingue une analyse simulée d'une analyse réelle.
  * @param {string} moto_id
  * @returns {Promise<{items: object[], jaugeGenerale: ?object}>}
  */
@@ -67,19 +69,20 @@ async function buildConsommablesJauges(moto_id) {
   const items = [];
   for (const type of SB.TYPES_CONSOMMABLES) {
     const conso = byType[type] || null;
-    let pct_usure = null, etat = null, has_data = false;
+    let pct_usure = null, etat = null, has_data = false, engine = null;
     if (conso) {
       const photos = await SB.PhotosConsommables.listByConsommable(conso.id); // desc created_at
       if (type === 'chaine') {
         // Migration 30 : pire des 2 zones (brin/couronne), jamais "la dernière gagne".
         const worst = pickChainAnalysis(photos);
-        if (worst) { pct_usure = worst.pct_usure; etat = worst.etat; has_data = true; }
+        if (worst) { pct_usure = worst.pct_usure; etat = worst.etat; has_data = true; engine = worst.engine ?? null; }
       } else {
         const latest = photos[0];
         if (latest && latest.analyse_ia && typeof latest.analyse_ia.pct_usure === 'number') {
           pct_usure = latest.analyse_ia.pct_usure;
           etat = latest.analyse_ia.etat;
           has_data = true;
+          engine = latest.analyse_ia.engine ?? null;
         }
       }
     }
@@ -88,7 +91,7 @@ async function buildConsommablesJauges(moto_id) {
       km_montage: conso ? (conso.km_montage ?? null) : null,
       date_montage: conso ? (conso.date_montage ?? null) : null,
       reference: conso ? (conso.reference ?? null) : null,
-      pct_usure, etat, has_data
+      pct_usure, etat, has_data, engine
     });
   }
   return { items, jaugeGenerale: computeJaugeGenerale(items) };
