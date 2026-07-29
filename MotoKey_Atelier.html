@@ -588,7 +588,7 @@ function renderBriefing(motoId, { moto, consommables, planEntretien, fraudeFlags
       detail: o.km_restant > 0 ? ('dans ' + o.km_restant + ' km') : 'échéance dépassée',
       pct: o.pct_usage + '%'
     })))
-    .concat((consommables || []).filter(c => c.has_data && (c.etat === 'usé' || c.etat === 'critique')).map(c => ({
+    .concat((consommables || []).filter(c => c.has_data && c.engine === 'anthropic' && (c.etat === 'usé' || c.etat === 'critique')).map(c => ({
       cls: c.etat === 'critique' ? 'urgent' : 'warning',
       label: CONSO_LABELS[c.type_consommable] || c.type_consommable,
       detail: c.etat,
