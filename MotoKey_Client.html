@@ -814,6 +814,10 @@ function jaugeRowClient(motoId, item, profilTransmission) {
   if (!item.has_data) {
     return `<div class="conso-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="flex:1;font-size:13px">${label}</span><span class="score-num jaune" style="opacity:.55;font-size:12px;padding:2px 8px">Non renseigné</span>${actionHtml}</div>`;
   }
+  if (item.engine !== 'anthropic') {
+    // Analyse stub (ou engine absent sur d'anciennes lignes) : jamais présentée comme un diagnostic.
+    return `<div class="conso-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)"><span style="flex:1;font-size:13px">${label}</span><span style="font-size:12px;color:var(--tx3);font-style:italic">Analyse non disponible</span>${actionHtml}</div>`;
+  }
   const color = ETAT_COLOR_CLIENT[item.etat] || 'bleu';
   const wording = ETAT_WORDING_CLIENT[item.etat] || item.etat;
   return `<div class="conso-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">

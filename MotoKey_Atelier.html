@@ -1343,7 +1343,10 @@ function renderConsommablesChecklist(consommables, profilTransmission, motoId) {
           : `<button class="btn-conso-photo" onclick="triggerConsoPhotoAtelier('${escapeHtml(motoId)}','${escapeHtml(item.type_consommable)}','${escapeHtml(profilTransmission||'')}')">📸 ${item.has_data ? 'Nouvelle photo' : 'Photo à faire'}</button>`;
     const stateHtml = !item.has_data
       ? '<span class="conso-state jaune" style="opacity:.6">Non renseigné</span>'
-      : `<span class="conso-state ${ETAT_COLOR_ATELIER[item.etat] || 'bleu'}">${escapeHtml(ETAT_WORDING_ATELIER[item.etat] || item.etat)}</span>`;
+      : item.engine !== 'anthropic'
+        // Analyse stub (ou engine absent sur d'anciennes lignes) : jamais présentée comme un diagnostic.
+        ? '<span class="conso-hint">Analyse non disponible</span>'
+        : `<span class="conso-state ${ETAT_COLOR_ATELIER[item.etat] || 'bleu'}">${escapeHtml(ETAT_WORDING_ATELIER[item.etat] || item.etat)}</span>`;
     return `<div class="conso-row"><span class="conso-label">${escapeHtml(label)}</span>${hint}${stateHtml}</div>`;
   }).join('');
 }
