@@ -132,6 +132,19 @@ function caseJaugeGeneraleLogic() {
     !!pireEtat && pireEtat.etat === 'critique',
     pireEtat ? `etat=${pireEtat.etat}` : 'null'
   );
+
+  // LOT 1 (revue avant push) : computeJaugeGenerale retourne l'item lui-même
+  // (reduce sans reconstruction) — engine doit donc être propagé tel quel.
+  const avecEngine = computeJaugeGenerale([
+    { type_consommable: 'chaine', has_data: true, pct_usure: 20, etat: 'bon', engine: 'stub' },
+    { type_consommable: 'pneu_av', has_data: true, pct_usure: 70, etat: 'usé', engine: 'anthropic' },
+  ]);
+  assert(
+    caseName,
+    "computeJaugeGenerale propage engine de l'item retenu (retourne l'item lui-même, pas une reconstruction)",
+    !!avecEngine && avecEngine.engine === 'anthropic',
+    JSON.stringify(avecEngine)
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -197,6 +210,49 @@ function caseChaineZoneLogic() {
     'égalité de pct_usure entre les deux zones → une des deux analyses retournée (pas de crash)',
     !!doubleZoneMemePct && doubleZoneMemePct.pct_usure === 60,
     JSON.stringify(doubleZoneMemePct)
+  );
+
+  // LOT 1 (revue avant push) : engine fail-closed — 4 cas, aucune DB.
+  const deuxZonesAnthropic = pickChainAnalysis([
+    { zone: 'couronne', analyse_ia: { pct_usure: 30, etat: 'moyen', engine: 'anthropic' } },
+    { zone: 'brin', analyse_ia: { pct_usure: 50, etat: 'moyen', engine: 'anthropic' } },
+  ]);
+  assert(
+    caseName,
+    "engine fail-closed : 2 zones anthropic → engine='anthropic'",
+    !!deuxZonesAnthropic && deuxZonesAnthropic.engine === 'anthropic',
+    JSON.stringify(deuxZonesAnthropic)
+  );
+
+  const brinAnthropicCouronneStub = pickChainAnalysis([
+    { zone: 'brin', analyse_ia: { pct_usure: 80, etat: 'usé', engine: 'anthropic' } },
+    { zone: 'couronne', analyse_ia: { pct_usure: 20, etat: 'bon', engine: 'stub' } },
+  ]);
+  assert(
+    caseName,
+    "engine fail-closed : brin anthropic gagnant le pire-des-deux + couronne stub → non fiable (PAS 'anthropic')",
+    !!brinAnthropicCouronneStub && brinAnthropicCouronneStub.pct_usure === 80 && brinAnthropicCouronneStub.engine !== 'anthropic',
+    JSON.stringify(brinAnthropicCouronneStub)
+  );
+
+  const uneSeuleZoneAnthropic = pickChainAnalysis([
+    { zone: 'brin', analyse_ia: { pct_usure: 45, etat: 'moyen', engine: 'anthropic' } },
+  ]);
+  assert(
+    caseName,
+    "engine fail-closed : une seule zone photographiée, anthropic → engine='anthropic' (D-04, jamais bloquant)",
+    !!uneSeuleZoneAnthropic && uneSeuleZoneAnthropic.engine === 'anthropic',
+    JSON.stringify(uneSeuleZoneAnthropic)
+  );
+
+  const engineAbsent = pickChainAnalysis([
+    { zone: 'brin', analyse_ia: { pct_usure: 45, etat: 'moyen' } }, // engine absent — ancienne ligne pré-6c68bad
+  ]);
+  assert(
+    caseName,
+    "engine fail-closed : engine absent/null sur une ligne ancienne → non fiable (PAS 'anthropic')",
+    !!engineAbsent && engineAbsent.engine !== 'anthropic',
+    JSON.stringify(engineAbsent)
   );
 }
 
