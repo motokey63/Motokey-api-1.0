@@ -35,9 +35,15 @@ function computeJaugeGenerale(items) {
  * bloquant en attendant la 2e photo (D-04, cohérent avec le reste du système : montrer ce
  * qui est disponible plutôt que rien).
  *
- * @param {Array<{zone?: ?('brin'|'couronne'), analyse_ia?: ?{pct_usure:number, etat:string}}>} photos
+ * engine fail-closed : reflète TOUTES les zones contributives (celles réellement
+ * photographiées, même base que candidates ci-dessous), pas seulement la zone gagnante
+ * du pire-des-deux. 'anthropic' seulement si chaque zone contributive l'est ; dès qu'une
+ * seule est 'stub' ou absente/null, la valeur exposée reste non fiable (jamais la plus
+ * optimiste).
+ *
+ * @param {Array<{zone?: ?('brin'|'couronne'), analyse_ia?: ?{pct_usure:number, etat:string, engine?:?string}}>} photos
  *        Triées desc created_at (comme retourné par PhotosConsommables.listByConsommable).
- * @returns {?{pct_usure:number, etat:string}} null si aucune photo exploitable
+ * @returns {?{pct_usure:number, etat:string, engine:?string}} null si aucune photo exploitable
  */
 function pickChainAnalysis(photos) {
   const latestByZone = {};
@@ -48,7 +54,11 @@ function pickChainAnalysis(photos) {
   }
   const candidates = Object.values(latestByZone);
   if (!candidates.length) return null;
-  return candidates.reduce((worst, a) => (a.pct_usure > worst.pct_usure ? a : worst));
+  const worst = candidates.reduce((w, a) => (a.pct_usure > w.pct_usure ? a : w));
+  const engine = candidates.every(c => c.engine === 'anthropic')
+    ? 'anthropic'
+    : (candidates.find(c => c.engine !== 'anthropic').engine ?? null);
+  return { ...worst, engine };
 }
 
 /**
