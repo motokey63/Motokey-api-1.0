@@ -1145,12 +1145,14 @@ document.getElementById('btn-register').addEventListener('click', async () => {
 
   if (!ok) { toast(errMsg(data), 'error'); return; }
 
-  pendingEmail = email;
-  verifyMode   = 'register';
-  document.getElementById('verify-subtitle').textContent = 'Un code à 8 chiffres a été envoyé à ' + email + '.';
-  document.getElementById('verify-code').value = '';
-  showScreen('verify');
-  toast('Code envoyé ! Vérifiez votre boîte email.', 'success');
+  // POST /auth/client/register ne renvoie ni token ni session exploitable
+  // (réponse anti-énumération : { message } uniquement — motokey-api.js:2655-2657)
+  // → login direct plutôt que #screen-verify (cul-de-sac OTP, Supabase
+  // email confirmation désactivée — CLAUDE.md:161). #screen-verify reste
+  // en place, orphelin, pour la vraie livraison OTP à venir.
+  document.getElementById('login-email').value = email;
+  toast('Compte créé — connectez-vous.', 'success');
+  showScreen('login');
 });
 
 document.getElementById('link-login-from-register').addEventListener('click', () => showScreen('login'));
