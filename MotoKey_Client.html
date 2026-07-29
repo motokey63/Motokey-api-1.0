@@ -830,9 +830,12 @@ function jaugeRowClient(motoId, item, profilTransmission) {
 function jaugesSectionClient(moto) {
   const items = Array.isArray(moto.consommables) ? moto.consommables : [];
   const jg = moto.jaugeGenerale || null;
-  const general = jg
-    ? `<div style="margin-bottom:10px"><span class="score-num ${ETAT_COLOR_CLIENT[jg.etat]||'bleu'}" style="font-size:13px;padding:4px 10px">État général : ${ETAT_WORDING_CLIENT[jg.etat]||jg.etat}</span></div>`
-    : `<div style="margin-bottom:10px;font-size:13px;color:var(--tx3)">Pas encore suivi — ajoutez une photo pour lancer le suivi d'usure.</div>`;
+  const general = !jg
+    ? `<div style="margin-bottom:10px;font-size:13px;color:var(--tx3)">Pas encore suivi — ajoutez une photo pour lancer le suivi d'usure.</div>`
+    : jg.engine !== 'anthropic'
+      // Analyse stub (ou engine absent sur d'anciennes lignes) : jamais présentée comme un diagnostic.
+      ? `<div style="margin-bottom:10px"><span style="font-size:12px;color:var(--tx3);font-style:italic">Analyse non disponible</span></div>`
+      : `<div style="margin-bottom:10px"><span class="score-num ${ETAT_COLOR_CLIENT[jg.etat]||'bleu'}" style="font-size:13px;padding:4px 10px">État général : ${ETAT_WORDING_CLIENT[jg.etat]||jg.etat}</span></div>`;
   return `<div class="moto-section">
     <div class="moto-section-title">Usure des Consommables</div>
     ${general}
