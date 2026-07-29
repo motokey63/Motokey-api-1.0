@@ -1067,6 +1067,10 @@ function jaugeBarConso(item) {
   if (!item.has_data) {
     return `<div class="pneu-stat"><span class="pneu-label">${label}</span><span class="score-badge score-jaune" style="opacity:.55">Non renseigné</span></div>`;
   }
+  if (item.engine !== 'anthropic') {
+    // Analyse stub (ou engine absent sur d'anciennes lignes) : jamais présentée comme un diagnostic.
+    return `<div class="pneu-stat"><span class="pneu-label">${label}</span><span style="font-size:12px;color:var(--text2);font-style:italic">Analyse non disponible</span></div>`;
+  }
   const cls = ETAT_CLASS[item.etat] || 'score-bleu';
   return `<div class="pneu-stat">
     <span class="pneu-label" style="min-width:130px">${label}</span>
@@ -1080,9 +1084,12 @@ function jaugeBarConso(item) {
 function renderConsommables(data) {
   const items = (data && data.consommables) || [];
   const jg = data ? data.jauge_generale : null;
-  const generalHtml = jg
-    ? `<div class="card" style="margin-bottom:16px"><div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">État général (maillon le plus faible)</div><span class="score-badge ${ETAT_CLASS[jg.etat]||'score-bleu'}">${labelConso(jg.type_consommable)} · ${jg.pct_usure}% · ${jg.etat}</span></div>`
-    : `<div class="card" style="margin-bottom:16px"><span class="score-badge score-jaune" style="opacity:.7">Pas encore suivi</span><div style="font-size:12px;color:var(--text2);margin-top:8px">Aucune photo/analyse de consommable pour cette moto. Le client peut ajouter une photo depuis son espace.</div></div>`;
+  const generalHtml = !jg
+    ? `<div class="card" style="margin-bottom:16px"><span class="score-badge score-jaune" style="opacity:.7">Pas encore suivi</span><div style="font-size:12px;color:var(--text2);margin-top:8px">Aucune photo/analyse de consommable pour cette moto. Le client peut ajouter une photo depuis son espace.</div></div>`
+    : jg.engine !== 'anthropic'
+      // Analyse stub (ou engine absent sur d'anciennes lignes) : jamais présentée comme un diagnostic.
+      ? `<div class="card" style="margin-bottom:16px"><div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">État général (maillon le plus faible)</div><span style="font-size:12px;color:var(--text2);font-style:italic">Analyse non disponible</span></div>`
+      : `<div class="card" style="margin-bottom:16px"><div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">État général (maillon le plus faible)</div><span class="score-badge ${ETAT_CLASS[jg.etat]||'score-bleu'}">${labelConso(jg.type_consommable)} · ${jg.pct_usure}% · ${jg.etat}</span></div>`;
   return `${generalHtml}<div class="card"><div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">Détail par consommable</div>${items.map(jaugeBarConso).join('')}</div>`;
 }
 
