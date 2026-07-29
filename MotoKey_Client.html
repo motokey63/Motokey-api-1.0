@@ -823,7 +823,7 @@ function jaugeRowClient(motoId, item, profilTransmission) {
   return `<div class="conso-row" style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)">
     <span style="flex:1;font-size:13px">${label}</span>
     <div style="width:80px;height:6px;background:var(--line);border-radius:3px;overflow:hidden"><div class="${color}" style="width:${item.pct_usure}%;height:100%;background:currentColor"></div></div>
-    <span class="score-num ${color}" style="font-size:12px;padding:2px 8px">${wording}</span>${actionHtml}
+    <span class="score-num ${color}" style="font-size:12px;padding:2px 8px">${item.pct_usure}% · ${wording}</span>${actionHtml}
   </div>`;
 }
 
